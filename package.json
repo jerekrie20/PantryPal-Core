@@ -1,0 +1,21 @@
+{
+  "name": "pantrypal_core",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "setup-mkcert": "install-mkcert.bat"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.8",
+    "tailwindcss": "^4.0.0",
+    "vite-plugin-full-reload": "^1.2.0"
+  }
+}
