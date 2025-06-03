@@ -8,6 +8,9 @@ dist/
 ssl/
 *.pem
 
+#Folders
+app/Database/
+
 # Environment variables
 .env
 .env.local
