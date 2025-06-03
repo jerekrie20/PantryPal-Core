@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PantryPal Core Learning Modules</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Visualization & Content Choices:
+      - Module Navigation: Goal: Select Module. Method: Clickable list in sidebar. Interaction: JS updates main content. Justification: Standard, intuitive navigation for sectioned content.
+      - Module Details (Goal, Concepts, Time, Milestone): Goal: Inform. Method: Static text blocks. Justification: Direct presentation of information.
+      - Tasks: Goal: Track Progress. Method: List with HTML checkboxes. Interaction: JS updates task status, module progress, and module status. Justification: Direct manipulation for task management.
+      - Code Blocks: Goal: Inform/Reference. Method: HTML `<pre><code>` tags, styled for readability. Justification: Standard for displaying code.
+      - Module Status & Progress: Goal: Inform. Method: Dynamically updated text (e.g., "Status: In Progress (2/5 tasks)"). Interaction: JS updates based on task completion. Justification: Clear visual feedback.
+      - Libraries: Vanilla JS for all interactions and DOM manipulation. Tailwind CSS for styling. No Chart.js/Plotly.js as data types (text, tasks) are not suited for complex charts.
+  -->
+  <style>
+    body {
+      font-family: 'Inter', sans-serif; /* Matches Tailwind's default sans-serif */
+      background-color: #FDFBF6; /* Cream background */
+      color: #36454F; /* Dark Slate text */
+    }
+    .sidebar-item.active {
+      background-color: #E0F2FE; /* Lighter Sky Blue for active module */
+      color: #0284C7; /* Sky Blue text for active */
+      font-weight: 600;
+    }
+    .sidebar-item:hover {
+      background-color: #F0F9FF; /* Very Light Sky Blue for hover */
+    }
+    .task-checkbox:checked + label {
+      text-decoration: line-through;
+      color: #718096; /* Gray for completed task text */
+    }
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .status-completed {
+      background-color: #D1FAE5; /* Light Green */
+      color: #065F46; /* Dark Green */
+    }
+    .status-inprogress {
+      background-color: #FEF3C7; /* Light Yellow */
+      color: #92400E; /* Dark Yellow/Brown */
+    }
+    .status-notstarted {
+      background-color: #FEE2E2; /* Light Red */
+      color: #991B1B; /* Dark Red */
+    }
+    pre {
+      background-color: #F3F4F6; /* Light gray for code blocks */
+      border: 1px solid #E5E7EB; /* Slightly darker gray border */
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto; /* Allow horizontal scrolling for long code lines */
+      font-size: 0.875em;
+    }
+    code {
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    }
+    .content-section::-webkit-scrollbar {
+      width: 8px;
+    }
+    .content-section::-webkit-scrollbar-thumb {
+      background-color: #A0AEC0; /* Muted scrollbar color */
+      border-radius: 4px;
+    }
+    .content-section::-webkit-scrollbar-track {
+      background-color: #FDFBF6;
+    }
+    .sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .sidebar::-webkit-scrollbar-thumb {
+      background-color: #CBD5E0;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+<aside class="sidebar w-1/4 sm:w-1/5 lg:w-1/6 bg-[#FFF9F0] p-4 space-y-2 overflow-y-auto shadow-lg">
+  <h1 class="text-xl font-bold text-[#36454F] mb-6 border-b-2 border-[#E0F2FE] pb-2">PantryPal Modules</h1>
+
+  <a href="../app/Views/home.php"  class="sidebar-item block px-3 py-2.5 rounded-md text-sm font-medium text-gray-700 hover:bg-[#F0F9FF] flex items-center">
+    Home
+  </a>
+  <nav id="module-nav" class="space-y-1">
+  </nav>
+</aside>
+
+<main class="flex-1 p-6 sm:p-8 overflow-y-auto content-section">
+  <div id="module-content" class="max-w-4xl mx-auto">
+    <div class="text-center py-10">
+      <h2 class="text-3xl font-semibold text-[#36454F]">Welcome to PantryPal Learning</h2>
+      <p class="mt-2 text-lg text-gray-600">Select a module from the sidebar to begin your learning journey.</p>
+      <div class="mt-8">
+        <div class="inline-block p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+          <h3 class="text-xl font-medium text-[#0284C7]">Overall Progress</h3>
+          <p id="overall-progress-text" class="mt-2 text-2xl font-bold text-[#36454F]">0/9 Modules Completed</p>
+          <div class="w-full bg-gray-200 rounded-full h-4 mt-3 overflow-hidden">
+            <div id="overall-progress-bar" class="bg-[#0EA5E9] h-4 rounded-full transition-all duration-500 ease-out" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const modulesData = [
+    {
+      id: "module0",
+      title: "Module 0: Setting the Stage (Foundation)",
+      goal: "Prepare your development environment and project structure.",
+      keyConcepts: [
+        "Local development environment (XAMPP, MAMP, WAMP, Docker)",
+        "Basic file structure",
+        "Git initialization"
+      ],
+      tasks: [
+        { id: "m0t1", text: "Install a Local Web Server: Choose and install XAMPP, MAMP, WAMP, or set up Docker with a PHP environment. Ensure Apache/Nginx and MySQL/MariaDB are running. Verify PHP with `phpinfo.php`.", completed: true },
+        { id: "m0t2", text: "Choose a Code Editor: VS Code, Sublime Text, PhpStorm, or any preferred editor.", completed: true },
+        { id: "m0t3", text: "Create Project Folder: Inside web server's document root, create `pantrypal_core`.", completed: true },
+        { id: "m0t4", text: "Initialize Git: Open terminal in project folder and run `git init`.", completed: true },
+        { id: "m0t5", text: "Basic `index.php`: Create `index.php` with \"Hello PantryPal!\". Access via browser.", completed: true }
+      ],
+      estimatedTime: "1-3 hours",
+      selfCheck: "You can see \"Hello PantryPal!\" in your browser, and your project is a Git repository.",
+      status: "Completed!"
+    },
+    {
+      id: "module1",
+      title: "Module 1: First Look - Displaying Static Item Data",
+      goal: "Understand basic PHP syntax for data structures (arrays) and outputting dynamic content within HTML.",
+      keyConcepts: [
+        "PHP arrays (associative arrays)",
+        "`foreach` loop",
+        "Embedding PHP in HTML",
+        "`include` / `require` (for simple templating)"
+      ],
+      tasks: [
+        { id: "m1t1", text: "Define Sample Data: In `index.php` or `data.php`, create a PHP array of sample pantry items.", completed: false, code: `<?php\n$items = [\n    ['name' => 'Milk', 'category' => 'Dairy', 'expiry_date' => '2025-06-10'],\n    ['name' => 'Eggs', 'category' => 'Dairy', 'expiry_date' => '2025-06-20'],\n    ['name' => 'Bread', 'category' => 'Bakery', 'expiry_date' => '2025-06-05'],\n];\n?>` },
+        { id: "m1t2", text: "Display Items in HTML: Use a `foreach` loop to display items in an HTML table.", completed: false },
+        { id: "m1t3", text: "(Optional) Simple Templating: Create `views/partials/header.php` and `views/partials/footer.php`. Include them in the main display script.", completed: false }
+      ],
+      estimatedTime: "2-4 hours",
+      selfCheck: "Your sample pantry items are displayed in a structured HTML table on a webpage.",
+      status: "Not Started"
+    },
+    {
+      id: "module2",
+      title: "Module 2: Getting Real - Database & Item Creation/Reading (CRUD Part 1)",
+      goal: "Set up a database, connect to it with PHP (PDO), and implement the \"Create\" and \"Read\" parts of item management.",
+      keyConcepts: [
+        "Relational database basics (MySQL/MariaDB)",
+        "SQL (`CREATE TABLE`, `INSERT INTO`, `SELECT`)",
+        "PDO for database connections",
+        "Prepared statements (to prevent SQL injection)",
+        "HTML forms (`<form>`, `method=\"POST\"`)",
+        "`$_POST` superglobal"
+      ],
+      tasks: [
+        { id: "m2t1", text: "Database Design & Setup: Create `pantrypal_db` and `items` table (id, name, category, quantity, unit, purchase_date, expiration_date, created_at).", completed: false },
+        { id: "m2t2", text: "Database Connection (`config/db.php`): Write PHP for PDO connection. Store credentials.", completed: false },
+        { id: "m2t3", text: "Create \"Add Item\" Form: HTML form (`add_item_form.php`) with fields, method `POST` to `process_add_item.php`.", completed: false },
+        { id: "m2t4", text: "Process Form Submission (`process_add_item.php`): Include `config/db.php`. Check `$_SERVER[\"REQUEST_METHOD\"]`. Retrieve `$_POST` data. Validate. Prepare SQL `INSERT`. Execute. Redirect.", completed: false },
+        { id: "m2t5", text: "Display Items from Database (`list_items.php` or `index.php`): Include `config/db.php`. `SELECT * FROM items`. Use PDO. Fetch results. Loop to display in HTML table.", completed: false }
+      ],
+      estimatedTime: "6-10 hours",
+      selfCheck: "You can add new items via a web form, and these items are stored in the database and displayed on the item list page.",
+      status: "Not Started"
+    },
+    {
+      id: "module3",
+      title: "Module 3: Full Control - Item Updating & Deleting (CRUD Part 2)",
+      goal: "Implement the \"Update\" and \"Delete\" functionalities for your pantry items.",
+      keyConcepts: [
+        "SQL (`UPDATE`, `DELETE WHERE`)",
+        "Passing parameters via URL (`$_GET`)",
+        "Fetching a single record for editing",
+        "Pre-populating forms"
+      ],
+      tasks: [
+        { id: "m3t1", text: "Add \"Edit\" & \"Delete\" Links: In item list, add links like `edit_item.php?id=<?= $item['id'] ?>` and `delete_item.php?id=<?= $item['id'] ?>`.", completed: false },
+        { id: "m3t2", text: "Create \"Edit Item\" Functionality (`edit_item_form.php`): Check `$_GET['id']`. Fetch item by ID. Pre-populate form. Hidden `id` field. Action to `process_edit_item.php`.", completed: false },
+        { id: "m3t3", text: "Process Edit Item (`process_edit_item.php`): Retrieve `$_POST` data. Validate. Prepare SQL `UPDATE`. Execute. Redirect.", completed: false },
+        { id: "m3t4", text: "Create \"Delete Item\" Functionality (`delete_item.php`): Check `$_GET['id']`. (Optional) Confirmation. Prepare SQL `DELETE`. Execute. Redirect.", completed: false }
+      ],
+      estimatedTime: "4-8 hours",
+      selfCheck: "You can add, view, edit, and delete pantry items. Your core CRUD functionality is complete.",
+      status: "Not Started"
+    },
+    {
+      id: "module4",
+      title: "Module 4: Getting Organized - Basic Routing & MVC-ish Structure",
+      goal: "Refactor your code for better organization using a simple routing mechanism and a basic Model-View-Controller-like pattern.",
+      keyConcepts: [
+        "`$_SERVER['REQUEST_URI']` or `$_GET['page']` for routing",
+        "`switch` statement or `if/else if` for route handling",
+        "Separating concerns (logic, data access, presentation)"
+      ],
+      tasks: [
+        { id: "m4t1", text: "Choose a Routing Strategy: Simple GET Parameter (e.g., `index.php?action=list_items`) or Path-based (e.g., `/items/list`).", completed: false },
+        { id: "m4t2", text: "Implement a Central Router (`index.php`): Single entry point. Based on action/path, include/call appropriate logic.", completed: false },
+        { id: "m4t3", text: "Refactor into Folders/Files: `config/`, `views/`, `controllers/`, `models/`.", completed: false },
+        { id: "m4t4", text: "Update Request Handling: Router calls Controller functions. Controller calls Model functions. Controller includes View.", completed: false }
+      ],
+      estimatedTime: "6-12 hours",
+      selfCheck: "Your application uses a centralized routing mechanism, and your code is organized into models, views, and controllers. Functionality remains the same.",
+      status: "Not Started"
+    },
+    {
+      id: "module5",
+      title: "Module 5: Smart Pantry - Expiration Tracking & Alerts",
+      goal: "Implement logic to track item expiration and visually alert the user.",
+      keyConcepts: [
+        "PHP `DateTime` object",
+        "Date comparisons (`date_diff`, comparing timestamps)",
+        "Conditional logic in controllers and views"
+      ],
+      tasks: [
+        { id: "m5t1", text: "Logic in Model/Controller: When fetching items, determine status: \"Expired\", \"Expiring Soon\" (e.g., next 3 days), \"Fresh\".", completed: false },
+        { id: "m5t2", text: "Visual Indicators in `views/item_list.php`: Apply CSS classes based on status. Allow sorting by expiration date.", completed: false },
+        { id: "m5t3", text: "Dedicated \"Alerts\" View: New route/controller/view to display \"Expired\" or \"Expiring Soon\" items.", completed: false },
+        { id: "m5t4", text: "(Optional) Dashboard Notification: Summary message for items requiring attention.", completed: false }
+      ],
+      estimatedTime: "4-8 hours",
+      selfCheck: "Items are visually marked based on their expiration status, and there's a way to see all critical items at a glance.",
+      status: "Not Started"
+    },
+    {
+      id: "module6",
+      title: "Module 6: Making it Personal - User Authentication",
+      goal: "Add user registration and login, ensuring users can only see and manage their own items.",
+      keyConcepts: [
+        "`$_SESSION` for managing user login state",
+        "`password_hash()` and `password_verify()` for secure password handling",
+        "Updating database schema (`users` table, `user_id` in `items` table)",
+        "Form validation"
+      ],
+      tasks: [
+        { id: "m6t1", text: "Database Changes: Create `users` table (id, username, email, password_hash, created_at). Add `user_id` FK to `items` table.", completed: false },
+        { id: "m6t2", text: "User Registration: Create form (`views/register_form.php`). `UserController` actions (`showRegisterForm`, `handleRegister`). Validate, hash password, store user.", completed: false },
+        { id: "m6t3", text: "User Login: Create form (`views/login_form.php`). `UserController` actions (`showLoginForm`, `handleLogin`). Fetch user, verify password, store `user_id` in `$_SESSION`. Start session.", completed: false },
+        { id: "m6t4", text: "Logout: `UserController` action (`logout`). Destroy session, redirect.", completed: false },
+        { id: "m6t5", text: "Protect Routes/Content: Check `$_SESSION['user_id']`. Modify `ItemModel` queries to include `WHERE user_id = ?`.", completed: false }
+      ],
+      estimatedTime: "8-14 hours",
+      selfCheck: "Users can register, log in, and log out. Each user can only see and manage their own pantry items.",
+      status: "Not Started"
+    },
+    {
+      id: "module7",
+      title: "Module 7: Recipe Genius - Basic \"What Can I Make?\"",
+      goal: "Suggest simple recipes based on ingredients available in the user's pantry.",
+      keyConcepts: [
+        "Database design for recipes and ingredients (many-to-many or simplified)",
+        "Array manipulation",
+        "String matching or ID matching",
+        "Logical comparisons"
+      ],
+      tasks: [
+        { id: "m7t1", text: "Database Design for Recipes: `recipes` table (id, name, instructions, user_id). `recipe_ingredients` table (id, recipe_id, ingredient_name, quantity_needed, unit).", completed: false },
+        { id: "m7t2", text: "Recipe Management (Optional CRUD): Forms and logic for users to add recipes.", completed: false },
+        { id: "m7t3", text: "\"Suggest Recipes\" Logic: `RecipeController` and `RecipeModel`. `findMakeableRecipes($userId)` function: fetch user items, fetch all recipes, check if all ingredients present.", completed: false },
+        { id: "m7t4", text: "View (`views/suggested_recipes.php`): Display makeable recipes.", completed: false }
+      ],
+      estimatedTime: "8-15 hours",
+      selfCheck: "The application can suggest recipes to the user based on the items they currently have in their virtual pantry.",
+      status: "Not Started"
+    },
+    {
+      id: "module8",
+      title: "Module 8: Future Ready - Basic API Endpoint (Optional Extension)",
+      goal: "Create a simple API endpoint to add items programmatically, as a precursor to mobile app integration.",
+      keyConcepts: [
+        "Handling `$_POST` or raw POST body (e.g., JSON)",
+        "`json_encode()` for responses",
+        "`header('Content-Type: application/json')`",
+        "Basic API security considerations"
+      ],
+      tasks: [
+        { id: "m8t1", text: "Define API Route: In router, add route like `/api/items/add` to `ApiController->addItem()`.", completed: false },
+        { id: "m8t2", text: "`ApiController->addItem()`: Authenticate user. Expect data via `$_POST` or JSON. Validate. Use `ItemModel` to create item. Set `Content-Type: application/json`. Return JSON response.", completed: false },
+        { id: "m8t3", text: "Test with Postman/Insomnia: Send POST requests to API endpoint and verify.", completed: false }
+      ],
+      estimatedTime: "4-8 hours",
+      selfCheck: "You can successfully add a pantry item by sending a POST request to your API endpoint and receive a JSON response.",
+      status: "Not Started"
+    }
+  ];
+
+  const moduleNav = document.getElementById('module-nav');
+  const moduleContentEl = document.getElementById('module-content');
+  let currentModuleId = null;
+
+  function sanitizeHTML(str) {
+    const temp = document.createElement('div');
+    temp.textContent = str;
+    return temp.innerHTML;
+  }
+
+  function renderModuleContent(moduleId) {
+    const module = modulesData.find(m => m.id === moduleId);
+    if (!module) {
+      moduleContentEl.innerHTML = `<p class="text-red-500">Module not found.</p>`;
+      return;
+    }
+    currentModuleId = moduleId;
+
+    let tasksHtml = module.tasks.map((task, index) => `
+                <li class="py-3 flex items-start border-b border-gray-200 last:border-b-0">
+                    <input type="checkbox" id="task-${module.id}-${task.id}" data-module-id="${module.id}" data-task-id="${task.id}" class="task-checkbox h-5 w-5 text-[#0EA5E9] border-gray-300 rounded focus:ring-[#0EA5E9] mr-3 mt-1" ${task.completed ? 'checked' : ''}>
+                    <label for="task-${module.id}-${task.id}" class="flex-1 text-gray-700">${sanitizeHTML(task.text)}</label>
+                </li>
+                ${task.code ? `<li class="pb-3 ml-8 -mt-2"><pre><code class="language-php">${sanitizeHTML(task.code)}</code></pre></li>` : ''}
+            `).join('');
+
+    const completedTasks = module.tasks.filter(t => t.completed).length;
+    const totalTasks = module.tasks.length;
+    const progressText = totalTasks > 0 ? `(${completedTasks}/${totalTasks} tasks completed)` : '';
+
+    moduleContentEl.innerHTML = `
+                <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-3xl font-bold text-[#36454F]">${sanitizeHTML(module.title)}</h2>
+                        <span id="status-${module.id}" class="status-badge ${getModuleStatusClass(module.status)}">${sanitizeHTML(module.status)} ${progressText}</span>
+                    </div>
+
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold text-[#0284C7] mb-2">Goal</h3>
+                        <p class="text-gray-700 leading-relaxed">${sanitizeHTML(module.goal)}</p>
+                    </div>
+
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold text-[#0284C7] mb-2">Key Concepts</h3>
+                        <ul class="list-disc list-inside text-gray-700 space-y-1 pl-2">
+                            ${module.keyConcepts.map(concept => `<li>${sanitizeHTML(concept)}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold text-[#0284C7] mb-2">Tasks</h3>
+                        <ul class="bg-gray-50 p-4 rounded-lg border border-gray-200">${tasksHtml}</ul>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-[#E0F2FE] p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-[#0284C7] mb-2">Estimated Time</h3>
+                            <p class="text-gray-700">${sanitizeHTML(module.estimatedTime)}</p>
+                        </div>
+                        <div class="bg-[#E0F2FE] p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-[#0284C7] mb-2">Self-Check / Milestone</h3>
+                            <p class="text-gray-700">${sanitizeHTML(module.selfCheck)}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+    document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', handleTaskChange);
+    });
+    updateActiveNavItem();
+  }
+
+  function handleTaskChange(event) {
+    const moduleId = event.target.dataset.moduleId;
+    const taskId = event.target.dataset.taskId;
+    const module = modulesData.find(m => m.id === moduleId);
+    const task = module.tasks.find(t => t.id === taskId);
+    task.completed = event.target.checked;
+    updateModuleStatus(moduleId);
+    updateOverallProgress();
+  }
+
+  function updateModuleStatus(moduleId) {
+    const module = modulesData.find(m => m.id === moduleId);
+    const completedTasks = module.tasks.filter(t => t.completed).length;
+    const totalTasks = module.tasks.length;
+
+    if (totalTasks === 0) {
+      module.status = "Not Started"; // Or "No tasks"
+    } else if (completedTasks === totalTasks) {
+      module.status = "Completed!";
+    } else if (completedTasks > 0) {
+      module.status = "In Progress";
+    } else {
+      module.status = "Not Started";
+    }
+
+    if (currentModuleId === moduleId) {
+      const statusEl = document.getElementById(`status-${moduleId}`);
+      if (statusEl) {
+        const progressText = totalTasks > 0 ? `(${completedTasks}/${totalTasks} tasks completed)` : '';
+        statusEl.textContent = `${module.status} ${progressText}`;
+        statusEl.className = `status-badge ${getModuleStatusClass(module.status)}`;
+      }
+    }
+    renderModuleNav(); // Re-render nav to update status indicators if any
+  }
+
+  function getModuleStatusClass(status) {
+    if (status === "Completed!") return 'status-completed';
+    if (status === "In Progress") return 'status-inprogress';
+    return 'status-notstarted';
+  }
+
+  function renderModuleNav() {
+    moduleNav.innerHTML = modulesData.map(module => {
+      const completedTasks = module.tasks.filter(t => t.completed).length;
+      const totalTasks = module.tasks.length;
+      let statusIndicator = '';
+      if (module.status === "Completed!") {
+        statusIndicator = '<span class="ml-auto text-xs text-green-600">✓</span>';
+      } else if (module.status === "In Progress" && totalTasks > 0) {
+        statusIndicator = `<span class="ml-auto text-xs text-yellow-600">${completedTasks}/${totalTasks}</span>`;
+      }
+
+      return `
+                    <a href="#" data-module-id="${module.id}" class="sidebar-item block px-3 py-2.5 rounded-md text-sm font-medium text-gray-700 hover:bg-[#F0F9FF] flex items-center">
+                        ${sanitizeHTML(module.title.split(':')[0])} ${statusIndicator}
+                    </a>`;
+    }).join('');
+
+    document.querySelectorAll('#module-nav a').forEach(link => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        renderModuleContent(event.currentTarget.dataset.moduleId);
+      });
+    });
+    updateActiveNavItem();
+    updateOverallProgress();
+  }
+
+  function updateActiveNavItem() {
+    document.querySelectorAll('#module-nav a').forEach(link => {
+      link.classList.remove('active');
+      if (link.dataset.moduleId === currentModuleId) {
+        link.classList.add('active');
+      }
+    });
+  }
+
+  function updateOverallProgress() {
+    const completedModules = modulesData.filter(m => m.status === "Completed!").length;
+    const totalModules = modulesData.length;
+    const overallProgressTextEl = document.getElementById('overall-progress-text');
+    const overallProgressBarEl = document.getElementById('overall-progress-bar');
+
+    if (overallProgressTextEl) {
+      overallProgressTextEl.textContent = `${completedModules}/${totalModules} Modules Completed`;
+    }
+    if (overallProgressBarEl) {
+      const percentage = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
+      overallProgressBarEl.style.width = `${percentage}%`;
+    }
+  }
+
+  function initializeApp() {
+    modulesData.forEach(module => { // Initial status calculation for all modules
+      const completedTasks = module.tasks.filter(t => t.completed).length;
+      const totalTasks = module.tasks.length;
+      if (module.id === 'module0' && module.status === "Completed!") {
+        // Already set
+      } else if (totalTasks === 0) {
+        module.status = "Not Started";
+      } else if (completedTasks === totalTasks) {
+        module.status = "Completed!";
+      } else if (completedTasks > 0) {
+        module.status = "In Progress";
+      } else {
+        module.status = "Not Started";
+      }
+    });
+    renderModuleNav();
+    if (modulesData.length > 0 && !currentModuleId) {
+      // No action, keep welcome screen until user clicks
+    }
+  }
+
+  initializeApp();
+</script>
+</body>
+</html>

@@ -41,20 +41,40 @@ This will create a `dist` directory with optimized assets. The PHP files will au
 
 ## Project Structure
 
+The project follows a structured organization to separate concerns and maintain clean code:
+
 ```
 pantrypal_core/
-├── dist/                  # Production build output (created after build)
-├── node_modules/          # Node.js dependencies (created after npm install)
-├── src/
+├── app/                  # Application code
+│   ├── Config/           # Configuration files
+│   ├── Controllers/      # Controller classes
+│   ├── Database/         # Database-related code
+│   ├── Helpers/          # Utility functions and helper classes
+│   ├── Models/           # Data models and business logic
+│   ├── Modules/          # Feature modules
+│   └── Views/            # View templates
+│       ├── Components/   # Reusable UI components
+│       └── Layouts/      # Page layout templates
+├── dist/                 # Production build output (created after build)
+├── docs/                 # Documentation
+├── node_modules/         # Node.js dependencies (created after npm install)
+├── public/               # Publicly accessible files
+│   ├── css/              # CSS stylesheets
+│   ├── fonts/            # Font files
+│   ├── images/           # Image files
+│   ├── js/               # JavaScript files
+│   └── index.php         # Application entry point
+├── src/                  # Source files for frontend assets
 │   ├── css/
-│   │   └── style.css      # Main CSS file with Tailwind directives
+│   │   └── style.css     # Main CSS file with Tailwind directives
 │   └── js/
-│       └── main.js        # Main JavaScript entry point
-├── index.php              # Main PHP file
-├── package.json           # Node.js dependencies and scripts
-├── postcss.config.js      # PostCSS configuration
-├── tailwind.config.js     # Tailwind CSS configuration
-└── vite.config.js         # Vite configuration
+│       └── main.js       # Main JavaScript entry point
+├── ssl/                  # SSL certificates for local development
+├── tests/                # Test files
+├── package.json          # Node.js dependencies and scripts
+├── postcss.config.js     # PostCSS configuration
+├── tailwind.config.js    # Tailwind CSS configuration
+└── vite.config.js        # Vite configuration
 ```
 
 ## How It Works

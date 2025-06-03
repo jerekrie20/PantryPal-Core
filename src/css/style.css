@@ -1,10 +1,297 @@
 @import "tailwindcss";
 
-/* Your custom CSS goes here */
-body {
-  @apply bg-gray-100 text-gray-900;
+@theme {
+  /* PantryPal Theme - CSS Custom Properties for Tailwind CSS v4 (Refactored Names) */
+
+  /* Color Palette */
+  --color-bg-page: #FDFBF6;               /* Main page background */
+  --color-bg-subtle: #E8F5E9;             /* Subtle background, e.g., hero sections, sidebars */
+  --color-bg-footer: #FAFAFA;             /* Footer background */
+  --color-bg-component: #FFFFFF;          /* Default background for components like cards, inputs */
+
+  --color-text-base: #36454F;             /* Base text color for body copy */
+  --color-text-heading: #2E7D32;          /* Text color for headings, section titles */
+  --color-text-muted: #718096;            /* Muted text, e.g., for secondary info, placeholders */
+  --color-text-on-cta: #FFFFFF;           /* Text color for elements on CTA background */
+  --color-text-on-dark: #FFFFFF;          /* General text on dark backgrounds (if any) */
+
+  --color-cta: #4CAF50;                   /* Call-to-action, primary interactive elements */
+  --color-cta-hover: #388E3C;             /* CTA hover state */
+  --color-cta-focus-ring: #66BB6A;        /* CTA focus ring color */
+
+  --color-brand-accent: #66BB6A;          /* Specific brand accent, e.g., logo leaf */
+
+  --color-border-default: #E0E0E0;        /* Default border color for dividers, etc. */
+  --color-border-input: #D1D5DB;          /* Input field borders */
+  --color-border-input-focus: var(--color-cta); /* Input field border on focus */
+
+  /* Typography */
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+
+  /* Spacing System (based on 0.25rem unit) - Names are generally fine */
+  --spacing-unit: 0.25rem; /* 4px */
+  --spacing-0: 0rem;
+  --spacing-1: var(--spacing-unit);
+  --spacing-2: calc(var(--spacing-unit) * 2);  /* 8px */
+  --spacing-3: calc(var(--spacing-unit) * 3);  /* 12px */
+  --spacing-4: calc(var(--spacing-unit) * 4);  /* 16px */
+  --spacing-5: calc(var(--spacing-unit) * 5);  /* 20px */
+  --spacing-6: calc(var(--spacing-unit) * 6);  /* 24px */
+  --spacing-8: calc(var(--spacing-unit) * 8);  /* 32px */
+  --spacing-10: calc(var(--spacing-unit) * 10); /* 40px */
+  --spacing-12: calc(var(--spacing-unit) * 12); /* 48px */
+  --spacing-16: calc(var(--spacing-unit) * 16); /* 64px */
+
+  /* Border Radius - Names are generally fine */
+  --radius-none: 0px;
+  --radius-sm: 0.125rem;  /* 2px */
+  --radius-DEFAULT: 0.25rem; /* 4px (Tailwind's default for 'rounded') */
+  --radius-md: 0.375rem;  /* 6px */
+  --radius-lg: 0.5rem;    /* 8px */
+  --radius-xl: 0.75rem;   /* 12px */
+  --radius-2xl: 1rem;     /* 16px */
+  --radius-full: 9999px;
+
+  /* Transitions - Names are generally fine */
+  --transition-property-common: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  --transition-property-colors: color, background-color, border-color, text-decoration-color, fill, stroke;
+  --transition-timing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-duration-default: 150ms;
+  --transition-duration-fast: 100ms;
+  --transition-duration-slow: 300ms;
+
+  /* Shadows - Names are generally fine */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-DEFAULT: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
-.container {
-  @apply mx-auto px-4;
+@layer base {
+  body {
+    font-family: var(--font-body), sans-serif;
+    background-color: var(--color-bg-page);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /*p{*/
+  /*  color: var(--color-text-base);*/
+  /*}*/
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--color-text-heading);
+    font-weight: 600; /* semibold by default for headings */
+  }
+  h1 { font-size: 2.25rem; line-height: 2.5rem; } /* text-4xl */
+  h2 { font-size: 1.875rem; line-height: 2.25rem; } /* text-3xl */
+  h3 { font-size: 1.5rem; line-height: 2rem; }    /* text-2xl */
+  h4 { font-size: 1.25rem; line-height: 1.75rem; } /* text-xl */
+
+
+  a {
+    color: var(--color-cta);
+    text-decoration-line: none;
+    transition: color var(--transition-duration-default) var(--transition-timing-default);
+  }
+  a:hover {
+    color: var(--color-cta-hover);
+    text-decoration-line: underline;
+  }
+  a:focus-visible {
+    outline: 2px solid var(--color-cta-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Basic form input styling */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select {
+    appearance: none;
+    background-color: var(--color-bg-component);
+    border-color: var(--color-border-input);
+    border-width: 1px;
+    border-radius: var(--radius-md);
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: 1rem;
+    line-height: 1.5rem;
+    color: var(--color-text-base);
+    transition: border-color var(--transition-duration-default) var(--transition-timing-default), box-shadow var(--transition-duration-default) var(--transition-timing-default);
+  }
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="search"]:focus,
+  input[type="number"]:focus,
+  input[type="tel"]:focus,
+  input[type="url"]:focus,
+  textarea:focus,
+  select:focus {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    border-color: var(--color-border-input-focus);
+    box-shadow: 0 0 0 2px var(--color-cta-focus-ring); /* Focus ring */
+  }
+
+  pre, code {
+    font-family: var(--font-mono);
+    font-size: 0.875em; /* text-sm */
+  }
+  pre {
+    background-color: #F3F4F6; /* Consider a theme variable e.g., --color-bg-code-block */
+    border: 1px solid var(--color-border-default);
+    padding: var(--spacing-4);
+    border-radius: var(--radius-lg);
+    overflow-x: auto;
+  }
+}
+
+@utility btn { /* Base button style */
+  display: inline-block;
+  padding: var(--spacing-2) var(--spacing-4);
+  border-radius: var(--radius-lg);
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition-property: var(--transition-property-common);
+  transition-timing-function: var(--transition-timing-default);
+  transition-duration: var(--transition-duration-default);
+  border: 1px solid transparent;
+}
+
+@utility alert {
+  padding: var(--spacing-4);
+  border-radius: var(--radius-lg);
+  border-width: 1px;
+  border-style: solid;
+}
+
+@layer components {
+
+  .btn:focus-visible {
+    outline: 2px solid var(--color-cta-focus-ring);
+    outline-offset: 2px;
+  }
+
+  .btn-cta { /* Renamed from btn-primary */
+    @apply btn;
+    background-color: var(--color-cta);
+    color: var(--color-text-on-cta);
+    border-color: var(--color-cta);
+
+    @variant hover {
+      background-color: var(--color-cta-hover);
+      border-color: var(--color-cta-hover);
+    }
+  }
+
+  .btn-secondary { /* Kept name, but uses new variables */
+    @apply btn;
+    background-color: var(--color-bg-component);
+    color: var(--color-cta);
+    border: 1px solid var(--color-cta);
+
+    @variant hover {
+      background-color: var(--color-bg-subtle);
+      border-color: var(--color-cta-hover);
+      color: var(--color-cta-hover);
+    }
+  }
+
+  .bg-cta { /* Renamed from bg-primary */
+    background-color: var(--color-cta);
+    color: var(--color-text-on-cta);
+  }
+
+  /* Styles for links within .bg-cta */
+  .bg-cta a, .link-on-cta { /* Renamed from link-on-primary */
+    color: var(--color-text-on-cta);
+    text-decoration-line: underline;
+
+    @variant hover {
+      color: var(--color-text-on-cta);
+      opacity: 0.85;
+    }
+    @variant focus-visible {
+      outline: 1px solid var(--color-text-on-cta);
+      outline-offset: 2px;
+      border-radius: var(--radius-sm);
+    }
+  }
+
+  .bg-subtle { /* Renamed from bg-accent-subtle */
+    background-color: var(--color-bg-subtle);
+  }
+  /* Styles for links within .bg-subtle */
+  .bg-subtle a, .link-on-subtle { /* Renamed from link-on-accent-subtle */
+    color: var(--color-cta);
+
+    @variant hover {
+      color: var(--color-cta-hover);
+      text-decoration-line: underline;
+    }
+    @variant focus-visible {
+      outline: 1px solid var(--color-cta-focus-ring);
+      outline-offset: 2px;
+      border-radius: var(--radius-sm);
+    }
+  }
+
+
+  .card {
+    background-color: var(--color-bg-component);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-6);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .logo-leaf {
+    width: var(--spacing-5);
+    height: var(--spacing-5);
+    background-color: var(--color-brand-accent); /* Renamed from --color-accent-medium */
+    border-radius: var(--radius-none) var(--radius-full) var(--radius-none) var(--radius-full);
+    transform: rotate(-45deg);
+    display: inline-block;
+  }
+
+  .section-title { /* This class is more of a utility now, as base headings are styled */
+    color: var(--color-text-heading);
+  }
+
+  /* Alert component example */
+
+  .alert-info {
+    @apply alert;
+    background-color: #E0F2FE; /* Consider theme var: --color-bg-info-subtle */
+    border-color: #7DD3FC;    /* Consider theme var: --color-border-info */
+    color: #0C4A6E;           /* Consider theme var: --color-text-info */
+  }
+  .alert-success {
+    @apply alert;
+    background-color: var(--color-bg-subtle);
+    border-color: var(--color-brand-accent); /* Using brand-accent for success border */
+    color: var(--color-text-heading); /* Using heading color for success text */
+  }
+  .alert-warning {
+    @apply alert;
+    background-color: #FEF9C3; /* Consider theme var: --color-bg-warning-subtle */
+    border-color: #FDE047;    /* Consider theme var: --color-border-warning */
+    color: #713F12;           /* Consider theme var: --color-text-warning */
+  }
+  .alert-danger {
+    @apply alert;
+    background-color: #FEE2E2; /* Consider theme var: --color-bg-danger-subtle */
+    border-color: #FCA5A5;    /* Consider theme var: --color-border-danger */
+    color: #991B1B;           /* Consider theme var: --color-text-danger */
+  }
 }
