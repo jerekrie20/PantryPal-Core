@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PantryPal Core Learning Modules</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+
   <!-- Visualization & Content Choices:
       - Module Navigation: Goal: Select Module. Method: Clickable list in sidebar. Interaction: JS updates main content. Justification: Standard, intuitive navigation for sectioned content.
       - Module Details (Goal, Concepts, Time, Milestone): Goal: Inform. Method: Static text blocks. Justification: Direct presentation of information.
@@ -13,6 +13,8 @@
       - Module Status & Progress: Goal: Inform. Method: Dynamically updated text (e.g., "Status: In Progress (2/5 tasks)"). Interaction: JS updates based on task completion. Justification: Clear visual feedback.
       - Libraries: Vanilla JS for all interactions and DOM manipulation. Tailwind CSS for styling. No Chart.js/Plotly.js as data types (text, tasks) are not suited for complex charts.
   -->
+
+    <?php echo vite_tags(); ?>
   <style>
     body {
       font-family: 'Inter', sans-serif; /* Matches Tailwind's default sans-serif */
@@ -84,7 +86,7 @@
 <aside class="sidebar w-1/4 sm:w-1/5 lg:w-1/6 bg-[#FFF9F0] p-4 space-y-2 overflow-y-auto shadow-lg">
   <h1 class="text-xl font-bold text-[#36454F] mb-6 border-b-2 border-[#E0F2FE] pb-2">PantryPal Modules</h1>
 
-  <a href="../app/Views/home.php"  class="sidebar-item block px-3 py-2.5 rounded-md text-sm font-medium text-gray-700 hover:bg-[#F0F9FF] flex items-center">
+  <a href="/" class="sidebar-item block px-3 py-2.5 rounded-md text-sm font-medium text-gray-700 hover:bg-[#F0F9FF] flex items-center">
     Home
   </a>
   <nav id="module-nav" class="space-y-1">
@@ -184,7 +186,7 @@
         "Pre-populating forms"
       ],
       tasks: [
-        { id: "m3t1", text: "Add \"Edit\" & \"Delete\" Links: In item list, add links like `edit_item.php?id=<?= $item['id'] ?>` and `delete_item.php?id=<?= $item['id'] ?>`.", completed: false },
+        { id: "m3t1", text:   "Add \"Edit\" & \"Delete\" Links: In item list, add links like `edit_item.php?id=&lt;?= $item['id'] ?&gt;` and `delete_item.php?id=&lt;?= $item['id'] ?&gt;`.", completed: false },
         { id: "m3t2", text: "Create \"Edit Item\" Functionality (`edit_item_form.php`): Check `$_GET['id']`. Fetch item by ID. Pre-populate form. Hidden `id` field. Action to `process_edit_item.php`.", completed: false },
         { id: "m3t3", text: "Process Edit Item (`process_edit_item.php`): Retrieve `$_POST` data. Validate. Prepare SQL `UPDATE`. Execute. Redirect.", completed: false },
         { id: "m3t4", text: "Create \"Delete Item\" Functionality (`delete_item.php`): Check `$_GET['id']`. (Optional) Confirmation. Prepare SQL `DELETE`. Execute. Redirect.", completed: false }

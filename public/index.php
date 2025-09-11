@@ -1,74 +1,41 @@
 <?php
-/**
- * PantryPal Application Entry Point
- * 
- * This file serves as the entry point for the PantryPal application.
- * It bootstraps the application by loading configuration, setting up
- * error handling, and routing requests to the appropriate controllers.
- */
+declare(strict_types=1);
 
-// Define the application root directory
+use Controllers\HomeController;
+use Helpers\Router;
+
 define('APP_ROOT', dirname(__DIR__));
+const APP_PATH = APP_ROOT . '/app';
+const VIEW_PATH = APP_PATH . '/Views';
 
-// Load the autoloader (assuming Composer is used)
-if (file_exists(APP_ROOT . '/vendor/autoload.php')) {
-    require APP_ROOT . '/vendor/autoload.php';
-}
+// Environment and error reporting
+require_once APP_PATH . '/Config/environment.php';
 
-// Determine if we're in development mode
-$isDev = file_exists(APP_ROOT . '/node_modules');
+// Security headers
+require_once APP_PATH . '/Config/headers.php';
 
-// Function to include Vite assets
-function viteAssets() {
-    global $isDev;
+// Session setup
+require_once APP_PATH . '/Config/sessions.php';
 
-    if ($isDev) {
-        // In development, include the Vite client and use the dev server
-        // Use a timestamp to prevent caching issues
-        $timestamp = time();
-        echo '<script type="module" src="https://localhost:5173/pantrypal_core/@vite/client?' . $timestamp . '"></script>';
-        echo '<script type="module" src="https://localhost:5173/pantrypal_core/src/js/main.js?' . $timestamp . '"></script>';
-    } else {
-        // In production, include the built assets
-        $manifestPath = APP_ROOT . '/dist/manifest.json';
-        if (file_exists($manifestPath)) {
-            $manifest = json_decode(file_get_contents($manifestPath), true);
+require_once APP_PATH . '/Helpers/support.php';
 
-            if (isset($manifest['src/js/main.js']) && isset($manifest['src/js/main.js']['file'])) {
-                // CSS is imported in JS, so Vite automatically injects the CSS
-                echo '<script type="module" src="/pantrypal_core/dist/' . $manifest['src/js/main.js']['file'] . '"></script>';
-            }
-        }
+
+spl_autoload_register(function ($class) {
+    $relative = str_replace('\\', '/', ltrim($class, '\\')) . '.php';
+    $file = APP_PATH . '/' . $relative;
+    if (str_starts_with(realpath($file) ?: '', realpath(APP_PATH) . DIRECTORY_SEPARATOR) && is_readable($file)) {
+        require_once $file;
     }
-}
+});
 
-// Simple router (to be replaced with a more robust solution)
-$request = $_SERVER['REQUEST_URI'];
-$basePath = '/pantrypal_core/';
+// DB (optional until Module 2)
+$maybeDb = APP_PATH . '/Database/connection.php';
+if (is_readable($maybeDb)) require_once $maybeDb;
 
-// Remove the base path from the request
-if (strpos($request, $basePath) === 0) {
-    $request = substr($request, strlen($basePath));
-}
+// Router
+$router = new Router($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');
 
-// Remove query string
-if (($pos = strpos($request, '?')) !== false) {
-    $request = substr($request, 0, $pos);
-}
+// ROUTES
+require_once APP_PATH . '/routes/web.php';
 
-// Default to index if no path is specified
-if (empty($request) || $request === '/') {
-    $request = 'home';
-}
-
-// Basic routing
-switch ($request) {
-    case 'home':
-        require APP_ROOT . '/app/Views/home.php';
-        break;
-    default:
-        // If no route matches, show a 404 page
-        header("HTTP/1.0 404 Not Found");
-        require APP_ROOT . '/app/Views/404.php';
-        break;
-}
+$router->run();

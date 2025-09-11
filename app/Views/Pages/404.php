@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PantryPal - Page Not Found</title>
-    <?php viteAssets(); ?>
+    <?php echo vite_tags(); ?>
 </head>
 <body class="bg-gray-100">
     <div class="container mx-auto py-16 px-4">
@@ -17,7 +17,7 @@
                         The page you are looking for might have been removed, had its name changed,
                         or is temporarily unavailable.
                     </p>
-                    <a href="/pantrypal_core/" class="inline-block px-5 py-3 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 transition">
+                    <a href="/" class="inline-block px-5 py-3 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 transition">
                         Go to Homepage
                     </a>
                 </div>

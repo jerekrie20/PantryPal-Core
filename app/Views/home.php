@@ -27,7 +27,7 @@
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div>
-                <img src="https://placehold.co/600x450/E8F5E9/36454F?text=Pantry+Organization" alt="Organized Pantry Illustration" class="rounded-lg shadow-xl w-full h-auto object-cover">
+                <img src="<?= e(asset('images/home/pantry.webp')) ?> alt="Organized Pantry Illustration" class="rounded-lg shadow-xl w-full h-auto object-cover">
             </div>
             <div class="space-y-6 text-gray-700">
                 <p class="leading-relaxed text-lg">
