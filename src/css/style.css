@@ -1,297 +1,486 @@
 @import "tailwindcss";
 
+/* Badge base & sizes */
+@utility badge {
+    display: inline-block;
+    padding: var(--spacing-1) var(--spacing-3);
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    border-width: 0px;
+}
+@utility badge-success { @apply badge; background-color: var(--color-success-bg); color: var(--color-success-text); }
+@utility badge-warning { @apply badge; background-color: var(--color-warning-bg); color: var(--color-warning-text); }
+@utility badge-danger  { @apply badge; background-color: var(--color-danger-bg);  color: var(--color-danger-text); }
+@utility badge-info    { @apply badge; background-color: var(--color-info-bg);    color: var(--color-info-text); }
+@utility badge-neutral { @apply badge; background-color: var(--color-neutral-bg); color: var(--color-neutral-text); }
+
+/* Alert base & variants */
+@utility alert {
+    padding: var(--spacing-4);
+    border-radius: var(--radius-lg);
+    border-width: 1px;
+}
+@utility alert-success { @apply alert; background-color: var(--color-success-bg); border-color: var(--color-success-border); color: var(--color-success-text); }
+@utility alert-warning { @apply alert; background-color: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
+@utility alert-danger  { @apply alert; background-color: var(--color-danger-bg);  border-color: var(--color-danger-border);  color: var(--color-danger-text); }
+@utility alert-info    { @apply alert; background-color: var(--color-info-bg);    border-color: var(--color-info-border);    color: var(--color-info-text); }
+
 @theme {
-  /* PantryPal Theme - CSS Custom Properties for Tailwind CSS v4 (Refactored Names) */
+    /* PantryPal Theme - CSS Custom Properties for Tailwind CSS v4 */
 
-  /* Color Palette */
-  --color-bg-page: #FDFBF6;               /* Main page background */
-  --color-bg-subtle: #E8F5E9;             /* Subtle background, e.g., hero sections, sidebars */
-  --color-bg-footer: #FAFAFA;             /* Footer background */
-  --color-bg-component: #FFFFFF;          /* Default background for components like cards, inputs */
+    /* Color Palette */
+    --color-bg-page: #FDFBF6;
+    --color-bg-subtle: #E8F5E9;
+    --color-bg-component: #FFFFFF;
 
-  --color-text-base: #36454F;             /* Base text color for body copy */
-  --color-text-heading: #2E7D32;          /* Text color for headings, section titles */
-  --color-text-muted: #718096;            /* Muted text, e.g., for secondary info, placeholders */
-  --color-text-on-cta: #FFFFFF;           /* Text color for elements on CTA background */
-  --color-text-on-dark: #FFFFFF;          /* General text on dark backgrounds (if any) */
+    --color-text-base: #36454F;
+    --color-text-heading: #2E7D32;
+    --color-text-muted: #52667A; /* Darkened for WCAG AA compliance */
+    --color-text-on-cta: #FFFFFF;
+    --color-text-on-dark: #FFFFFF;
 
-  --color-cta: #4CAF50;                   /* Call-to-action, primary interactive elements */
-  --color-cta-hover: #388E3C;             /* CTA hover state */
-  --color-cta-focus-ring: #66BB6A;        /* CTA focus ring color */
+    --color-cta: #4CAF50;
+    --color-cta-hover: #388E3C;
+    --color-cta-focus-ring: #66BB6A;
 
-  --color-brand-accent: #66BB6A;          /* Specific brand accent, e.g., logo leaf */
+    --color-link: #2E7D32;
+    --color-link-hover: #1B5E20;
 
-  --color-border-default: #E0E0E0;        /* Default border color for dividers, etc. */
-  --color-border-input: #D1D5DB;          /* Input field borders */
-  --color-border-input-focus: var(--color-cta); /* Input field border on focus */
+    --color-brand-accent: #66BB6A;
 
-  /* Typography */
-  --font-body: 'Inter', sans-serif;
-  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    --color-border-default: #E0E0E0;
+    --color-border-input: #D1D5DB;
+    --color-border-input-focus: var(--color-cta);
 
-  /* Spacing System (based on 0.25rem unit) - Names are generally fine */
-  --spacing-unit: 0.25rem; /* 4px */
-  --spacing-0: 0rem;
-  --spacing-1: var(--spacing-unit);
-  --spacing-2: calc(var(--spacing-unit) * 2);  /* 8px */
-  --spacing-3: calc(var(--spacing-unit) * 3);  /* 12px */
-  --spacing-4: calc(var(--spacing-unit) * 4);  /* 16px */
-  --spacing-5: calc(var(--spacing-unit) * 5);  /* 20px */
-  --spacing-6: calc(var(--spacing-unit) * 6);  /* 24px */
-  --spacing-8: calc(var(--spacing-unit) * 8);  /* 32px */
-  --spacing-10: calc(var(--spacing-unit) * 10); /* 40px */
-  --spacing-12: calc(var(--spacing-unit) * 12); /* 48px */
-  --spacing-16: calc(var(--spacing-unit) * 16); /* 64px */
+    /* Status Colors (adjusted to meet WCAG AA contrast on light bg) */
+    --color-success-text: #065F46;  /* 6.2:1 on #BBF7D0 */
+    --color-success-bg:   #BBF7D0;  /* darker than #DCFCE7 for contrast */
+    --color-success-border: #86EFAC;
 
-  /* Border Radius - Names are generally fine */
-  --radius-none: 0px;
-  --radius-sm: 0.125rem;  /* 2px */
-  --radius-DEFAULT: 0.25rem; /* 4px (Tailwind's default for 'rounded') */
-  --radius-md: 0.375rem;  /* 6px */
-  --radius-lg: 0.5rem;    /* 8px */
-  --radius-xl: 0.75rem;   /* 12px */
-  --radius-2xl: 1rem;     /* 16px */
-  --radius-full: 9999px;
+    --color-warning-text: #713F12;  /* 5.0:1 on #FEF3C7 */
+    --color-warning-bg:   #FEF3C7;  /* darker than #FEF9C3 for contrast */
+    --color-warning-border: #FDE047;
 
-  /* Transitions - Names are generally fine */
-  --transition-property-common: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-  --transition-property-colors: color, background-color, border-color, text-decoration-color, fill, stroke;
-  --transition-timing-default: cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-duration-default: 150ms;
-  --transition-duration-fast: 100ms;
-  --transition-duration-slow: 300ms;
+    --color-danger-text: #7F1D1D;   /* 5.5:1 on #FECACA */
+    --color-danger-text-strong: #7F1D1D; /* align strong with base to ensure contrast */
+    --color-danger-bg:   #FECACA;   /* darker than #FEE2E2 for contrast */
+    --color-danger-border: #FCA5A5;
 
-  /* Shadows - Names are generally fine */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-DEFAULT: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --color-info-text: #1E3A8A;     /* 5.2:1 on #BFDBFE */
+    --color-info-bg:   #BFDBFE;     /* darker than #DBEAFE for contrast */
+    --color-info-border: #93C5FD;
+
+    --color-neutral-text: #374151;
+    --color-neutral-bg: #F3F4F6;
+    --color-neutral-border: #D1D5DB;
+
+
+    /* Typography */
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+
+    /* Spacing System */
+    --spacing-unit: 0.25rem;
+    --spacing-1: var(--spacing-unit);
+    --spacing-2: calc(var(--spacing-unit) * 2);
+    --spacing-3: calc(var(--spacing-unit) * 3);
+    --spacing-4: calc(var(--spacing-unit) * 4);
+    --spacing-6: calc(var(--spacing-unit) * 6);
+    --spacing-8: calc(var(--spacing-unit) * 8);
+    --spacing-12: calc(var(--spacing-unit) * 12);
+    --spacing-16: calc(var(--spacing-unit) * 16);
+
+    /* Border Radius */
+    --radius-sm: 0.125rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-full: 9999px;
+
+    /* Transitions */
+    --transition-property-common: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+    --transition-timing-default: cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-duration-default: 150ms;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-DEFAULT: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
 @layer base {
-  body {
-    font-family: var(--font-body), sans-serif;
-    background-color: var(--color-bg-page);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+    body {
+        font-family: var(--font-body);
+        background-color: var(--color-bg-page);
+        color: var(--color-text-base);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
 
-  /*p{*/
-  /*  color: var(--color-text-base);*/
-  /*}*/
+    h1, h2, h3, h4, h5, h6 {
+        color: var(--color-text-heading);
+        font-weight: 600;
+    }
 
-  h1, h2, h3, h4, h5, h6 {
-    color: var(--color-text-heading);
-    font-weight: 600; /* semibold by default for headings */
-  }
-  h1 { font-size: 2.25rem; line-height: 2.5rem; } /* text-4xl */
-  h2 { font-size: 1.875rem; line-height: 2.25rem; } /* text-3xl */
-  h3 { font-size: 1.5rem; line-height: 2rem; }    /* text-2xl */
-  h4 { font-size: 1.25rem; line-height: 1.75rem; } /* text-xl */
+    a {
+        color: var(--color-link);
+        text-decoration: none;
+        transition: color var(--transition-duration-default) var(--transition-timing-default);
+    }
+    a:hover {
+        color: var(--color-link-hover);
+        text-decoration: underline;
+    }
+    *:focus-visible {
+        outline: 2px solid var(--color-cta-focus-ring);
+        outline-offset: 2px;
+        border-radius: var(--radius-sm);
+    }
 
-
-  a {
-    color: var(--color-cta);
-    text-decoration-line: none;
-    transition: color var(--transition-duration-default) var(--transition-timing-default);
-  }
-  a:hover {
-    color: var(--color-cta-hover);
-    text-decoration-line: underline;
-  }
-  a:focus-visible {
-    outline: 2px solid var(--color-cta-focus-ring);
-    outline-offset: 2px;
-    border-radius: var(--radius-sm);
-  }
-
-  /* Basic form input styling */
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="search"],
-  input[type="number"],
-  input[type="tel"],
-  input[type="url"],
-  textarea,
-  select {
-    appearance: none;
-    background-color: var(--color-bg-component);
-    border-color: var(--color-border-input);
-    border-width: 1px;
-    border-radius: var(--radius-md);
-    padding: var(--spacing-2) var(--spacing-3);
-    font-size: 1rem;
-    line-height: 1.5rem;
-    color: var(--color-text-base);
-    transition: border-color var(--transition-duration-default) var(--transition-timing-default), box-shadow var(--transition-duration-default) var(--transition-timing-default);
-  }
-  input[type="text"]:focus,
-  input[type="email"]:focus,
-  input[type="password"]:focus,
-  input[type="search"]:focus,
-  input[type="number"]:focus,
-  input[type="tel"]:focus,
-  input[type="url"]:focus,
-  textarea:focus,
-  select:focus {
-    outline: 2px solid transparent;
-    outline-offset: 2px;
-    border-color: var(--color-border-input-focus);
-    box-shadow: 0 0 0 2px var(--color-cta-focus-ring); /* Focus ring */
-  }
-
-  pre, code {
-    font-family: var(--font-mono);
-    font-size: 0.875em; /* text-sm */
-  }
-  pre {
-    background-color: #F3F4F6; /* Consider a theme variable e.g., --color-bg-code-block */
-    border: 1px solid var(--color-border-default);
-    padding: var(--spacing-4);
-    border-radius: var(--radius-lg);
-    overflow-x: auto;
-  }
-}
-
-@utility btn { /* Base button style */
-  display: inline-block;
-  padding: var(--spacing-2) var(--spacing-4);
-  border-radius: var(--radius-lg);
-  font-weight: 600;
-  text-align: center;
-  text-decoration: none;
-  cursor: pointer;
-  transition-property: var(--transition-property-common);
-  transition-timing-function: var(--transition-timing-default);
-  transition-duration: var(--transition-duration-default);
-  border: 1px solid transparent;
-}
-
-@utility alert {
-  padding: var(--spacing-4);
-  border-radius: var(--radius-lg);
-  border-width: 1px;
-  border-style: solid;
+    input, textarea, select {
+        background-color: var(--color-bg-component);
+        border-color: var(--color-border-input);
+        border-width: 1px;
+        border-radius: var(--radius-md);
+        padding: var(--spacing-2) var(--spacing-3);
+        color: var(--color-text-base);
+        transition: border-color var(--transition-duration-default), box-shadow var(--transition-duration-default);
+    }
+    input:focus, textarea:focus, select:focus {
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+        border-color: var(--color-border-input-focus);
+        box-shadow: 0 0 0 2px var(--color-cta-focus-ring);
+    }
 }
 
 @layer components {
+    /* Base Button */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--spacing-2);
+        border-radius: var(--radius-lg);
+        font-weight: 600;
+        text-align: center;
+        text-decoration: none;
+        cursor: pointer;
+        transition-property: var(--transition-property-common);
+        transition-timing-function: var(--transition-timing-default);
+        transition-duration: var(--transition-duration-default);
+        border: 1px solid transparent;
+    }
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .btn-lg { padding: var(--spacing-3) var(--spacing-6); font-size: 1.125rem; }
+    .btn-md { padding: var(--spacing-2) var(--spacing-4); font-size: 1rem; }
+    .btn-sm { padding: var(--spacing-1) var(--spacing-3); font-size: 0.875rem; }
 
-  .btn:focus-visible {
-    outline: 2px solid var(--color-cta-focus-ring);
-    outline-offset: 2px;
-  }
+    /* Button Variants */
+    .btn-cta { @apply btn; background-color: var(--color-cta); color: var(--color-text-on-cta); border-color: var(--color-cta); }
+    .btn-cta:hover:not(:disabled) { background-color: var(--color-cta-hover); border-color: var(--color-cta-hover); }
 
-  .btn-cta { /* Renamed from btn-primary */
-    @apply btn;
+    .btn-secondary { @apply btn; background-color: var(--color-bg-component); color: var(--color-cta); border-color: var(--color-cta); }
+    .btn-secondary:hover:not(:disabled) { background-color: var(--color-bg-subtle); border-color: var(--color-cta-hover); color: var(--color-cta-hover); }
+
+    .btn-subtle { @apply btn; background-color: transparent; color: var(--color-cta); border-color: transparent; }
+    .btn-subtle:hover:not(:disabled) { background-color: var(--color-bg-subtle); color: var(--color-cta-hover); }
+
+    .btn-danger { @apply btn; background-color: var(--color-danger-bg); color: var(--color-danger-text); border-color: var(--color-danger-border); }
+    .btn-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--color-danger-bg) 90%, black); }
+
+    /* Card */
+    .card {
+        background-color: var(--color-bg-component);
+        border-radius: var(--radius-xl);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow-md);
+    }
+
+    /* Badges */
+    .badge { display: inline-block; padding: var(--spacing-1) var(--spacing-3); font-size: 0.75rem; font-weight: 600; border-radius: var(--radius-full); }
+    .badge-success { @apply badge; background-color: var(--color-success-bg); color: var(--color-success-text); }
+    .badge-warning { @apply badge; background-color: var(--color-warning-bg); color: var(--color-warning-text); }
+    .badge-danger { @apply badge; background-color: var(--color-danger-bg); color: var(--color-danger-text); }
+    .badge-info { @apply badge; background-color: var(--color-info-bg); color: var(--color-info-text); }
+    .badge-neutral { @apply badge; background-color: var(--color-neutral-bg); color: var(--color-neutral-text); }
+
+    /* Alerts */
+    .alert { padding: var(--spacing-4); border-radius: var(--radius-lg); border-width: 1px; }
+    .alert-success { @apply alert; background-color: var(--color-success-bg); border-color: var(--color-success-border); color: var(--color-success-text); }
+    .alert-warning { @apply alert; background-color: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
+    .alert-danger { @apply alert; background-color: var(--color-danger-bg); border-color: var(--color-danger-border); color: var(--color-danger-text); }
+    .alert-info { @apply alert; background-color: var(--color-info-bg); border-color: var(--color-info-border); color: var(--color-info-text); }
+}
+
+
+/* =============================
+   Compatibility shim for HTML usage
+   - Adds aliases like .text-danger, .bg-danger, .border-danger
+   - Adds size+variant button combos (e.g., .btn-cta-lg)
+   - Adds escaped focus utility classes (e.g., .focus:ring-danger)
+   ============================= */
+@layer utilities {
+    /* Text color aliases */
+    .text-success { color: var(--color-success-text); }
+    .text-warning { color: var(--color-warning-text); }
+    .text-danger  { color: var(--color-danger-text); }
+    .text-info    { color: var(--color-info-text); }
+
+    /* Background color aliases */
+    .bg-success { background-color: var(--color-success-bg); }
+    .bg-warning { background-color: var(--color-warning-bg); }
+    .bg-danger  { background-color: var(--color-danger-bg); }
+    .bg-info    { background-color: var(--color-info-bg); }
+
+    /* Border color aliases */
+    .border-success { border-color: var(--color-success-border); }
+    .border-warning { border-color: var(--color-warning-border); }
+    .border-danger  { border-color: var(--color-danger-border); }
+    .border-info    { border-color: var(--color-info-border); }
+
+    /* Font family utility alias */
+    .font-body { font-family: var(--font-body); }
+
+    /* Focus ring/border aliases with escaped colon */
+    .focus\:ring-danger:focus { box-shadow: 0 0 0 2px var(--color-danger-border); }
+    .focus\:ring-success:focus { box-shadow: 0 0 0 2px var(--color-success-border); }
+    .focus\:ring-warning:focus { box-shadow: 0 0 0 2px var(--color-warning-border); }
+    .focus\:ring-info:focus    { box-shadow: 0 0 0 2px var(--color-info-border); }
+
+    .focus\:border-danger:focus { border-color: var(--color-danger-border); }
+    .focus\:border-success:focus { border-color: var(--color-success-border); }
+    .focus\:border-warning:focus { border-color: var(--color-warning-border); }
+    .focus\:border-info:focus    { border-color: var(--color-info-border); }
+}
+
+/* Button size+variant convenience classes (useful for HTML like .btn-cta-lg) */
+@layer components {
+    .btn-cta-lg { @apply btn-cta btn-lg; }
+    .btn-cta-sm { @apply btn-cta btn-sm; }
+
+    .btn-secondary-lg { @apply btn-secondary btn-lg; }
+    .btn-secondary-sm { @apply btn-secondary btn-sm; }
+
+    .btn-subtle-lg { @apply btn-subtle btn-lg; }
+    .btn-subtle-sm { @apply btn-subtle btn-sm; }
+
+    .btn-danger-lg { @apply btn-danger btn-lg; }
+    .btn-danger-sm { @apply btn-danger btn-sm; }
+}
+
+
+/* ===== Tailwind v4 custom utilities (TOP-LEVEL, not nested) ===== */
+
+/* Button base & sizes */
+@utility btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition-property: var(--transition-property-common);
+    transition-timing-function: var(--transition-timing-default);
+    transition-duration: var(--transition-duration-default);
+    border: 1px solid transparent;
+}
+@utility btn-lg { padding: var(--spacing-3) var(--spacing-6); font-size: 1.125rem; }
+@utility btn-md { padding: var(--spacing-2) var(--spacing-4); font-size: 1rem; }
+@utility btn-sm { padding: var(--spacing-1) var(--spacing-3); font-size: 0.875rem; }
+
+/* Variants */
+@utility btn-cta {
     background-color: var(--color-cta);
     color: var(--color-text-on-cta);
     border-color: var(--color-cta);
-
-    @variant hover {
-      background-color: var(--color-cta-hover);
-      border-color: var(--color-cta-hover);
-    }
-  }
-
-  .btn-secondary { /* Kept name, but uses new variables */
-    @apply btn;
+}
+@utility btn-secondary {
     background-color: var(--color-bg-component);
     color: var(--color-cta);
-    border: 1px solid var(--color-cta);
+    border-color: var(--color-cta);
+}
+@utility btn-subtle { background-color: transparent; color: var(--color-cta); border-color: transparent; }
+@utility btn-danger {
+    background-color: var(--color-danger-bg);
+    color: var(--color-danger-text);
+    border-color: var(--color-danger-border);
+}
 
-    @variant hover {
-      background-color: var(--color-bg-subtle);
-      border-color: var(--color-cta-hover);
-      color: var(--color-cta-hover);
+/* Convenience combos */
+@utility btn-cta-lg { @apply btn btn-cta btn-lg; }
+@utility btn-cta-sm { @apply btn btn-cta btn-sm; }
+@utility btn-secondary-lg { @apply btn btn-secondary btn-lg; }
+@utility btn-secondary-sm { @apply btn btn-secondary btn-sm; }
+@utility btn-subtle-lg { @apply btn btn-subtle btn-lg; }
+@utility btn-subtle-sm { @apply btn btn-subtle btn-sm; }
+@utility btn-danger-lg { @apply btn btn-danger btn-lg; }
+@utility btn-danger-sm { @apply btn btn-danger btn-sm; }
+
+/* Status text/bg/border aliases */
+@utility text-success { color: var(--color-success-text); }
+@utility text-warning { color: var(--color-warning-text); }
+@utility text-danger  { color: var(--color-danger-text); }
+@utility text-info    { color: var(--color-info-text); }
+
+@utility bg-success { background-color: var(--color-success-bg); }
+@utility bg-warning { background-color: var(--color-warning-bg); }
+@utility bg-danger  { background-color: var(--color-danger-bg); }
+@utility bg-info    { background-color: var(--color-info-bg); }
+
+@utility border-success { border-color: var(--color-success-border); }
+@utility border-warning { border-color: var(--color-warning-border); }
+@utility border-danger  { border-color: var(--color-danger-border); }
+@utility border-info    { border-color: var(--color-info-border); }
+
+/* Font alias */
+@utility font-body { font-family: var(--font-body); }
+
+
+/* ===== Component/hover states (regular CSS) ===== */
+@layer components {
+    .btn-cta:hover:not(:disabled) { background-color: var(--color-cta-hover); border-color: var(--color-cta-hover); }
+    .btn-secondary:hover:not(:disabled) { background-color: var(--color-bg-subtle); border-color: var(--color-cta-hover); color: var(--color-cta-hover); }
+    .btn-subtle:hover:not(:disabled) { background-color: var(--color-bg-subtle); color: var(--color-cta-hover); }
+    .btn-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--color-danger-bg) 90%, black); }
+
+    .btn:disabled,
+    .btn-cta:disabled,
+    .btn-secondary:disabled,
+    .btn-subtle:disabled,
+    .btn-danger:disabled,
+    .btn-cta-lg:disabled, .btn-cta-sm:disabled,
+    .btn-secondary-lg:disabled, .btn-secondary-sm:disabled,
+    .btn-subtle-lg:disabled, .btn-subtle-sm:disabled,
+    .btn-danger-lg:disabled, .btn-danger-sm:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
-  }
+}
 
-  .bg-cta { /* Renamed from bg-primary */
+
+/* ===============================
+   BUTTON REFINEMENTS (best practice)
+   - Consistent heights, padding, and typography
+   - Clear primary/outline/ghost/danger variants
+   - Proper :focus-visible ring and :disabled behavior
+   - Higher contrast for destructive (solid red)
+   =============================== */
+
+/* Sizes (use fixed heights for better vertical rhythm) */
+@utility btn-sm { height: 32px; padding-left: 12px; padding-right: 12px; font-size: 0.875rem; line-height: 1; }
+@utility btn-md { height: 40px; padding-left: 16px; padding-right: 16px; font-size: 1rem; line-height: 1; }
+@utility btn-lg { height: 48px; padding-left: 20px; padding-right: 20px; font-size: 1.125rem; line-height: 1; }
+
+/* Base button improvements */
+@utility btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    text-decoration: none;
+    cursor: pointer;
+    border-width: 1px;
+    border-style: solid;
+    transition: background-color var(--transition-duration-default) var(--transition-timing-default),
+    color var(--transition-duration-default) var(--transition-timing-default),
+    border-color var(--transition-duration-default) var(--transition-timing-default),
+    box-shadow var(--transition-duration-default) var(--transition-timing-default),
+    transform var(--transition-duration-default) var(--transition-timing-default);
+    transform: translateZ(0); /* perf */
+}
+
+/* Primary (CTA) — solid */
+@utility btn-cta {
     background-color: var(--color-cta);
     color: var(--color-text-on-cta);
-  }
-
-  /* Styles for links within .bg-cta */
-  .bg-cta a, .link-on-cta { /* Renamed from link-on-primary */
-    color: var(--color-text-on-cta);
-    text-decoration-line: underline;
-
-    @variant hover {
-      color: var(--color-text-on-cta);
-      opacity: 0.85;
-    }
-    @variant focus-visible {
-      outline: 1px solid var(--color-text-on-cta);
-      outline-offset: 2px;
-      border-radius: var(--radius-sm);
-    }
-  }
-
-  .bg-subtle { /* Renamed from bg-accent-subtle */
-    background-color: var(--color-bg-subtle);
-  }
-  /* Styles for links within .bg-subtle */
-  .bg-subtle a, .link-on-subtle { /* Renamed from link-on-accent-subtle */
-    color: var(--color-cta);
-
-    @variant hover {
-      color: var(--color-cta-hover);
-      text-decoration-line: underline;
-    }
-    @variant focus-visible {
-      outline: 1px solid var(--color-cta-focus-ring);
-      outline-offset: 2px;
-      border-radius: var(--radius-sm);
-    }
-  }
-
-
-  .card {
-    background-color: var(--color-bg-component);
-    border-radius: var(--radius-xl);
-    padding: var(--spacing-6);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .logo-leaf {
-    width: var(--spacing-5);
-    height: var(--spacing-5);
-    background-color: var(--color-brand-accent); /* Renamed from --color-accent-medium */
-    border-radius: var(--radius-none) var(--radius-full) var(--radius-none) var(--radius-full);
-    transform: rotate(-45deg);
-    display: inline-block;
-  }
-
-  .section-title { /* This class is more of a utility now, as base headings are styled */
-    color: var(--color-text-heading);
-  }
-
-  /* Alert component example */
-
-  .alert-info {
-    @apply alert;
-    background-color: #E0F2FE; /* Consider theme var: --color-bg-info-subtle */
-    border-color: #7DD3FC;    /* Consider theme var: --color-border-info */
-    color: #0C4A6E;           /* Consider theme var: --color-text-info */
-  }
-  .alert-success {
-    @apply alert;
-    background-color: var(--color-bg-subtle);
-    border-color: var(--color-brand-accent); /* Using brand-accent for success border */
-    color: var(--color-text-heading); /* Using heading color for success text */
-  }
-  .alert-warning {
-    @apply alert;
-    background-color: #FEF9C3; /* Consider theme var: --color-bg-warning-subtle */
-    border-color: #FDE047;    /* Consider theme var: --color-border-warning */
-    color: #713F12;           /* Consider theme var: --color-text-warning */
-  }
-  .alert-danger {
-    @apply alert;
-    background-color: #FEE2E2; /* Consider theme var: --color-bg-danger-subtle */
-    border-color: #FCA5A5;    /* Consider theme var: --color-border-danger */
-    color: #991B1B;           /* Consider theme var: --color-text-danger */
-  }
+    border-color: var(--color-cta);
+    box-shadow: var(--shadow-sm);
 }
+/* Outline (Secondary) */
+@utility btn-secondary {
+    background-color: transparent;
+    color: var(--color-cta);
+    border-color: var(--color-cta);
+}
+/* Ghost/Subtle */
+@utility btn-subtle {
+    background-color: transparent;
+    color: var(--color-cta);
+    border-color: transparent;
+}
+
+/* Danger (Destructive) — use a strong solid for clarity & contrast */
+@utility btn-danger {
+    background-color: #DC2626;      /* solid red */
+    color: #FFFFFF;
+    border-color: #DC2626;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Hover & active states */
+@layer components {
+    .btn-cta:hover:not(:disabled) { background-color: var(--color-cta-hover); border-color: var(--color-cta-hover); }
+    .btn-cta:active:not(:disabled) { transform: translateY(1px); }
+
+    .btn-secondary:hover:not(:disabled) { background-color: var(--color-bg-subtle); border-color: var(--color-cta-hover); color: var(--color-cta-hover); }
+    .btn-secondary:active:not(:disabled) { transform: translateY(1px); }
+
+    .btn-subtle:hover:not(:disabled) { background-color: var(--color-bg-subtle); color: var(--color-cta-hover); }
+    .btn-subtle:active:not(:disabled) { transform: translateY(1px); }
+
+    .btn-danger:hover:not(:disabled) { background-color: #B91C1C; border-color: #B91C1C; }
+    .btn-danger:active:not(:disabled) { transform: translateY(1px); }
+
+    /* Focus-visible ring for all buttons */
+    .btn:focus-visible,
+    .btn-cta:focus-visible,
+    .btn-secondary:focus-visible,
+    .btn-subtle:focus-visible,
+    .btn-danger:focus-visible,
+    .btn-cta-lg:focus-visible, .btn-cta-sm:focus-visible,
+    .btn-secondary-lg:focus-visible, .btn-secondary-sm:focus-visible,
+    .btn-subtle-lg:focus-visible, .btn-subtle-sm:focus-visible,
+    .btn-danger-lg:focus-visible, .btn-danger-sm:focus-visible {
+        outline: 2px solid transparent;
+        box-shadow: 0 0 0 3px var(--color-cta-focus-ring);
+    }
+
+    /* Disabled */
+    .btn:disabled,
+    .btn-cta:disabled,
+    .btn-secondary:disabled,
+    .btn-subtle:disabled,
+    .btn-danger:disabled,
+    .btn-cta-lg:disabled, .btn-cta-sm:disabled,
+    .btn-secondary-lg:disabled, .btn-secondary-sm:disabled,
+    .btn-subtle-lg:disabled, .btn-subtle-sm:disabled,
+    .btn-danger-lg:disabled, .btn-danger-sm:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+        box-shadow: none;
+    }
+}
+
+/* Convenience combos */
+@utility btn-cta-lg { @apply btn btn-cta btn-lg; }
+@utility btn-cta-sm { @apply btn btn-cta btn-sm; }
+@utility btn-secondary-lg { @apply btn btn-secondary btn-lg; }
+@utility btn-secondary-sm { @apply btn btn-secondary btn-sm; }
+@utility btn-subtle-lg { @apply btn btn-subtle btn-lg; }
+@utility btn-subtle-sm { @apply btn btn-subtle btn-sm; }
+@utility btn-danger-lg { @apply btn btn-danger btn-lg; }
+@utility btn-danger-sm { @apply btn btn-danger btn-sm; }

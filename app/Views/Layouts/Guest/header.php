@@ -19,6 +19,7 @@
                 <a href="/" class="font-medium text-gray-600 hover:text-primary">Home</a>
                 <a href="/about" class="font-medium text-gray-600 hover:text-primary">About</a>
                 <a href="/features" class="font-medium text-gray-600 hover:text-primary">Features</a>
+                <a href="/login" class="font-medium text-gray-600 hover:text-primary">Login</a>
                 <a href="/overview" class="font-medium text-gray-600 hover:text-primary">Learning</a>
                 <a href="/theme" class="font-medium text-gray-600 hover:text-primary">Theme</a>
             </nav>

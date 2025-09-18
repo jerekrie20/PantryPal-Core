@@ -2,15 +2,26 @@
 global $router;
 
 use Controllers\HomeController;
+use Controllers\UserController;
 
 // Define application routes
+
+//Guests
 $router->get('/', [HomeController::class, 'index']);
-$router->get('/overview', function () {
-    require VIEW_PATH . '/Learning/overview.html';
+$router->get('/overview', function () {require VIEW_PATH . '/Learning/overview.html';});
+$router->get('/theme', function () {require VIEW_PATH . '/Learning/theme.php';});
+$router->get('/login', function () {require VIEW_PATH . '/Pages/login.php';});
+$router->get('/register', function () { require VIEW_PATH . '/Pages/register.php';});
+$router->post('/login', [UserController::class, 'index']);
+$router->post('/register', [UserController::class, 'create']);
+
+//Auth Users
+$router->get('/dashboard', function () {
+    require VIEW_PATH . '/Users/dashboard.php';
 });
-$router->get('/theme', function () {
-    require VIEW_PATH . '/Learning/theme.php';
-});
+
+
+
 
 // Placeholder examples for future CRUD
 //$router->get('/items', [ItemController::class, 'index']);
