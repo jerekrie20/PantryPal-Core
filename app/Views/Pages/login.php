@@ -8,56 +8,60 @@
 
 </div>
 
-<main class="flex items-center justify-center  py-[var(--spacing-12)]">
+<main class="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="w-full max-w-md">
 
-        <div class="card">
-            <div class="text-center mb-[var(--spacing-8)]">
+        <div class="card p-6 md:p-8">
+            <div class="text-center mb-8">
                 <div class="inline-flex items-center justify-center">
-                    <div class="logo-leaf mr-[var(--spacing-2)]"></div>
-                    <h1 class="section-title text-3xl font-bold">Welcome Back</h1>
+                    <div style="width: var(--spacing-5); height: var(--spacing-5); background-color: var(--color-brand-accent); border-radius: 0 var(--radius-full) 0 var(--radius-full); transform: rotate(-45deg);" class="inline-block mr-2"></div>
+                    <h1 class="text-3xl font-bold text-text-heading">Welcome Back</h1>
                 </div>
-                <p class="mt-[var(--spacing-2)] text-gray-600">Sign in to manage your pantry.</p>
+                <p class="mt-2 text-text-muted">Sign in to manage your pantry.</p>
             </div>
 
-            <form action="/login" method="POST" class="space-y-[var(--spacing-6)]">
+            <?php if (isset($errors['credentials'])): ?>
+                <div class="alert-danger mb-4" role="alert">
+                    <?php echo htmlspecialchars($errors['credentials']); ?>
+                </div>
+            <?php endif; ?>
+
+            <form action="/login" method="POST" class="space-y-6">
 
                 <?php
-                form_input(
-                    id: 'email',
-                    type: 'email',
-                    label: 'Email Address',
-                    placeholder: 'you@example.com'
-                );
+                form_input('email', 'Email Address', 'email', [
+                        'placeholder' => 'you@example.com',
+                        'required' => true,
+                        'value' => $input['email'] ?? '',
+                        'error' => $errors['email'] ?? null
+                ]);
                 ?>
 
                 <div>
                     <?php
-                    form_input(
-                        id: 'password',
-                        type: 'password',
-                        label: 'Password',
-                        placeholder: '••••••••'
-                    );
+                    form_input('password', 'Password', 'password', [
+                            'placeholder' => '••••••••',
+                            'required' => true,
+                            'error' => $errors['password'] ?? null
+                    ]);
                     ?>
-                    <div class="text-right mt-[var(--spacing-2)]">
-                        <a href="/forgot-password.php" class="text-sm font-medium">
+                    <div class="text-right mt-2">
+                        <a href="/forgot-password" class="text-sm font-medium">
                             Forgot Password?
                         </a>
                     </div>
                 </div>
 
                 <?php
-                form_button(
-                    text: 'Sign In',
-                    type: 'submit',
-                    size: 'lg'
-                );
+                form_button('Sign In', 'cta', [
+                        'size' => 'lg',
+                        'fullWidth' => true
+                ]);
                 ?>
 
             </form>
 
-            <div class="mt-[var(--spacing-6)] text-center text-sm text-gray-600">
+            <div class="mt-6 text-center text-sm text-text-muted">
                 <p>
                     Don't have an account?
                     <a href="/register" class="font-medium">
@@ -69,6 +73,7 @@
 
     </div>
 </main>
+
 
 <?php include VIEW_PATH . '/Layouts/Guest/footer.php'; ?>
 

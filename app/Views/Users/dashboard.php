@@ -19,7 +19,7 @@ ob_start();
         <h1 id="dashboard-heading" class="text-3xl font-bold text-text-heading">Welcome Back, <?php echo htmlspecialchars($username); ?>!</h1>
         <p class="text-text-muted mt-1">Here's a snapshot of your pantry today.</p>
     </div>
-    <a href="/items/new" class="btn btn-cta btn-md mt-4 sm:mt-0">
+    <a href="/items/create" class="btn btn-cta btn-md mt-4 sm:mt-0">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" role="img" aria-hidden="true"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
         <span>Add New Item</span>
     </a>

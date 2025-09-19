@@ -1,5 +1,11 @@
-<?php require_once VIEW_PATH . '/Components/form_elements.php'; ?>
-<?php include VIEW_PATH . '/Layouts/Guest/header.php'; ?>
+<?php
+require_once VIEW_PATH . '/Components/form_elements.php';
+include VIEW_PATH . '/Layouts/Guest/header.php';
+
+$errors = $errors ?? [];
+$input = $input ?? [];
+?>
+
 
 <div
         class="relative h-64 bg-cover bg-center rounded-lg overflow-hidden bg-[image:var(--hero-img)]"
@@ -8,87 +14,64 @@
 
 </div>
 
-<main class="flex items-center justify-center  py-[var(--spacing-12)]">
+<main class="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="w-full max-w-md">
 
-        <div class="card">
-            <div class="text-center mb-[var(--spacing-8)]">
+        <div class="card p-6 md:p-8">
+            <div class="text-center mb-8">
                 <div class="inline-flex items-center justify-center">
-                    <div class="logo-leaf mr-[var(--spacing-2)]"></div>
-                    <h1 class="section-title text-3xl font-bold">Create an Account</h1>
+                    <div style="width: var(--spacing-5); height: var(--spacing-5); background-color: var(--color-brand-accent); border-radius: 0 var(--radius-full) 0 var(--radius-full); transform: rotate(-45deg);" class="inline-block mr-2"></div>
+                    <h1 class="text-3xl font-bold text-text-heading">Create an Account</h1>
                 </div>
-                <p class="mt-[var(--spacing-2)] text-gray-600">Create an account</p>
+                <p class="mt-2 text-text-muted">Join PantryPal to start managing your pantry today.</p>
             </div>
 
-            <div class="text-center mb-[var(--spacing-8)]">
-                <?php if (!empty($errors)) {
-                    foreach ($errors as $field => $message) {
-                        ?>
-                        <p class="mt-[var(--spacing-2)] text-gray-600"><?php echo htmlspecialchars($field) . ": " . htmlspecialchars($message) . "<br>"; ?></p>
-                    <?php }
-                } ?>
-            </div>
-
-            <form action="/register" method="POST" class="space-y-[var(--spacing-6)]">
+            <form action="/register" method="POST" class="space-y-6">
 
                 <?php
-                form_input(
-                        id: 'username',
-                        type: 'text',
-                        label: 'Username',
-                        placeholder: 'pal34',
-                        value: $input['username'] ?? ''
-                );
+                form_input('username', 'Username', 'text', [
+                        'placeholder' => 'e.g., pantrypal123',
+                        'required' => true,
+                        'value' => $input['username'] ?? '',
+                        'error' => $errors['username'] ?? null
+                ]);
+
+                form_input('email', 'Email Address', 'email', [
+                        'placeholder' => 'you@example.com',
+                        'required' => true,
+                        'value' => $input['email'] ?? '',
+                        'error' => $errors['email'] ?? null
+                ]);
+
+                form_input('password', 'Password', 'password', [
+                        'placeholder' => '••••••••',
+                        'required' => true,
+                        'error' => $errors['password'] ?? null
+                ]);
+
+                form_input('password_confirm', 'Confirm Password', 'password', [
+                        'placeholder' => '••••••••',
+                        'required' => true,
+                        'error' => $errors['password_confirm'] ?? null
+                ]);
                 ?>
 
-                <?php
-                form_input(
-                        id: 'email',
-                        type: 'email',
-                        label: 'Email Address',
-                        placeholder: 'you@example.com',
-                        value: $input['email'] ?? ''
-                );
-                ?>
-
-
-                <?php
-                form_input(
-                        id: 'password',
-                        type: 'password',
-                        label: 'Password',
-                        placeholder: '••••••••',
-                        value: $input['password'] ?? ''
-                );
-                ?>
-
-
-                <?php
-                form_input(
-                        id: 'password_confirm',
-                        type: 'password',
-                        label: 'Confirm Password',
-                        placeholder: '••••••••',
-                        value: $input['password_confirm'] ?? ''
-                );
-                ?>
-
-
-                <?php
-                form_button(
-                        text: 'Sign In',
-                        type: 'submit',
-                        size: 'lg'
-                );
-                ?>
+                <div class="pt-2">
+                    <?php
+                    form_button('Create Account', 'cta', [
+                            'size' => 'lg',
+                            'fullWidth' => true
+                    ]);
+                    ?>
+                </div>
 
             </form>
 
-            <div class="mt-[var(--spacing-6)] text-center text-sm text-gray-600">
+            <div class="mt-6 text-center text-sm text-text-muted">
                 <p>
-                    Have an account?
+                    Already have an account?
                     <a href="/login" class="font-medium">
-                        Login Here
+                        Sign in here
                     </a>
                 </p>
             </div>

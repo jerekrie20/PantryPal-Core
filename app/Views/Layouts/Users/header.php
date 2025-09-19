@@ -16,7 +16,9 @@ require_once VIEW_PATH . '/Components/avatar.php';
                 <a href="/" class="text-xl font-bold text-text-base" aria-label="PantryPal Home">PantryPal</a>
             </div>
             <div class="flex items-center space-x-4">
+                <a href="/dashboard" class="btn btn-subtle btn-md hidden sm:inline-flex">Dashboard</a>
                 <a href="/recipes" class="btn btn-subtle btn-md hidden sm:inline-flex">Recipes</a>
+                <a href="/items" class="btn btn-subtle btn-md hidden sm:inline-flex">Items</a>
                 <a href="/logout" class="btn btn-subtle btn-md hidden sm:inline-flex">Logout</a>
                 <button aria-label="User menu">
                     <?php

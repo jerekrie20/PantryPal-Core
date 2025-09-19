@@ -19,7 +19,12 @@
                 <a href="/" class="font-medium text-gray-600 hover:text-primary">Home</a>
                 <a href="/about" class="font-medium text-gray-600 hover:text-primary">About</a>
                 <a href="/features" class="font-medium text-gray-600 hover:text-primary">Features</a>
-                <a href="/login" class="font-medium text-gray-600 hover:text-primary">Login</a>
+                <?php if (!empty($_SESSION['user_id'])) { ?>
+                    <a href="/dashboard" class="font-medium text-gray-600 hover:text-primary">Dashboard</a>
+                    <a href="/logout" class="font-medium text-gray-600 hover:text-primary">Logout</a>
+                <?php } else { ?>
+                    <a href="/login" class="font-medium text-gray-600 hover:text-primary">Login</a>
+                <?php } ?>
                 <a href="/overview" class="font-medium text-gray-600 hover:text-primary">Learning</a>
                 <a href="/theme" class="font-medium text-gray-600 hover:text-primary">Theme</a>
             </nav>
@@ -44,6 +49,16 @@
                class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">About</a>
             <a href="#features"
                class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Features</a>
+
+            <?php if (!empty($_SESSION['user_id'])) { ?>
+                <a href="/dashboard"
+                   class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Dashboard</a>
+                <a href="/logout"
+                   class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Logout</a>
+            <?php } else { ?>
+                <a href="/login"
+                   class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Login</a>
+            <?php } ?>
 
             <a href="/app/Views/Learning/overview.html"
                class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Learning</a>

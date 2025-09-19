@@ -3,6 +3,7 @@ global $router;
 
 use Controllers\DashboardController;
 use Controllers\HomeController;
+use Controllers\ItemsController;
 use Controllers\UserController;
 use Middleware\AuthMiddleware;
 
@@ -10,10 +11,18 @@ use Middleware\AuthMiddleware;
 
 //Guests
 $router->get('/', [HomeController::class, 'index']);
-$router->get('/overview', function () {require VIEW_PATH . '/Learning/overview.html';});
-$router->get('/theme', function () {require VIEW_PATH . '/Learning/theme.php';});
-$router->get('/login', function () {require VIEW_PATH . '/Pages/login.php';});
-$router->get('/register', function () { require VIEW_PATH . '/Pages/register.php';});
+$router->get('/overview', function () {
+    require VIEW_PATH . '/Learning/overview.html';
+});
+$router->get('/theme', function () {
+    require VIEW_PATH . '/Learning/theme.php';
+});
+$router->get('/login', function () {
+    require VIEW_PATH . '/Pages/login.php';
+});
+$router->get('/register', function () {
+    require VIEW_PATH . '/Pages/register.php';
+});
 $router->post('/login', [UserController::class, 'index']);
 $router->post('/register', [UserController::class, 'create']);
 
@@ -24,6 +33,16 @@ $router->group(['middleware' => [AuthMiddleware::class]], function ($router) {
 
     $router->get('/dashboard', [DashboardController::class, 'index']);
     $router->get('/logout', [UserController::class, 'logout']);
+
+    //Items Routes
+    $router->get('/items', [ItemsController::class, 'index']); //Display all items
+    $router->get('/items/create', [ItemsController::class, 'create']); // Display the form
+    $router->post('/items', [ItemsController::class, 'store']); // store data from the forms
+    $router->get('/items/{id:int}/edit', [ItemsController::class, 'edit']); // display the form for update
+    $router->post('/items/{id:int}', [ItemsController::class, 'update']); // Update data from the form
+    $router->post('/items/{id:int}/delete', [ItemsController::class, 'destroy']); // Delete an item
+
+
     // You can add all other authenticated routes here
     // $router->get('/items', [ItemController::class, 'index']);
     // $router->get('/profile', [ProfileController::class, 'show']);
@@ -31,18 +50,6 @@ $router->group(['middleware' => [AuthMiddleware::class]], function ($router) {
 
 });
 
-
-
-
-
-
-// Placeholder examples for future CRUD
-//$router->get('/items', [ItemController::class, 'index']);
-//$router->get('/items/create', [ItemController::class, 'create']);
-//$router->post('/items', [ItemController::class, 'store']);
-//$router->get('/items/{id:int}/edit', [ItemController::class, 'edit']);
-//$router->post('/items/{id:int}', [ItemController::class, 'update']);
-//$router->post('/items/{id:int}/delete', [ItemController::class, 'destroy']);
 
 // 404 fallback
 $router->fallback(function () {
