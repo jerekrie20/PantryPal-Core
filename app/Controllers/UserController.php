@@ -7,6 +7,7 @@
 namespace Controllers;
 
 use Helpers\View;
+use JetBrains\PhpStorm\NoReturn;
 use Models\User;
 
 /**
@@ -23,8 +24,17 @@ class UserController
 
     public function index()
     {
-        var_dump($_POST);
-        die;
+        $userArrau = $this->user->login($_POST);
+
+        if ($userArrau != false) {
+        }
+        {
+            $_SESSION['user_id'] = $userArrau['id'];
+            $_SESSION['username'] = $userArrau['username'];
+        }
+
+
+        header('location: /dashboard');
     }
 
     public function create() //Create A new users
@@ -41,10 +51,11 @@ class UserController
             return View::render('Pages/register', ['title' => 'Register', 'errors' => $validation, 'input' => $_POST]);
         }
 
-        if($data != false){
+        if ($data != false) {
             $_SESSION['user_id'] = $data;
-            return View::render('Users/dashboard', ['title' => 'Dashboard']);
-        }else{
+            header('location: /dashboard');
+            exit();
+        } else {
             return View::render('Pages/register', ['title' => 'Register', 'errors' => 'An unexpected error has occurred, please try again.']);
         }
 
@@ -71,6 +82,14 @@ class UserController
 
     public function destroy()
     {
+    }
+
+    #[NoReturn]
+    public function logout(): void
+    {
+        $this->user->logout();
+        header('location: /');
+        exit();
     }
 
 

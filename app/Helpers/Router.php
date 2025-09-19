@@ -5,6 +5,7 @@ class Router {
     private string $method;
     private string $path;
     private array $routes = ['GET'=>[], 'POST'=>[]];
+    private array $middlewareGroupStack = []; // Added to manage nested groups
     private $fallback = null;
 
     public function __construct(string $method, string $requestUri) {
@@ -16,10 +17,34 @@ class Router {
     public function post(string $pattern, $handler): void { $this->map('POST', $pattern, $handler); }
     public function fallback(callable $handler): void { $this->fallback = $handler; }
 
+    /**
+     * NEW: Groups routes together under a common set of options, like middleware.
+     *
+     * @param array $options An array of options, e.g., ['middleware' => [AuthMiddleware::class]]
+     * @param callable $callback A function that defines the routes within the group.
+     */
+    public function group(array $options, callable $callback): void {
+        // Push the middleware from this group onto a stack. This allows for nested groups.
+        $this->middlewareGroupStack[] = $options['middleware'] ?? [];
+
+        // Execute the callback, which will register the routes inside the group.
+        call_user_func($callback, $this);
+
+        // Once the group is finished, pop its middleware off the stack.
+        array_pop($this->middlewareGroupStack);
+    }
+
     public function run(): void {
         $routes = $this->routes[$this->method] ?? [];
-        foreach ($routes as [$regex, $keys, $handler]) {
+        foreach ($routes as [$regex, $keys, $handler, $middlewares]) {
             if (preg_match($regex, $this->path, $m)) {
+                // --- NEW: Run Middleware for the matched route ---
+                foreach ($middlewares as $middleware) {
+                    // Instantiate the middleware class and call its handle method.
+                    (new $middleware())->handle();
+                }
+                // --- End of Middleware Logic ---
+
                 $params = [];
                 foreach ($keys as $i => $key) $params[$key] = $m[$i+1] ?? null;
 
@@ -44,7 +69,9 @@ class Router {
 
     private function map(string $method, string $pattern, $handler): void {
         [$regex, $keys] = $this->compile($pattern);
-        $this->routes[$method][] = [$regex, $keys, $handler];
+        // Get all middleware from the current stack and flatten into a single array.
+        $currentMiddlewares = array_merge(...$this->middlewareGroupStack);
+        $this->routes[$method][] = [$regex, $keys, $handler, $currentMiddlewares];
     }
 
     private function compile(string $pattern): array {
@@ -71,7 +98,6 @@ class Router {
         return ['#^' . $regex . '$#', $keys];
     }
 
-
     private function detectPath(string $requestUri): string {
         // Always parse the path piece only
         $path = parse_url($requestUri, PHP_URL_PATH) ?? '/';
@@ -89,3 +115,4 @@ class Router {
         return $path === '' ? '/' : $path;
     }
 }
+
