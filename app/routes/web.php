@@ -38,6 +38,8 @@ $router->group(['middleware' => [AuthMiddleware::class]], function ($router) {
     $router->get('/items', [ItemsController::class, 'index']); //Display all items
     $router->get('/items/create', [ItemsController::class, 'create']); // Display the form
     $router->post('/items', [ItemsController::class, 'store']); // store data from the forms
+    $router->post('/items/confirm', [ItemsController::class, 'storeConfirmed']); // confirm selection from API choices
+    $router->get('/items/view/{id:int}', [ItemsController::class, 'show']); // View a specific item
     $router->get('/items/{id:int}/edit', [ItemsController::class, 'edit']); // display the form for update
     $router->post('/items/{id:int}', [ItemsController::class, 'update']); // Update data from the form
     $router->post('/items/{id:int}/delete', [ItemsController::class, 'destroy']); // Delete an item

@@ -22,7 +22,7 @@ if ($env === 'production') {
         "default-src 'self'; " .
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' {$vite}; " .
         "style-src 'self' 'unsafe-inline'; " .
-        "img-src 'self' data:; " .
+        "img-src 'self' https: data:; " .
         "connect-src 'self' {$vite} {$ws}; " .
         "font-src 'self' data:"
     );

@@ -1,7 +1,9 @@
 <?php
+
 declare(strict_types=1);
 
-use Controllers\HomeController;
+require_once __DIR__ . '/../vendor/autoload.php';
+
 use Helpers\Router;
 
 define('APP_ROOT', dirname(__DIR__));

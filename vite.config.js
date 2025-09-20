@@ -34,7 +34,7 @@ export default defineConfig({
         https: {
             key: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost+3-key.pem')),
             cert: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost+3.pem')),
-            ca: fs.readFileSync(path.resolve(__dirname, 'ssl/rootCA.pem')),
+            ca: fs.readFileSync(path.resolve(__dirname, 'ssl/rootCA.crt')),
         },
         host: true,
         port: 5173,

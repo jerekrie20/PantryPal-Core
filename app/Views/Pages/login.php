@@ -20,9 +20,9 @@
                 <p class="mt-2 text-text-muted">Sign in to manage your pantry.</p>
             </div>
 
-            <?php if (isset($errors['credentials'])): ?>
+            <?php if (isset($error)): ?>
                 <div class="alert-danger mb-4" role="alert">
-                    <?php echo htmlspecialchars($errors['credentials']); ?>
+                    <?php echo htmlspecialchars((string)$error); ?>
                 </div>
             <?php endif; ?>
 

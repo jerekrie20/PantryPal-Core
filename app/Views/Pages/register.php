@@ -26,6 +26,12 @@ $input = $input ?? [];
                 <p class="mt-2 text-text-muted">Join PantryPal to start managing your pantry today.</p>
             </div>
 
+            <?php if (isset($error)): ?>
+                <div class="alert-danger mb-4" role="alert">
+                    <?php echo htmlspecialchars((string)$error); ?>
+                </div>
+            <?php endif; ?>
+
             <form action="/register" method="POST" class="space-y-6">
 
                 <?php

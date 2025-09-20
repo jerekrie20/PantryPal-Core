@@ -95,6 +95,28 @@ class Validator
                         }
                         break;
 
+                    case 'string':
+                        if ($ruleValue === true && !is_string($value)) {
+                            $this->addError($field, "The {$field} field must be a string.");
+                        }
+                        break;
+                    case 'date':
+                        if ($ruleValue === true) {
+                            // Enforce strict YYYY-MM-DD (zero-padded) format
+                            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+                                $this->addError($field, "The {$field} field must be a valid date (YYYY-MM-DD).");
+                                break;
+                            }
+
+                            $year = (int)substr($value, 0, 4);
+                            $month = (int)substr($value, 5, 2);
+                            $day = (int)substr($value, 8, 2);
+
+                            if (!checkdate($month, $day, $year)) {
+                                $this->addError($field, "The {$field} field must be a valid date.");
+                            }
+                        }
+                        break;
                     case 'matches':
                         if ($value !== ($this->_source[$ruleValue] ?? '')) {
                             $this->addError($field, "The {$field} field must match the {$ruleValue} field.");

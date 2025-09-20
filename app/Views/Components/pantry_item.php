@@ -1,11 +1,19 @@
 <?php
 // This component expects an $item (array) variable.
+// Determine image source: use actual URL if provided, else fallback placeholder with item name.
+$imageSrc = null;
+if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
+    $imageSrc = $item['image'];
+} else {
+    $placeholderText = !empty($item['name']) ? $item['name'] : 'Item';
+    $imageSrc = 'https://placehold.co/80x80/E8F5E9/36454F?text=' . urlencode($placeholderText);
+}
 ?>
 <li class="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 <?php echo isset($item['expired']) && $item['expired'] ? 'opacity-60' : ''; ?>">
     <div class="flex items-center w-full sm:w-auto">
-        <img src="https://placehold.co/80x80/E8F5E9/36454F?text=<?php echo urlencode($item['image']); ?>" class="w-12 h-12 rounded-lg object-cover mr-4 flex-shrink-0" alt="Image of <?php echo htmlspecialchars($item['name']); ?>">
+        <img src="<?php echo htmlspecialchars($imageSrc); ?>" class="w-12 h-12 rounded-lg object-cover mr-4 flex-shrink-0" alt="Image of <?php echo htmlspecialchars($item['name'] ?? 'Item'); ?>">
         <div class="flex-grow">
-            <p class="font-semibold text-text-base"><?php echo htmlspecialchars($item['name']); ?></p>
+            <a href="/items/view/<?php echo $item['id']; ?>" class="text-text-base font-semibold hover:underline"><?php echo htmlspecialchars($item['name']); ?></a>
             <p class="text-sm text-text-muted"><?php echo htmlspecialchars($item['status']); ?></p>
         </div>
     </div>

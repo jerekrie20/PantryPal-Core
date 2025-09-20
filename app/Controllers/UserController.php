@@ -15,7 +15,7 @@ use Models\User;
  */
 class UserController
 {
-    private $user;
+    private User $user;
 
     public function __construct()
     {
@@ -24,42 +24,56 @@ class UserController
 
     public function index()
     {
-        $userArrau = $this->user->login($_POST);
+        try {
+            $userArray = $this->user->login($_POST);
 
-        if ($userArrau != false) {
+            if (!$userArray) {
+                return View::render('Pages/login', ['title' => 'Login', 'error' => 'Please try again']);
+            }
+
+            $_SESSION['user_id'] = $userArray['id'];
+            $_SESSION['username'] = $userArray['username'];
+
+            header('location: /dashboard');
+        }catch (\Throwable $e){
+            // Log the detailed database error for debugging purposes.
+            error_log("Database Error in UserController::index(): " . $e->getMessage());
+            header('location: /login');
+            exit();
         }
-        {
-            $_SESSION['user_id'] = $userArrau['id'];
-            $_SESSION['username'] = $userArrau['username'];
-        }
-
-
-        header('location: /dashboard');
     }
 
-    public function create() //Create A new users
+    public function create(): string // Create a new user
     {
-        $validation = '';
-        $data = '';
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $validation = $this->user->register();
+        $isPost = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
+
+        $renderRegister = function (array $data = []): string {
+            $defaults = ['title' => 'Register', 'input' => $_POST ?? []];
+            return View::render('Pages/register', $defaults + $data);
+        };
+
+        if (!$isPost) {
+            return $renderRegister();
         }
 
-        if ($validation === true) {
-            $data = $this->user->createUser($_POST);
-        } else {
-            return View::render('Pages/register', ['title' => 'Register', 'errors' => $validation, 'input' => $_POST]);
+        $validationResult = $this->user->register();
+
+        if ($validationResult !== true) {
+            return $renderRegister(['errors' => $validationResult]);
+        }
+        $userId = $this->user->createUser($_POST);
+
+        $createdUser =  $this->user->find($userId);
+
+        if (!$createdUser) {
+            return $renderRegister(['error' => 'An unexpected error has occurred, please try again.']);
         }
 
-        if ($data != false) {
-            $_SESSION['user_id'] = $data;
-            header('location: /dashboard');
-            exit();
-        } else {
-            return View::render('Pages/register', ['title' => 'Register', 'errors' => 'An unexpected error has occurred, please try again.']);
-        }
+        $_SESSION['user_id'] = $createdUser['id'] ?? null;
+        $_SESSION['username'] = $createdUser['username'] ?? null;
 
-
+        header('Location: /dashboard');
+        exit();
     }
 
     public function store()

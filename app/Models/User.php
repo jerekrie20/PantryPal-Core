@@ -8,12 +8,15 @@ use PDOException;
 
 class User
 {
-    protected $db;
+    protected ?PDO $db = null;
 
     function __construct()
     {
         global $conn;
-        $this->db = $conn;
+        $this->db = $conn instanceof PDO ? $conn : null;
+        if ($this->db === null) {
+            throw new \RuntimeException('Database connection not initialized.');
+        }
     }
 
     public function register(): true|array
@@ -47,45 +50,44 @@ class User
         if ($validator->passed()) {
             return true;
         } else {
-            $errors = $validator->errors();
-            return $errors;
+            return $validator->errors();
         }
 
     }
 
-    public function login($data) {
+    public function login($data)
+    {
         $email = $data['email'];
         $password = $data['password'];
 
-        try {
-            // It's good practice to select the user's ID as well
-            $stmt = $this->db->prepare("SELECT id,username,email,password_hash FROM users WHERE email = :email");
-            $stmt->execute(['email' => $email]);
+        // It's good practice to select the user's ID as well
+        $stmt = $this->db->prepare("SELECT id,username,email,password_hash FROM users WHERE email = :email");
 
-            // Fetch the user record from the database
-            $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $stmt->execute(['email' => $email]);
 
-            // 1. Check if a user was found
-            // 2. If found, verify the submitted password against the stored hash
-            if ($user && password_verify($password, $user['password_hash'])) {
-                // Passwords match! Return the user's ID.
-                return $user;
-            } else {
-                // Either the user was not found or the password was incorrect.
-                // In either case, return false for security (don't specify which was wrong).
-                return false;
-            }
+        // Fetch the user record from the database
+        $user = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-        } catch (\PDOException $e) {
-            // Log the detailed error for debugging, but don't show it to the user.
-            error_log($e->getMessage());
+        // 1. Check if a user was found
+        // 2. If found, verify the submitted password against the stored hash
+        if ($user && password_verify($password, $user['password_hash'])) {
+            // Passwords match! Return the user's ID.
+            return $user;
+        } else {
+            // Either the user was not found or the password was incorrect.
+            // In either case, return false for security (don't specify which was wrong).
             return false;
         }
+
+
     }
 
 
-    protected function getUser()
+    public function find(int $id)
     {
+        $stmt = $this->db->prepare("SELECT id, username FROM users WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch();
     }
 
     protected function getUserId()
@@ -113,8 +115,7 @@ class User
             $stmt->bindParam(':email', $email);
             $stmt->bindParam(':hashedPassword', $hashedPassword);
             $stmt->execute();
-            $last_id = $this->db->lastInsertId();
-            return $last_id;
+            return $this->db->lastInsertId();
         } catch (PDOException $e) {
             //Save error message in the error log
             error_log($e->getMessage());
