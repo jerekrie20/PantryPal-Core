@@ -1,5 +1,8 @@
 {
     "require": {
-        "guzzlehttp/guzzle": "^7.10"
+        "guzzlehttp/guzzle": "^7.10",
+      "ext-mbstring": "*",
+      "ext-pdo": "*",
+      "ext-curl": "*"
     }
 }

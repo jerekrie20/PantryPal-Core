@@ -4,13 +4,15 @@ namespace Services;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
-use Models\GlobalItems;
+use Models\Ingredients;
+use Models\Products;
 
 class SpoonacularService
 {
     protected Client $client;
     protected string $apiKey;
-    protected GlobalItems $globalItemsModel;
+    protected Ingredients $ingredients;
+    protected Products $products;
 
     public function __construct()
     {
@@ -19,270 +21,267 @@ class SpoonacularService
             'timeout'  => 5.0,
         ]);
         $this->apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? 'YOUR_SPOONACULAR_API_KEY';
-        $this->globalItemsModel = new GlobalItems();
+        $this->ingredients = new Ingredients();
+        $this->products = new Products();
     }
 
-    /**
-     * Searches the API for potential matches for a user's query.
-     * It prioritizes specific products and falls back to generic ingredients.
-     *
-     * @param string $itemName The user-provided item name.
-     * @return array An array of potential choices, each with an id, name, and image.
-     */
-    public function searchForChoices(string $itemName): array
+    public static function normalizeName(string $name): string
+    {
+        return Ingredients::normalizeName($name);
+    }
+
+    public static function normalizeBrand(?string $brand): ?string
+    {
+        return Ingredients::normalizeBrand($brand);
+    }
+
+    /** Search by explicit kind to avoid guesswork. */
+    public function searchWithKind(string $query, string $apiKind, ?string $brand = null, int $limit = 5): array
     {
         try {
-            // First, try to find specific branded products.
-            $products = $this->searchProducts($itemName);
-            if (!empty($products)) {
-                return $products;
+            if ($apiKind === 'product') {
+                return $this->searchProducts($brand ? ($brand . ' ' . $query) : $query, $limit);
+            } elseif ($apiKind === 'ingredient') {
+                return $this->searchIngredients($query, $limit);
             }
-
-            // If no products are found, fall back to generic ingredients.
-            $normalizedName = $this->normalizeName($itemName);
-            if (empty($normalizedName)) {
-                return [];
-            }
-            return $this->searchIngredients($normalizedName);
-
+            return [];
         } catch (GuzzleException $e) {
-            error_log("Spoonacular API search error: " . $e->getMessage());
+            error_log("Spoonacular search error: " . $e->getMessage());
             return [];
         }
     }
 
-    /**
-     * Fetches final details for a confirmed Spoonacular item ID and creates it in the local DB if needed.
-     *
-     * @param int $apiId The confirmed Spoonacular ID (from either product or ingredient search).
-     * @param string $originalQuery The user's original search term for caching.
-     * @return array|null The full global item record from the local database.
-     */
-
-    /**
-     * Create or fetch a Global Item based on a Spoonacular id and kind.
-     *
-     * @param int $apiId
-     * @param string|null $kind 'ingredient' or 'product'
-     * @param string $originalQuery
-     * @return array|null
-     */
-    public function createGlobalItemFromApi(int $apiId, ?string $kind, string $originalQuery): ?array
+    /** Ensure an ingredient exists from API id (ingredient kind). */
+    public function ensureIngredientFromApi(int $apiId, string $originalQuery, ?string $brand = null): ?array
     {
-        // existing?
-        if ($existing = $this->globalItemsModel->findByApiId($apiId)) {
-            return $existing;
-        }
+        if ($existing = $this->ingredients->findByApiId($apiId)) return $existing;
 
-        $details = null;
         try {
-            if ($kind === 'product') {
-                $details = $this->fetchProductDetails($apiId);
-            } else {
-                // default path
-                $details = $this->fetchIngredientDetails($apiId);
-            }
-        } catch (GuzzleException $e) {
-            error_log("Spoonacular API detail fetch error: " . $e->getMessage());
-        }
-
-        // Fallback: if wrong kind or missing, try the other one too
-        if (!$details) {
-            try {
-                $tryOther = ($kind === 'product') ? 'ingredient' : 'product';
-                $details = ($tryOther === 'product')
-                    ? $this->fetchProductDetails($apiId)
-                    : $this->fetchIngredientDetails($apiId);
-            } catch (GuzzleException $e) { /* ignore */ }
-        }
-
-        return $this->upsertGlobalFromDetailsWrapper($apiId, $details, $originalQuery);
-    }
-
-    private function upsertGlobalFromDetailsWrapper(int $apiId, ?array $details, string $originalQuery): ?array
-    {
-        if ($details) {
-            $newItemId = $this->globalItemsModel->create([
-                'name' => $details['name'],
-                'normalized_name' => strtolower(trim($originalQuery)),
-                'api_id' => $apiId,
-                'image_url' => $details['image_url'] ?? null,
-                'category' => $details['category'] ?? 'uncategorized',
-                'nutrition_info' => isset($details['nutrition_info']) ? (is_array($details['nutrition_info']) ? json_encode($details['nutrition_info']) : $details['nutrition_info']) : null,
-            ]);
-            return $newItemId ? $this->globalItemsModel->find($newItemId) : null;
-        }
-
-        // minimal fallback
-        $normalized = $this->normalizeName($originalQuery);
-        if ($existingByName = $this->globalItemsModel->findByNormalizedName($normalized)) {
-            return $existingByName;
-        }
-        $newItemId = $this->globalItemsModel->create([
-            'name' => trim($originalQuery),
-            'normalized_name' => $normalized,
-            'api_id' => null,
-            'image_url' => null,
-            'category' => 'uncategorized',
-            'nutrition_info' => null,
-        ]);
-        return $newItemId ? $this->globalItemsModel->find($newItemId) : null;
-    }
-
-    public function createGlobalItemFromApiId(int $apiId, string $originalQuery): ?array
-    {
-        // 1) If we already cached this API id, return it.
-        $item = $this->globalItemsModel->findByApiId($apiId);
-        if ($item) {
-            return $item;
-        }
-
-        $details = null;
-        try {
-            // 2) Try to fetch details from Spoonacular.
             $details = $this->fetchIngredientDetails($apiId);
         } catch (GuzzleException $e) {
-            // Log and continue to fallback.
-            error_log("Spoonacular API detail fetch error: " . $e->getMessage());
+            error_log("Spoonacular fetch ingredient error: " . $e->getMessage());
+            $details = null;
         }
 
-        if (!$details) {
-            try { $details = $this->fetchProductDetails($apiId); } catch (\GuzzleHttp\Exception\GuzzleException $e) { /* ignore */ }
-        }
-
-        if ($details) {
-            // 3) Create using full details when available.
-            $newItemId = $this->globalItemsModel->create([
-                'name' => $details['name'],
-                'normalized_name' => strtolower(trim($originalQuery)),
-                'api_id' => $apiId,
-                'image_url' => $details['image_url'],
-                'category' => $details['category'],
-                'nutrition_info' => $details['nutrition_info'],
-            ]);
-            return $newItemId ? $this->globalItemsModel->find($newItemId) : null;
-        }
-
-        // 4) Fallback: if the API didn't return details (404, network, key missing, etc.),
-        //    create or reuse a minimal global item using the user's original input.
-        $normalized = $this->normalizeName($originalQuery);
-        $existingByName = $this->globalItemsModel->findByNormalizedName($normalized);
-        if ($existingByName) {
-            return $existingByName;
-        }
-
-        $newItemId = $this->globalItemsModel->create([
-            'name' => trim($originalQuery),
-            'normalized_name' => $normalized,
-            // Do not store a broken external id; keep it null so we can re-enrich later if needed.
-            'api_id' => null,
-            'image_url' => null,
-            'category' => 'uncategorized',
-            'nutrition_info' => null,
+        $name = $details['name'] ?? $originalQuery;
+        $newId = $this->ingredients->create([
+            'name'            => $name,
+            'normalized_name' => self::normalizeName($name),
+            'brand'           => self::normalizeBrand($brand),
+            'api_id'          => $apiId,
+            'api_kind'        => 'ingredient',
+            'image_url'       => $details['image_url'] ?? null,
+            'category'        => $details['category'] ?? null,
+            'nutrition_info'  => $details['nutrition_info'] ?? null,
+            'search_terms'    => $originalQuery,
         ]);
-        return $newItemId ? $this->globalItemsModel->find($newItemId) : null;
+        return $newId ? $this->ingredients->find($newId) : null;
     }
 
+    /** Ensure a product exists from API id; optionally link to an ingredient if derivable. */
+    public function ensureProductFromApi(int $apiId, string $originalQuery, ?string $brand = null): ?array
+    {
+        if ($existing = $this->products->findByApiId($apiId)) return $existing;
+
+        try {
+            $details = $this->fetchProductDetails($apiId);
+        } catch (GuzzleException $e) {
+            error_log("Spoonacular fetch product error: " . $e->getMessage());
+            $details = null;
+        }
+        if (!$details) return null;
+
+        // Best-effort map to a generic ingredient by normalized title
+        $nameForIng = $details['name'] ?? $originalQuery;
+        $ing = $this->ingredients->findExact(self::normalizeName($nameForIng), null, 'ingredient');
+        $ingId = $ing['id'] ?? null;
+
+        $newId = $this->products->create([
+            'ingredient_id'  => $ingId,
+            'api_id'         => $apiId,
+            'title'          => $details['name'] ?? $originalQuery,
+            'brand'          => $details['brand'] ?? $brand,
+            'upc'            => $details['upc'] ?? null,
+            'size_text'      => $details['size_text'] ?? null,
+            'image_url'      => $details['image_url'] ?? null,
+            'category'       => $details['category'] ?? null,
+            'nutrition_info' => $details['nutrition_info'] ?? null,
+            'raw_payload'    => $details['raw'] ?? null,
+        ]);
+        return $newId ? $this->products->findByApiId($apiId) : null;
+    }
+
+    // --------- Spoonacular low-level ---------
+
     /**
-     * Searches for branded grocery products.
-     * @return array A list of choices.
      * @throws GuzzleException
      */
-    private function searchProducts(string $query): array
+    private function searchProducts(string $query, int $limit = 20): array
     {
-        $response = $this->client->get('food/products/search', [
-            'query' => ['query' => $query, 'number' => 5, 'apiKey' => $this->apiKey]
+        $r = $this->client->get('food/products/search', [
+            'query' => ['query' => $query, 'number' => $limit, 'apiKey' => $this->apiKey]
         ]);
-        $data = json_decode($response->getBody(), true);
-
-        $choices = [];
-        foreach ($data['products'] ?? [] as $product) {
-            $choices[] = [
-                'api_id' => $product['id'],
-                'name' => $product['title'],
-                'image_url' => (isset($product['imageType']) ? "https://img.spoonacular.com/products/{$product['id']}-312x231.{$product['imageType']}" : ($product['image'] ?? null)),
-                'type' => 'product',
+        $d = json_decode($r->getBody(), true) ?: [];
+        $out = [];
+        foreach ($d['products'] ?? [] as $p) {
+            $imageType = $p['imageType'] ?? 'jpg';
+            $out[] = [
+                'api_id'    => (int)$p['id'],
+                'name'      => $p['title'] ?? '',
+                'brand'     => $p['brand'] ?? null,
+                'image_url' => "https://img.spoonacular.com/products/{$p['id']}-312x231.{$imageType}",
+                'type'      => 'product',
             ];
         }
-        return $choices;
+        return $out;
     }
 
     /**
-     * Searches for generic ingredients.
-     * @return array A list of choices.
-     * @throws GuzzleException
-     */
-    private function searchIngredients(string $query): array
-    {
-        $response = $this->client->get('food/ingredients/search', [
-            'query' => ['query' => $query, 'number' => 5, 'apiKey' => $this->apiKey]
-        ]);
-        $data = json_decode($response->getBody(), true);
-
-        $choices = [];
-        foreach ($data['results'] ?? [] as $ingredient) {
-            $choices[] = [
-                'api_id' => $ingredient['id'],
-                'name' => $ingredient['name'],
-                'image_url' => "https://img.spoonacular.com/ingredients_250x250/" . $ingredient['image'],
-                'type' => 'ingredient',
-            ];
-        }
-        return $choices;
-    }
-
-    /**
-     * @throws GuzzleException
-     */
-    private function fetchIngredientDetails(int $apiId): ?array {
-        $response = $this->client->get("food/ingredients/{$apiId}/information", [
-            'query' => [ 'amount' => 1, 'apiKey' => $this->apiKey ]
-        ]);
-        $data = json_decode($response->getBody(), true);
-
-        if (empty($data)) return null;
-
-        return [
-            'name' => $data['name'],
-            'image_url' => "https://img.spoonacular.com/ingredients_250x250/" . $data['image'],
-            'category' => $data['categoryPath'][0] ?? 'uncategorized',
-            'nutrition_info' => json_encode($data['nutrition'] ?? []),
-        ];
-    }
-
-    /**
-     * Fetch product details by product ID.
      * @throws GuzzleException
      */
     private function fetchProductDetails(int $apiId): ?array
     {
-        $response = $this->client->get("food/products/{$apiId}", [
+        $r = $this->client->get("food/products/{$apiId}", [
             'query' => ['apiKey' => $this->apiKey]
         ]);
-        $data = json_decode($response->getBody(), true);
-
-        if (empty($data)) {
-            return null;
-        }
-
-        $imageType = $data['imageType'] ?? 'jpg';
+        $d = json_decode($r->getBody(), true) ?: null;
+        if (!$d) return null;
+        $imageType = $d['imageType'] ?? 'jpg';
         return [
-            'name'           => $data['title'] ?? '',
-            // Recommended product image pattern
+            'name'           => $d['title'] ?? '',
+            'brand'          => $d['brand'] ?? null,
+            'upc'            => $d['upc'] ?? null,
+            'size_text'      => $d['servings']['number'] ?? null,  // adjust if you prefer different size fields
             'image_url'      => "https://img.spoonacular.com/products/{$apiId}-312x231.{$imageType}",
-            'category'       => $data['aisle'] ?? ($data['breadcrumbs'][0] ?? 'uncategorized'),
-            'nutrition_info' => $data['nutrition'] ?? null, // keep as array; your model can json_encode
+            'category'       => $d['aisle'] ?? ($d['breadcrumbs'][0] ?? null),
+            'nutrition_info' => $d['nutrition'] ?? null,
+            'raw'            => $d
         ];
     }
 
-    private function normalizeName(string $name): string {
-        $name = strtolower($name);
-        $commonWords = ['organic', 'fresh', 'whole', 'natural', 'free-range'];
-        $name = preg_replace('/\b(' . implode('|', $commonWords) . ')\b/i', '', $name);
-        if (str_ends_with($name, 's') && !str_ends_with($name, 'ss')) {
-            $name = rtrim($name, 's');
+    /**
+     */
+    private function searchIngredients(string $query, int $limit = 5): array
+    {
+        $variants = $this->generateIngredientQueryVariants($query);
+        $variants[] = $query; // ensure original is included
+        $seen = [];
+        $results = [];
+
+        foreach (array_unique($variants) as $q) {
+            try {
+                $r = $this->client->get('food/ingredients/search', [
+                    'query' => ['query' => $q, 'number' => $limit, 'apiKey' => $this->apiKey]
+                ]);
+                $d = json_decode($r->getBody(), true) ?: [];
+                foreach (($d['results'] ?? []) as $ing) {
+                    $id = (int)($ing['id'] ?? 0);
+                    if ($id && !isset($seen[$id])) {
+                        $seen[$id] = true;
+                        $results[] = [
+                            'api_id'    => $id,
+                            'name'      => $ing['name'] ?? '',
+                            'brand'     => null,
+                            'image_url' => 'https://img.spoonacular.com/ingredients_250x250/' . ($ing['image'] ?? ''),
+                            'type'      => 'ingredient',
+                        ];
+                        if (count($results) >= $limit) {
+                            return $results;
+                        }
+                    }
+                }
+                if (count($results) >= $limit) break;
+            } catch (GuzzleException $e) {
+                error_log("Spoonacular ingredient search error for '$q': " . $e->getMessage());
+            }
         }
-        return trim(preg_replace('/\s+/', ' ', $name));
+
+        // Fallback to autocomplete if we still have no results
+        if (empty($results)) {
+            try {
+                $r = $this->client->get('food/ingredients/autocomplete', [
+                    'query' => ['query' => $query, 'number' => $limit, 'metaInformation' => true, 'apiKey' => $this->apiKey]
+                ]);
+                $d = json_decode($r->getBody(), true) ?: [];
+                foreach ($d as $ing) {
+                    $id = (int)($ing['id'] ?? 0);
+                    if ($id && !isset($seen[$id])) {
+                        $seen[$id] = true;
+                        $results[] = [
+                            'api_id'    => $id,
+                            'name'      => $ing['name'] ?? '',
+                            'brand'     => null,
+                            'image_url' => !empty($ing['image']) ? 'https://img.spoonacular.com/ingredients_250x250/' . $ing['image'] : null,
+                            'type'      => 'ingredient',
+                        ];
+                        if (count($results) >= $limit) break;
+                    }
+                }
+            } catch (GuzzleException $e) {
+                error_log("Spoonacular ingredient autocomplete error for '$query': " . $e->getMessage());
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Generate useful query variants for ingredient search to improve recall.
+     * Examples:
+     *  - "honeycrisps apple" -> ["honeycrisp apple", "honeycrisp apples", "honeycrisps apples", "apple honeycrisp"]
+     */
+    private function generateIngredientQueryVariants(string $query): array
+    {
+        $q = trim(mb_strtolower($query));
+        $q = preg_replace('/\s+/', ' ', $q);
+        $tokens = array_values(array_filter(explode(' ', $q)));
+        if (empty($tokens)) return [];
+
+        // singularize simple plurals (apples -> apple), (berries -> berry)
+        $singular = function (string $w): string {
+            if (preg_match('/[a-z]ies$/', $w)) return preg_replace('/ies$/', 'y', $w);
+            if (preg_match('/ses$|xes$|zes$|ches$|shes$/', $w)) return substr($w, 0, -2); // crude
+            if (str_ends_with($w, 's') && !str_ends_with($w, 'ss')) return substr($w, 0, -1);
+            return $w;
+        };
+
+        $variants = [];
+
+        // Base: singularize all tokens
+        $singTokens = array_map($singular, $tokens);
+        $variants[] = implode(' ', $singTokens);
+
+        // Also try pluralizing last noun with simple 's' if was singular
+        if (!empty($singTokens)) {
+            $last = $singTokens[count($singTokens)-1];
+            $variants[] = implode(' ', array_merge(array_slice($singTokens, 0, -1), [$last . 's']));
+        }
+
+        // Try swapping order for two-token phrases (e.g., apple honeycrisp)
+        if (count($singTokens) === 2) {
+            $variants[] = $singTokens[1] . ' ' . $singTokens[0];
+        }
+
+        // De-duplicate and remove identical to original lowercased
+        return array_values(array_unique(array_filter($variants, function ($v) use ($q) { return $v && $v !== $q; })));
+    }
+
+    /**
+     * @throws GuzzleException
+     */
+    private function fetchIngredientDetails(int $apiId): ?array
+    {
+        $r = $this->client->get("food/ingredients/{$apiId}/information", [
+            'query' => ['amount' => 100, 'unit' => 'grams' , 'apiKey' => $this->apiKey]
+        ]);
+        $d = json_decode($r->getBody(), true) ?: null;
+        if (!$d) return null;
+        return [
+            'name'           => $d['name'] ?? '',
+            'image_url'      => 'https://img.spoonacular.com/ingredients_250x250/' . ($d['image'] ?? ''),
+            'category'       => $d['aisle'] ?? ($d['categoryPath'][0] ?? null),
+            'nutrition_info' => $d['nutrition'] ?? null,
+            'raw'            => $d
+        ];
     }
 }
-

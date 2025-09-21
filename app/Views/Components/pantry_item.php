@@ -13,7 +13,7 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
     <div class="flex items-center w-full sm:w-auto">
         <img src="<?php echo htmlspecialchars($imageSrc); ?>" class="w-12 h-12 rounded-lg object-cover mr-4 flex-shrink-0" alt="Image of <?php echo htmlspecialchars($item['name'] ?? 'Item'); ?>">
         <div class="flex-grow">
-            <a href="/items/view/<?php echo $item['id']; ?>" class="text-text-base font-semibold hover:underline"><?php echo htmlspecialchars($item['name']); ?></a>
+            <a href="<?php echo htmlspecialchars($item['url'] ?? ('/items/view/' . $item['id'])); ?>" class="text-text-base font-semibold hover:underline"><?php echo htmlspecialchars($item['name']); ?></a>
             <p class="text-sm text-text-muted"><?php echo htmlspecialchars($item['status']); ?></p>
         </div>
     </div>

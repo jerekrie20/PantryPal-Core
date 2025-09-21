@@ -2,46 +2,42 @@
 
 namespace Controllers;
 
-
 use Helpers\Validator;
 use Helpers\View;
-use Models\GlobalItems;
 use Models\Items;
-use Services\SpoonacularService;
+use Models\Ingredients;
+use Models\Products;
+use Services\FoodService;
 
 class ItemsController
 {
-
-    protected Items $item;
-    protected GlobalItems $globalItemsModel;
-    protected SpoonacularService $spoonacularService;
+    protected Items $items;
+    protected Ingredients $ingredients;
+    protected Products $products;
+    protected FoodService $svc;
 
     public function __construct()
     {
-        // Initialize required models and services
-        $this->item = new Items();
-        $this->globalItemsModel = new GlobalItems();
-        $this->spoonacularService = new SpoonacularService();
+        $this->items = new Items();
+        $this->ingredients = new Ingredients();
+        $this->products = new Products();
+        $this->svc = new FoodService();
     }
 
     public function index(): string
     {
         try {
             // 1. Get Inputs for Pagination
-            // Get the current page from the URL query string (e.g., /items?page=2), default to 1
             $currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-            $itemsPerPage = isset($_GET['perPage']) ? (int)$_GET['perPage'] : 15; // You can set how many items you want per page
+            $itemsPerPage = isset($_GET['perPage']) ? (int)$_GET['perPage'] : 15;
 
             // 2. Get the Authenticated User's ID
-            // The AuthMiddleware ensures this is set.
             $userId = $_SESSION['user_id'];
 
-            // 3. Call the Model to Get Data
-            // Use the findAll method to get the items and pagination details
-            $results = $this->item->findAll($userId, $currentPage, $itemsPerPage);
+            // 3. Fetch
+            $results = $this->items->findAll($userId, $currentPage, $itemsPerPage);
 
-            // 4. Prepare Data and Render the View
-            // Pass the fetched items and the pagination metadata to the view.
+            // 4. Render
             $data = [
                 'title' => 'My Pantry',
                 'items' => $results['items'],
@@ -51,180 +47,484 @@ class ItemsController
             return View::render('Items/index', $data);
 
         } catch (\PDOException $e) {
-            // Log the detailed database error for debugging purposes.
             error_log("Database Error in ItemsController::index(): " . $e->getMessage());
-
-            // Display a generic, user-friendly error page.
-            // It's important not to show the raw error message to the end-user.
             http_response_code(500);
-            // Assuming you have an error view at views/errors/500.php
             return View::render('Pages/500', ['title' => 'Server Error']);
         }
     }
 
     public function create(): string
     {
-        return View::render('Items/create');
-    }
-
-    /**
-     * Handles the form submission for creating a new item.
-     */
-    public function store()
-    {
-        // Validate and early-return on failure
-        $validationResult = $this->validation();
-        if ($validationResult) {
-            return $validationResult;
-        }
-
-        $itemName = $_POST['name'];
-
-        // First, check if a global item with a similar normalized name already exists.
-        $existingGlobalItem = $this->globalItemsModel->findByNormalizedName(strtolower(trim($itemName)));
-        if ($existingGlobalItem) {
-            // If it exists, skip the API and add it directly to the user's pantry.
-            $this->item->insert($_POST, $existingGlobalItem['id']);
-            header('Location: /dashboard');
-            exit();
-        }
-
-        // If not in our DB, search the Spoonacular API for choices.
-        $choices = $this->spoonacularService->searchForChoices($itemName);
-
-        if (empty($choices)) {
-            return View::render('Items/create', [
-                'errors' => ['name' => 'Could not find any matching items. Please try a different name.'],
-                'input' => $_POST
-            ]);
-        }
-
-        // If choices are found, show the confirmation page.
-        return View::render('Items/confirm', [
-            'title' => 'Confirm Your Item',
-            'choices' => $choices,
-            'original_input' => $_POST
+        return View::render('Items/create', [
+            'title' => 'Add Item',
+            'errors' => [],
+            'input' => [],
         ]);
     }
 
-    /**
-     * Step 2 of adding an item: Store the user's confirmed choice from the selection page.
-     */
-    public function storeConfirmed()
+    public function store()
     {
-        $apiId = (int)($_POST['api_id'] ?? 0);
-        $originalInput = $_POST['original_input'] ?? [];
-
-        if ($apiId <= 0) {
-            // Handle error - this can happen if the form is submitted incorrectly.
-            return View::render('Items/create', ['errors' => ['name' => 'Please select an item to confirm.'], 'input' => $originalInput]);
+        // Slim controller: delegate based on api_kind
+        $kind = $_POST['api_kind'] ?? 'ingredient';
+        if ($kind === 'product') {
+            $ctrl = new ProductsController();
+            return $ctrl->store();
         }
-
-        // Use the service to fetch final details and create the global item record in our DB.
-        $apiKind = $_POST['api_kind'] ?? null;
-        $globalItem = $this->spoonacularService->createGlobalItemFromApi($apiId, $apiKind, $originalInput['name']);
-
-        if (!$globalItem) {
-            return View::render('Items/create', ['errors' => ['name' => 'An error occurred while saving the item details.'], 'input' => $originalInput]);
+        // treat manual as ingredient flow (manual ingredient creation)
+        if ($kind === 'manual') {
+            // Force a manual confirm path via IngredientsController
+            $_POST['api_kind'] = 'manual';
+            $_POST['picked_source'] = 'manual';
+            $_POST['api_id'] = 0;
+            $_POST['original_input'] = $_POST;
+            $ctrl = new IngredientsController();
+            return $ctrl->confirm();
         }
-
-        // Add the new item to the user's personal pantry table, linking to the global item.
-        $this->item->insert($originalInput, $globalItem['id']);
-
-        // Redirect to a success page.
-        header('Location: /dashboard');
-        exit();
+        $ctrl = new IngredientsController();
+        return $ctrl->store();
     }
 
-    public function edit($id)
+    /** POST /items/confirm (finalize selection) */
+    public function confirm()
     {
-    }
-
-    public function update()
-    {
-    }
-
-    public function show($id)
-    {
-        $userId = $_SESSION['user_id'] ?? null;
-        $id = (int)$id;
-        if (!$userId || $id <= 0) {
-            http_response_code(404);
-            return View::render('Pages/404', ['title' => 'Item Not Found']);
+        // Slim controller: delegate based on api_kind (POST or original_input)
+        $apiKind = $_POST['api_kind'] ?? ($_POST['original_input']['api_kind'] ?? 'ingredient');
+        if ($apiKind === 'product') {
+            $ctrl = new ProductsController();
+            return $ctrl->confirm();
         }
+        // manual treated in ingredient flow
+        $ctrl = new IngredientsController();
+        return $ctrl->confirm();
+    }
 
+    // If you still have a route pointing to storeConfirmed(), keep this shim:
+    public function storeConfirmed(): ?string
+    {
+        return $this->confirm();
+    }
+
+    public function show(int $id): string
+    {
         try {
-            $row = $this->item->findWithGlobalById($id, $userId);
-        } catch (\PDOException $e) {
-            error_log('ItemsController::show DB error: ' . $e->getMessage());
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) {
+                http_response_code(401);
+                return View::render('Pages/401', ['title' => 'Unauthorized']);
+            }
+
+            $itemRow = $this->items->find($id);
+            if (!$itemRow || (int)$itemRow['user_id'] !== (int)$userId) {
+                http_response_code(404);
+                return View::render('Pages/404', ['title' => 'Item Not Found']);
+            }
+
+            // If this is an ingredient-backed item, delegate to the IngredientsController show route
+            if (!empty($itemRow['ingredient_id'])) {
+                header('Location: /ingredients/view/' . (int)$id);
+                exit;
+            }
+
+            // Build a unified $row structure without Items doing cross-table joins
+            $ing = null; $prod = null;
+            if (!empty($itemRow['ingredient_id'])) {
+                $ingModel = new Ingredients();
+                $ing = $ingModel->find((int)$itemRow['ingredient_id']);
+            }
+            if (!empty($itemRow['product_id'])) {
+                $prodModel = new Products();
+                $prod = $prodModel->find((int)$itemRow['product_id']);
+            }
+
+            $row = $itemRow; // start with items columns (quantity, dates, etc.)
+            if ($ing) {
+                $row['ingredient_name'] = $ing['name'] ?? null;
+                $row['ingredient_category'] = $ing['category'] ?? null;
+                $row['ingredient_image_url'] = $ing['image_url'] ?? null;
+                $row['ingredient_nutrition_info'] = $ing['nutrition_info'] ?? null;
+                // legacy plain key sometimes used
+                $row['nutrition_info'] = $ing['nutrition_info'] ?? null;
+            }
+            if ($prod) {
+                $row['product_title'] = $prod['title'] ?? null;
+                $row['product_brand'] = $prod['brand'] ?? null;
+                $row['product_category'] = $prod['category'] ?? null;
+                $row['product_image_url'] = $prod['image_url'] ?? null;
+                $row['product_upc'] = $prod['upc'] ?? null;
+                $row['product_nutrition_info'] = $prod['nutrition_info'] ?? null;
+                $row['product_raw_payload'] = $prod['raw_payload'] ?? null;
+            }
+
+            // ----- status / badge
+            $status = 'In Stock';
+            $badge  = 'badge-success';
+            if (!empty($row['expiration_date'])) {
+                try {
+                    $today    = new \DateTimeImmutable('today');
+                    $exp      = new \DateTimeImmutable($row['expiration_date']);
+                    $diffDays = (int)$today->diff($exp)->format('%r%a');
+                    if     ($diffDays < 0) { $status = 'Expired ' . (abs($diffDays) === 1 ? '1 day ago' : abs($diffDays) . ' days ago'); $badge = 'badge-danger'; }
+                    elseif ($diffDays === 0){ $status = 'Expires today'; $badge = 'badge-warning'; }
+                    elseif ($diffDays <= 3){ $status = 'Expires in ' . ($diffDays === 1 ? '1 day' : $diffDays . ' days'); $badge = 'badge-warning'; }
+                    else                    { $status = 'Expires in ' . $diffDays . ' days'; $badge = 'badge-neutral'; }
+                } catch (\Exception $e) {}
+            }
+
+            // ----- nutrition (ingredient first)
+            $nutrition = null;
+            $rawNutri = null;
+
+            // Ingredients: prefer ingredient_nutrition_info; also accept plain 'nutrition_info'
+            $ingNutri = $row['ingredient_nutrition_info']
+                ?? $row['nutrition_info']
+                ?? null;
+
+            if ($ingNutri) {
+                $decoded = is_array($ingNutri) ? $ingNutri : json_decode((string)$ingNutri, true);
+                // Flexible decode: handle escaped or double-encoded JSON stored in DB
+                if (!is_array($decoded)) {
+                    $s = (string)$ingNutri;
+                    // remove common escaping
+                    $stripped = stripslashes($s);
+                    $decoded = json_decode($stripped, true);
+                    if (!is_array($decoded)) {
+                        // Sometimes JSON is string inside JSON {"nutrition":"{...}"}
+                        $once = json_decode($s, true);
+                        if (is_string($once)) {
+                            $decoded = json_decode($once, true);
+                        } elseif (is_array($once)) {
+                            // find first large JSON-ish string value
+                            foreach ($once as $vv) {
+                                if (is_string($vv) && strlen($vv) > 10 && ($vv[0] === '{' || $vv[0] === '[')) {
+                                    $decoded = json_decode($vv, true);
+                                    if (is_array($decoded)) break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (is_array($decoded)) {
+                    $rawNutri = $decoded;
+                    $nutrition = $this->normalizeNutrition($decoded);
+                }
+            }
+
+            // Products (if no nutrition yet): try OFF raw payload, then product_nutrition_info
+            $productRaw = null;
+            if ($nutrition === null && !empty($row['product_raw_payload'])) {
+                $productRaw = is_array($row['product_raw_payload'])
+                    ? $row['product_raw_payload']
+                    : json_decode((string)$row['product_raw_payload'], true);
+
+                if (is_array($productRaw) && isset($productRaw['product']) && is_array($productRaw['product'])) {
+                    $productRaw = $productRaw['product']; // OFF embeds under 'product'
+                }
+                if (is_array($productRaw)) {
+                    // normalize a few common keys used by the view
+                    if (!isset($productRaw['brand']) && isset($productRaw['brands'])) {
+                        $productRaw['brand'] = $productRaw['brands'];
+                    }
+                    if (!isset($productRaw['upc'])) {
+                        $productRaw['upc'] = $productRaw['code'] ?? ($row['product_upc'] ?? null);
+                    }
+                    if (!isset($productRaw['image']) && isset($productRaw['image_url'])) {
+                        $productRaw['image'] = $productRaw['image_url'];
+                    }
+                    // OFF nutriments → nutrition
+                    $nutrition = $this->normalizeNutrition($productRaw);
+                }
+            }
+
+            if ($nutrition === null && !empty($row['product_nutrition_info'])) {
+                $pn = is_array($row['product_nutrition_info'])
+                    ? $row['product_nutrition_info']
+                    : json_decode((string)$row['product_nutrition_info'], true);
+                if (is_array($pn)) {
+                    $nutrition = $this->normalizeNutrition($pn);
+                }
+            }
+
+            // ----- display fields (prefer ingredient, then product)
+            $displayName = $row['ingredient_name'] ?? ($row['product_title'] ?? 'Item');
+
+            // Category may be a JSON array / path → stringify safely
+            $catRaw = $row['ingredient_category'] ?? ($row['product_category'] ?? null);
+            $displayCategory = $this->stringifyCategory($catRaw);
+
+            $displayImage = $row['ingredient_image_url']
+                ?? ($row['product_image_url'] ?? ($productRaw['image'] ?? null));
+
+            $item = [
+                'id'              => (int)$row['id'],
+                'name'            => $displayName,
+                'category'        => $displayCategory,
+                'image'           => $displayImage,
+                'quantity'        => $row['quantity'] ?? null,
+                'unit'            => $row['unit'] ?? null,
+                'purchase_date'   => $row['purchase_date'] ?? null,
+                'expiration_date' => $row['expiration_date'] ?? null,
+                'status'          => $status,
+                'badge_class'     => $badge,
+                'nutrition'       => $nutrition,
+                'nutrition_raw'   => $rawNutri,
+
+                // Brand: prefer product brand, else ingredient brand, else entered brand
+                'brand'           => $row['product_brand'] ?? ($ing['brand'] ?? ($row['entered_brand'] ?? null)),
+                'product_title'   => $row['product_title'] ?? null,
+                'product_raw'     => $productRaw,
+            ];
+
+            $isIngredient = !empty($itemRow['ingredient_id']);
+            $view = $isIngredient ? 'Ingredients/show' : 'Products/show';
+            $title = $isIngredient ? 'Ingredient Details' : 'Product Details';
+            return View::render($view, [
+                'title' => $title,
+                'item'  => $item,
+            ]);
+
+        } catch (\Throwable $e) {
+            error_log('ItemsController::show error: ' . $e->getMessage());
             http_response_code(500);
             return View::render('Pages/500', ['title' => 'Server Error']);
         }
+    }
 
-        if (!$row) {
-            http_response_code(404);
-            return View::render('Pages/404', ['title' => 'Item Not Found']);
+    /** Stringify category which could be a string, JSON string, or array. */
+    private function stringifyCategory($cat): ?string
+    {
+        if ($cat === null || $cat === '') return null;
+
+        if (is_string($cat)) {
+            $trim = ltrim($cat);
+            if ($trim !== '' && ($trim[0] === '{' || $trim[0] === '[')) {
+                $decoded = json_decode($cat, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    return $this->stringifyCategory($decoded);
+                }
+            }
+            return $cat; // already a plain string
         }
 
-        // Compute status similar to dashboard
-        $status = 'In Stock';
-        $badge = 'badge-success';
-        $expiredFlag = false;
-        if (!empty($row['expiration_date'])) {
-            try {
-                $today = new \DateTimeImmutable('today');
-                $exp = new \DateTimeImmutable($row['expiration_date']);
-                $diffDays = (int)$today->diff($exp)->format('%r%a');
-                if ($diffDays < 0) {
-                    $status = 'Expired ' . (abs($diffDays) === 1 ? '1 day ago' : abs($diffDays) . ' days ago');
-                    $badge = 'badge-danger';
-                    $expiredFlag = true;
-                } elseif ($diffDays === 0) {
-                    $status = 'Expires today';
-                    $badge = 'badge-warning';
-                } elseif ($diffDays <= 3) {
-                    $status = 'Expires in ' . ($diffDays === 1 ? '1 day' : $diffDays . ' days');
-                    $badge = 'badge-warning';
+        if (is_array($cat)) {
+            // OFF sometimes gives category paths / arrays
+            if (isset($cat['categoryPath']) && is_array($cat['categoryPath'])) {
+                return implode(' › ', array_filter($cat['categoryPath'], 'is_string'));
+            }
+            // generic: collapse any stringy array
+            $vals = [];
+            foreach ($cat as $v) {
+                if (is_string($v)) $vals[] = $v;
+            }
+            return $vals ? implode(' › ', $vals) : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize to:
+     * ['nutrients' => [ ['name','amount','unit'], ... ],
+     *  'servings'  => ['original' => '...']]
+     *
+     * Supports:
+     * - Spoonacular-like structure (nutrients[])
+     * - FDC labelNutrients
+     * - FDC foodNutrients (Foundation/Survey/Branded)
+     * - OFF nutriments (per serving or per 100g)
+     */
+    private function normalizeNutrition($src): ?array
+    {
+        if (!is_array($src) || !$src) return null;
+
+        // If we received a bare FDC-style list of FoodNutrient entries, wrap it.
+        if (isset($src[0]) && is_array($src[0]) && (isset($src[0]['nutrient']) || isset($src[0]['nutrientName']) || (isset($src[0]['type']) && $src[0]['type'] === 'FoodNutrient'))) {
+            $src = ['foodNutrients' => $src];
+        }
+
+        // Already in target form?
+        if (isset($src['nutrients']) && is_array($src['nutrients'])) {
+            return $src;
+        }
+
+        // ---------- FDC: labelNutrients ----------
+        if (isset($src['labelNutrients']) && is_array($src['labelNutrients'])) {
+            $ln = $src['labelNutrients'];
+            $get = fn($k) => isset($ln[$k]['value']) ? (float)$ln[$k]['value'] : null;
+            $nutrients = [
+                ['name'=>'Calories',       'amount'=>$get('calories'),      'unit'=>'kcal'],
+                ['name'=>'Protein',        'amount'=>$get('protein'),       'unit'=>'g'],
+                ['name'=>'Fat',            'amount'=>$get('fat'),           'unit'=>'g'],
+                ['name'=>'Saturated Fat',  'amount'=>$get('saturatedFat'),  'unit'=>'g'],
+                ['name'=>'Carbohydrates',  'amount'=>$get('carbohydrates'), 'unit'=>'g'],
+                ['name'=>'Fiber',          'amount'=>$get('fiber'),         'unit'=>'g'],
+                ['name'=>'Sugar',          'amount'=>$get('sugars'),        'unit'=>'g'],
+                ['name'=>'Sodium',         'amount'=>$get('sodium'),        'unit'=>'mg'],
+                ['name'=>'Calcium',        'amount'=>$get('calcium'),       'unit'=>'mg'],
+                ['name'=>'Iron',           'amount'=>$get('iron'),          'unit'=>'mg'],
+                ['name'=>'Potassium',      'amount'=>$get('potassium'),     'unit'=>'mg'],
+                ['name'=>'Cholesterol',    'amount'=>$get('cholesterol'),   'unit'=>'mg'],
+            ];
+            $nutrients = array_values(array_filter($nutrients, fn($n) => $n['amount'] !== null));
+
+            $servingText = null;
+            if (isset($src['servingSize'], $src['servingSizeUnit'])) {
+                $servingText = $src['servingSize'].' '.$src['servingSizeUnit'];
+            } elseif (isset($src['householdServingFullText'])) {
+                $servingText = $src['householdServingFullText'];
+            }
+
+            return $nutrients ? ['nutrients'=>$nutrients, 'servings'=>['original'=>$servingText ?? 'per serving']] : null;
+        }
+
+        // ---------- FDC: foodNutrients ----------
+        if (isset($src['foodNutrients']) && is_array($src['foodNutrients'])) {
+            $core = [
+                'Energy'                          => ['Calories','kcal'],
+                'Energy (Atwater General Factors)'=> ['Calories','kcal'],
+                'Protein'                         => ['Protein','g'],
+                'Total lipid (fat)'               => ['Fat','g'],
+                'Carbohydrate, by difference'     => ['Carbohydrates','g'],
+                'Fiber, total dietary'            => ['Fiber','g'],
+                'Sugars, total including NLEA'    => ['Sugar','g'],
+                'Sugars, total'                   => ['Sugar','g'],
+                'Sodium, Na'                      => ['Sodium','mg'],
+                'Calcium, Ca'                     => ['Calcium','mg'],
+                'Iron, Fe'                        => ['Iron','mg'],
+                'Potassium, K'                    => ['Potassium','mg'],
+                'Cholesterol'                     => ['Cholesterol','mg'],
+            ];
+            $bucket = [];
+            $extras = [];
+            foreach ($src['foodNutrients'] as $fn) {
+                $name = $fn['nutrient']['name'] ?? $fn['nutrientName'] ?? null;
+                $amount = $fn['amount'] ?? $fn['value'] ?? null;
+                $unit = $fn['nutrient']['unitName'] ?? $fn['unitName'] ?? null;
+                if (!$name || $amount === null) continue;
+                $out = [
+                    'name'   => $core[$name][0] ?? $name,
+                    'amount' => (float)$amount,
+                    'unit'   => $unit ?: ($core[$name][1] ?? ''),
+                ];
+                if (isset($core[$name])) {
+                    $bucket[$out['name']] = $out;
                 } else {
-                    $status = 'Expires in ' . $diffDays . ' days';
-                    $badge = 'badge-neutral';
+                    $extras[] = $out;
                 }
-            } catch (\Exception $e) {
-                // ignore
+            }
+            $list = array_values($bucket);
+            foreach ($extras as $ex) {
+                if (!isset($bucket[$ex['name']])) $list[] = $ex;
+            }
+            if ($list) {
+                $servingText = null;
+                if (isset($src['servingSize'], $src['servingSizeUnit'])) {
+                    $servingText = $src['servingSize'].' '.$src['servingSizeUnit'];
+                } elseif (isset($src['householdServingFullText'])) {
+                    $servingText = $src['householdServingFullText'];
+                }
+                if (count($list) > 200) $list = array_slice($list, 0, 200);
+                return ['nutrients'=>$list, 'servings'=>['original'=>$servingText ?? 'per 100 g']];
             }
         }
 
-        $data = [
-            'title' => $row['name'] . ' • Pantry Item',
-            'item' => [
-                'id' => (int)$row['id'],
-                'name' => $row['name'],
-                'category' => $row['category'] ?? 'Uncategorized',
-                'image' => $row['image_url'] ?? null,
-                'quantity' => $row['quantity'] ?? null,
-                'unit' => $row['unit'] ?? null,
-                'purchase_date' => $row['purchase_date'] ?? null,
-                'expiration_date' => $row['expiration_date'] ?? null,
-                'status' => $status,
-                'badge_class' => $badge,
-                'expired' => $expiredFlag,
-                // Pass nutrition info decoded from JSON (if present)
-                'nutrition' => (function($raw) {
-                    if ($raw === null || $raw === '') { return null; }
-                    if (is_array($raw)) { return $raw; }
-                    $decoded = json_decode($raw, true);
-                    return $decoded ?: null;
-                })($row['nutrition_info'] ?? null),
-            ]
-        ];
+        // ---------- OFF: nutriments ----------
+        $nutriments = $src['nutriments'] ?? null;
+        if (!$nutriments && $this->looksLikeOffNutriments($src)) {
+            $nutriments = $src;
+        }
+        if (is_array($nutriments)) {
+            $pick = function(string $base) use ($nutriments) {
+                if (isset($nutriments[$base.'_serving'])) return ['v'=>(float)$nutriments[$base.'_serving'], 'scope'=>'per serving'];
+                if (isset($nutriments[$base.'_100g']))    return ['v'=>(float)$nutriments[$base.'_100g'],    'scope'=>'per 100 g'];
+                return null;
+            };
+            $unit = function(string $base, string $default) use ($nutriments) {
+                $k = $base.'_unit';
+                return isset($nutriments[$k]) && is_string($nutriments[$k]) ? $nutriments[$k] : $default;
+            };
 
-        return View::render('Items/show', $data);
+            $map = [
+                ['Calories',      'energy-kcal',  'kcal'],
+                ['Protein',       'proteins',     'g'],
+                ['Fat',           'fat',          'g'],
+                ['Saturated Fat', 'saturated-fat','g'],
+                ['Carbohydrates', 'carbohydrates','g'],
+                ['Fiber',         'fiber',        'g'],
+                ['Sugar',         'sugars',       'g'],
+                ['Sodium',        'sodium',       'mg'],
+                ['Calcium',       'calcium',      'mg'],
+                ['Iron',          'iron',         'mg'],
+                ['Potassium',     'potassium',    'mg'],
+            ];
+
+            $scope = null; $out = [];
+            $taken = [];
+            foreach ($map as [$name, $base, $defUnit]) {
+                $picked = $pick($base);
+                if ($picked) {
+                    $out[] = ['name'=>$name, 'amount'=>$picked['v'], 'unit'=>$unit($base, $defUnit)];
+                    $scope = $scope ?? $picked['scope'];
+                    $taken[$base] = true;
+                }
+            }
+            foreach ($nutriments as $key => $val) {
+                if (!is_scalar($val)) continue;
+                if (preg_match('/^(.+?)_(serving|100g)$/', (string)$key, $m)) {
+                    $base = $m[1];
+                    if (isset($taken[$base])) continue;
+                    $v = (float)$val; if (!is_finite($v)) continue;
+                    $nm = ucwords(str_replace(['-', '_'], [' ', ' '], $base));
+                    $out[] = ['name'=>$nm, 'amount'=>$v, 'unit'=>$unit($base, '')];
+                }
+            }
+            if ($out) {
+                if (count($out) > 200) $out = array_slice($out, 0, 200);
+                return ['nutrients'=>$out, 'servings'=>['original'=>$scope ?? 'per 100 g']];
+            }
+        }
+
+        // Flat label-like structure
+        $flatKeys = ['calories','protein','fat','saturatedFat','transFat','carbohydrates','fiber','sugars','sodium','calcium','iron','potassium','cholesterol','addedSugars'];
+        $hasFlat = false;
+        foreach ($flatKeys as $k) {
+            if (isset($src[$k]) && is_array($src[$k]) && array_key_exists('value', $src[$k])) { $hasFlat = true; break; }
+        }
+        if ($hasFlat) {
+            $get = function(string $k) use ($src) { return isset($src[$k]['value']) ? (float)$src[$k]['value'] : null; };
+            $nutrients = [
+                ['name'=>'Calories',       'amount'=>$get('calories'),      'unit'=>'kcal'],
+                ['name'=>'Protein',        'amount'=>$get('protein'),       'unit'=>'g'],
+                ['name'=>'Fat',            'amount'=>$get('fat'),           'unit'=>'g'],
+                ['name'=>'Saturated Fat',  'amount'=>$get('saturatedFat'),  'unit'=>'g'],
+                ['name'=>'Trans Fat',      'amount'=>$get('transFat'),      'unit'=>'g'],
+                ['name'=>'Carbohydrates',  'amount'=>$get('carbohydrates'), 'unit'=>'g'],
+                ['name'=>'Fiber',          'amount'=>$get('fiber'),         'unit'=>'g'],
+                ['name'=>'Sugar',          'amount'=>$get('sugars'),        'unit'=>'g'],
+                ['name'=>'Added Sugars',   'amount'=>$get('addedSugars'),   'unit'=>'g'],
+                ['name'=>'Sodium',         'amount'=>$get('sodium'),        'unit'=>'mg'],
+                ['name'=>'Calcium',        'amount'=>$get('calcium'),       'unit'=>'mg'],
+                ['name'=>'Iron',           'amount'=>$get('iron'),          'unit'=>'mg'],
+                ['name'=>'Potassium',      'amount'=>$get('potassium'),     'unit'=>'mg'],
+                ['name'=>'Cholesterol',    'amount'=>$get('cholesterol'),   'unit'=>'mg'],
+            ];
+            $nutrients = array_values(array_filter($nutrients, fn($n) => $n['amount'] !== null));
+            return $nutrients ? ['nutrients'=>$nutrients, 'servings'=>['original'=>'per serving']] : null;
+        }
+
+        return null;
     }
+
+    private function looksLikeOffNutriments(array $a): bool
+    {
+        foreach (['energy-kcal_100g','fat_100g','proteins_100g','carbohydrates_100g'] as $k) {
+            if (array_key_exists($k, $a)) return true;
+        }
+        return false;
+    }
+
 
     public function validation(): ?string
     {
-        // Your Validator's constructor requires the database connection for the 'unique' rule.
-        // We'll need to make it available here.
         global $conn;
         $validator = new Validator($_POST, $conn);
 
@@ -236,15 +536,12 @@ class ItemsController
             'expiration_date' => ['required' => false, 'date' => true]
         ];
 
-        // Define the rules for your Validator's `check` method
         $validator->check($rules);
 
-        // Use the `passed()` method to check if validation succeeded
         if (!$validator->passed()) {
-            // If validation fails, return to the form with errors and original input
             return View::render('Items/create', [
                 'title' => 'Add New Item',
-                'errors' => $validator->errors(), // Use the errors() method
+                'errors' => $validator->errors(),
                 'input' => $_POST
             ]);
         }
@@ -252,9 +549,112 @@ class ItemsController
         return null; // success
     }
 
-    public function destroy()
+    public function edit(int $id): string
     {
+        try {
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) {
+                http_response_code(401);
+                return View::render('Pages/401', ['title' => 'Unauthorized']);
+            }
+            $row = $this->items->findWithGlobalById($id, (int)$userId);
+            if (!$row) {
+                http_response_code(404);
+                return View::render('Pages/404', ['title' => 'Item Not Found']);
+            }
+            // Prepare item fields for form
+            $item = [
+                'id' => (int)$row['id'],
+                'quantity' => $row['quantity'] ?? '1',
+                'unit' => $row['unit'] ?? '',
+                'purchase_date' => $row['purchase_date'] ?? null,
+                'expiration_date' => $row['expiration_date'] ?? null,
+                'entered_name' => $row['entered_name'] ?? null,
+                'entered_brand' => $row['entered_brand'] ?? null,
+            ];
+            // Display name/category/image for context
+            $name = $row['ingredient_name'] ?? ($row['product_title'] ?? ($row['entered_name'] ?? 'Item'));
+            $category = $this->stringifyCategory($row['ingredient_category'] ?? ($row['product_category'] ?? null));
+            $image = $row['ingredient_image_url'] ?? ($row['product_image_url'] ?? null);
+            return View::render('Items/edit', [
+                'title' => 'Edit Item',
+                'item' => $item,
+                'display' => [
+                    'name' => $name,
+                    'category' => $category,
+                    'image' => $image,
+                ],
+                'errors' => [],
+            ]);
+        } catch (\Throwable $e) {
+            error_log('ItemsController::edit error: '.$e->getMessage());
+            http_response_code(500);
+            return View::render('Pages/500', ['title' => 'Server Error']);
+        }
     }
 
+    public function update(int $id)
+    {
+        try {
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) {
+                http_response_code(401);
+                return View::render('Pages/401', ['title' => 'Unauthorized']);
+            }
+            // Basic validation
+            $data = [
+                'quantity' => isset($_POST['quantity']) ? (string)$_POST['quantity'] : null,
+                'unit' => $_POST['unit'] ?? null,
+                'purchase_date' => $_POST['purchase_date'] ?? null,
+                'expiration_date' => $_POST['expiration_date'] ?? null,
+                'entered_name' => $_POST['entered_name'] ?? null,
+                'entered_brand' => $_POST['entered_brand'] ?? null,
+            ];
+            // Clean empty strings to nulls
+            foreach ($data as $k => $v) {
+                if ($v === '') $data[$k] = null;
+            }
+            if (!is_numeric($data['quantity'] ?? null)) {
+                return View::render('Items/edit', [
+                    'title' => 'Edit Item',
+                    'errors' => ['quantity' => 'Quantity must be numeric'],
+                    'item' => array_merge(['id'=>$id], $data),
+                    'display' => ['name' => $_POST['display_name'] ?? 'Item', 'category' => $_POST['display_category'] ?? null, 'image' => $_POST['display_image'] ?? null],
+                ]);
+            }
+            $ok = $this->items->update($id, $data, (int)$userId);
+            if (!$ok) {
+                return View::render('Items/edit', [
+                    'title' => 'Edit Item',
+                    'errors' => ['general' => 'No changes were made or update failed.'],
+                    'item' => array_merge(['id'=>$id], $data),
+                    'display' => ['name' => $_POST['display_name'] ?? 'Item', 'category' => $_POST['display_category'] ?? null, 'image' => $_POST['display_image'] ?? null],
+                ]);
+            }
+            header('Location: /items/view/' . (int)$id);
+            exit;
+        } catch (\Throwable $e) {
+            error_log('ItemsController::update error: '.$e->getMessage());
+            http_response_code(500);
+            return View::render('Pages/500', ['title' => 'Server Error']);
+        }
+    }
 
+    public function destroy(int $id)
+    {
+        try {
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) {
+                http_response_code(401);
+                return View::render('Pages/401', ['title' => 'Unauthorized']);
+            }
+            $this->items->delete($id, (int)$userId);
+            header('Location: /dashboard');
+            exit;
+        } catch (\Throwable $e) {
+            error_log('ItemsController::destroy error: '.$e->getMessage());
+            http_response_code(500);
+            return View::render('Pages/500', ['title' => 'Server Error']);
+        }
+    }
 }

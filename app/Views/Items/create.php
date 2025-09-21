@@ -3,9 +3,7 @@
  * Add New Pantry Item View
  */
 
-
 // --- Templating Logic ---
-// Start output buffering to capture the main content
 ob_start();
 
 // Include the reusable form components
@@ -24,44 +22,75 @@ require_once VIEW_PATH . '/components/form_elements.php';
         <form action="/items" method="POST" class="space-y-6">
 
             <?php form_input('name', 'Item Name', 'text', [
-                'placeholder' => 'e.g., Organic Milk',
-                'required' => true,
-                'value' => $input['name'] ?? '',
-                'error' => $errors['name'] ?? null
+                    'placeholder' => 'e.g., Organic Milk',
+                    'required' => true,
+                    'value' => $input['name'] ?? '',
+                    'error' => $errors['name'] ?? null
             ]); ?>
+
+            <!-- NEW: Brand (optional) -->
+            <?php form_input('brand', 'Brand (optional)', 'text', [
+                    'placeholder' => 'e.g., Häagen-Dazs',
+                    'required' => false,
+                    'value' => $input['brand'] ?? '',
+                    'error' => $errors['brand'] ?? null
+            ]); ?>
+
+            <!-- NEW: Type selector (api_kind) -->
+            <div>
+                <label for="api_kind" class="block text-sm font-medium text-text-heading mb-1">Type</label>
+                <select
+                        id="api_kind"
+                        name="api_kind"
+                        class="w-full border border-border-default rounded px-3 py-2 bg-surface-default focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                    <?php $k = $input['api_kind'] ?? 'ingredient'; ?>
+                    <option value="ingredient" <?= $k==='ingredient' ? 'selected' : '' ?>>Ingredient (generic)</option>
+                    <option value="product"    <?= $k==='product'    ? 'selected' : '' ?>>Product (branded)</option>
+                    <option value="manual"     <?= $k==='manual'     ? 'selected' : '' ?>>Manual (skip API)</option>
+                </select>
+                <?php if (!empty($errors['api_kind'])): ?>
+                    <p class="text-red-600 text-sm mt-1"><?= htmlspecialchars($errors['api_kind']) ?></p>
+                <?php endif; ?>
+                <p class="text-xs text-text-muted mt-1">
+                    Choose <strong>Ingredient</strong> for generic items (e.g., “apples”),
+                    <strong>Product</strong> for specific brands (e.g., “Ritz Crackers”),
+                    or <strong>Manual</strong> to save without calling an API.
+                </p>
+            </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <?php form_input('quantity', 'Quantity', 'number', [
-                    'value' => $input['quantity'] ?? '1',
-                    'required' => true,
-                    'step' => '0.01', // Allows decimal quantities
-                    'error' => $errors['quantity'] ?? null
+                        'value' => $input['quantity'] ?? '1',
+                        'required' => true,
+                        'step' => '0.01', // Allows decimal quantities
+                        'error' => $errors['quantity'] ?? null
                 ]); ?>
 
                 <?php form_input('unit', 'Unit', 'text', [
-                    'placeholder' => 'e.g., L, kg, pcs',
-                    'required' => false,
-                    'value' => $input['unit'] ?? '',
-                    'error' => $errors['unit'] ?? null
+                        'placeholder' => 'e.g., L, kg, pcs',
+                        'required' => false,
+                        'value' => $input['unit'] ?? '',
+                        'error' => $errors['unit'] ?? null
                 ]); ?>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <?php form_input('purchase_date', 'Purchase Date', 'date', [
-                    'required' => false,
-                    'value' => $input['purchase_date'] ?? '',
-                    'error' => $errors['purchase_date'] ?? null
+                        'required' => false,
+                        'value' => $input['purchase_date'] ?? '',
+                        'error' => $errors['purchase_date'] ?? null
                 ]); ?>
 
                 <?php form_input('expiration_date', 'Expiration Date', 'date', [
-                    'required' => false,
-                    'value' => $input['expiration_date'] ?? '',
-                    'error' => $errors['expiration_date'] ?? null
+                        'required' => false,
+                        'value' => $input['expiration_date'] ?? '',
+                        'error' => $errors['expiration_date'] ?? null
                 ]); ?>
             </div>
 
             <div class="pt-6 border-t border-border-default flex flex-col sm:flex-row-reverse gap-3">
-                <?php form_button('Add Item to Pantry', 'cta', ['size' => 'md', 'fullWidth' => true, 'class' => 'sm:w-auto']); ?>
+                <?php form_button('Find & Add', 'cta', ['size' => 'md', 'fullWidth' => true, 'class' => 'sm:w-auto']); ?>
                 <a href="/dashboard" class="btn btn-secondary btn-md w-full sm:w-auto flex justify-center">Cancel</a>
             </div>
 
@@ -70,9 +99,6 @@ require_once VIEW_PATH . '/components/form_elements.php';
 </div>
 
 <?php
-// Get the captured content and assign it to a variable for the layout
 $content = ob_get_clean();
-
-// Include the main application layout, which will render the content
 require_once VIEW_PATH . '/layouts/Users/layout.php';
 ?>
