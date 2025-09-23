@@ -426,6 +426,7 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                     <a class="btn btn-cta btn-sm" href="/items/edit/<?php echo (int)($item['id'] ?? 0); ?>">Edit</a>
                     <form action="/items/<?php echo (int)($item['id'] ?? 0); ?>/delete" method="POST" class="inline"
                           onsubmit="return confirm('Are you sure you want to delete &quot;<?php echo htmlspecialchars($item['name'] ?? 'this item'); ?>&quot;? This action cannot be undone.');">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
                         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                     </form>
                 </div>

@@ -37,6 +37,7 @@ $img = !empty($display['image']) && preg_match('#^https?://#i', $display['image'
 
     <div class="card p-6">
         <form action="/items/<?php echo (int)$item['id']; ?>" method="POST" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
             <?php if (!empty($errors['general'])): ?>
                 <div class="p-3 rounded bg-red-50 text-red-700 text-sm"><?php echo e($errors['general']); ?></div>
             <?php endif; ?>
