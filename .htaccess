@@ -2,10 +2,10 @@
 RewriteEngine On
 RewriteBase /
 
-# If the requested path maps to a real file or directory here, serve it
+# If the requested path is a real file or folder here, serve it
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Otherwise, send the request into the public/ directory
+# Otherwise, forward into the app’s public/ directory
 RewriteRule ^(.*)$ public/$1 [L]
