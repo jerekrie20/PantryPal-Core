@@ -24,15 +24,23 @@ HTML;
         if (is_file($manifest)) {
             $data = json_decode(file_get_contents($manifest), true);
             if (!empty($data[$entry]['file'])) {
-                $js = '/dist/' . $data[$entry]['file'];
+                // Determine the public web base dynamically. If the web root is the project root,
+                // SCRIPT_NAME will be "/public/index.php" and base will be "/public".
+                // If the web root is the public/ folder, base will be "/" and we use empty prefix.
+                $publicBase = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+                $publicBase = rtrim($publicBase, '/');
+                if ($publicBase === '' || $publicBase === '/') { $publicBase = ''; }
+                $assetBase = $publicBase . '/dist/';
+
+                $jsUrl = $assetBase . $data[$entry]['file'];
                 $css = '';
                 if (!empty($data[$entry]['css'])) {
                     foreach ($data[$entry]['css'] as $cssFile) {
-                        $href = htmlspecialchars('/dist/' . $cssFile, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                        $href = htmlspecialchars($assetBase . $cssFile, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                         $css .= '<link rel="stylesheet" href="' . $href . '">' . PHP_EOL;
                     }
                 }
-                $jsEsc = htmlspecialchars($js, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $jsEsc = htmlspecialchars($jsUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 return $css . '<script type="module" src="' . $jsEsc . '"></script>';
             }
         }
