@@ -6,8 +6,8 @@
 // --- Templating Logic ---
 ob_start();
 
-// Include the reusable form components
-require_once VIEW_PATH . '/components/form_elements.php';
+// Include the reusable form components (case-sensitive on Linux)
+require_once VIEW_PATH . '/Components/form_elements.php';
 ?>
 
 <div class="max-w-2xl mx-auto">
