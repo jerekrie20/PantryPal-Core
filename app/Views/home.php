@@ -1,4 +1,4 @@
-<?php include 'Layouts/Guest/header.php'; ?>
+<?php include VIEW_PATH . '/Layouts/Guest/header.php'; ?>
 
 <section class="hero-bg py-16 sm:py-24">
     <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -92,5 +92,5 @@
     </div>
 </section>
 
-<?php include_once 'Layouts/Guest/footer.php'; ?>
+<?php include VIEW_PATH . '/Layouts/Guest/footer.php'; ?>
 
