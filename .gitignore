@@ -14,6 +14,8 @@ composer.phar
 /node_modules/
 public/hot
 .vite
+# But keep built metadata in public/dist/.vite tracked
+!public/dist/.vite/
 .eslintcache
 .stylelintcache
 .tsbuildinfo

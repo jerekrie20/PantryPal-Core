@@ -5,7 +5,19 @@ class Vite {
     public static function tags(): string {
         $devServer = getenv('VITE_DEV_SERVER') ?: 'https://localhost:5173';
         $entry     = 'src/js/main.js';
-        $manifest  = APP_ROOT . '/public/dist/manifest.json';
+        
+        // Prefer public/dist for production assets, but be resilient if someone uploaded to /dist or Vite wrote manifest under .vite
+        $possibleManifests = [
+            APP_ROOT . '/public/dist/manifest.json',
+            APP_ROOT . '/public/dist/.vite/manifest.json',
+            APP_ROOT . '/dist/manifest.json',
+            APP_ROOT . '/dist/.vite/manifest.json',
+        ];
+        $manifest = null;
+        foreach ($possibleManifests as $m) {
+            if (is_file($m)) { $manifest = $m; break; }
+        }
+
         $env       = getenv('APP_ENV') ?: 'development';
         $isDev     = ($env !== 'production') && is_dir(APP_ROOT . '/node_modules');
 
@@ -21,7 +33,7 @@ class Vite {
 HTML;
         }
 
-        if (is_file($manifest)) {
+        if ($manifest && is_file($manifest)) {
             $data = json_decode(file_get_contents($manifest), true);
             if (!empty($data[$entry]['file'])) {
                 // Determine the public web base dynamically. If the web root is the project root,
