@@ -157,26 +157,47 @@ class Recipes
         return (bool)$st->fetchColumn();
     }
 
-    /** Search locally by title/raw_payload. Returns normalized array like provider. */
+    /** Search locally by title or raw JSON payload. Works across MySQL and MariaDB. */
     public function searchLocalByQuery(string $q, int $limit = 12): array
     {
         $q = trim($q);
         if ($q === '') return [];
         $like = '%' . $q . '%';
-        // Search title, summary, and anywhere in the JSON payload (ingredients, instructions, etc.)
-        $sql = "SELECT * FROM recipes
-                WHERE (title LIKE :q)
-                   OR (raw_payload IS NOT NULL AND JSON_EXTRACT(raw_payload, '$.summary') LIKE :q)
-                   OR (raw_payload IS NOT NULL AND JSON_SEARCH(raw_payload, 'one', :pat, NULL, '$') IS NOT NULL)
-                ORDER BY id DESC
-                LIMIT :lim";
-        $st = $this->db->prepare($sql);
-        $st->bindValue(':q', $like, PDO::PARAM_STR);
-        $st->bindValue(':pat', $like, PDO::PARAM_STR);
-        $st->bindValue(':lim', $limit, PDO::PARAM_INT);
-        $st->execute();
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        return array_map([$this, 'normalize'], $rows);
+
+        // Try JSON-aware search (MySQL 5.7+/8.0+), but gracefully fall back to plain LIKE on raw_payload for MariaDB.
+        try {
+            $sql = "SELECT * FROM recipes
+                    WHERE (title LIKE :q)
+                       OR (raw_payload IS NOT NULL AND JSON_EXTRACT(raw_payload, '$.summary') LIKE :q)
+                       OR (raw_payload IS NOT NULL AND JSON_SEARCH(raw_payload, 'one', :pat, NULL, '$') IS NOT NULL)
+                    ORDER BY id DESC
+                    LIMIT :lim";
+            $st = $this->db->prepare($sql);
+            $st->bindValue(':q', $like, PDO::PARAM_STR);
+            $st->bindValue(':pat', $like, PDO::PARAM_STR);
+            $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+            $st->execute();
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            return array_map([$this, 'normalize'], $rows);
+        } catch (\Throwable $e) {
+            // Fallback for MariaDB (no JSON_SEARCH) or older MySQL: raw_payload is TEXT → LIKE works.
+            try {
+                $sql2 = "SELECT * FROM recipes
+                         WHERE (title LIKE :q)
+                            OR (raw_payload IS NOT NULL AND raw_payload LIKE :pat)
+                         ORDER BY id DESC
+                         LIMIT :lim";
+                $st2 = $this->db->prepare($sql2);
+                $st2->bindValue(':q', $like, PDO::PARAM_STR);
+                $st2->bindValue(':pat', $like, PDO::PARAM_STR);
+                $st2->bindValue(':lim', $limit, PDO::PARAM_INT);
+                $st2->execute();
+                $rows = $st2->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                return array_map([$this, 'normalize'], $rows);
+            } catch (\Throwable $e2) {
+                return [];
+            }
+        }
     }
 
     /** Find locally by ingredient keywords in title/raw. */
