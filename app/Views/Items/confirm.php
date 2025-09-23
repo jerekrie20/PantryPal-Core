@@ -39,6 +39,7 @@ ob_start();
                 <div class="card p-4">
                     <?php $confirm_action = $confirm_action ?? '/items/confirm'; ?>
                     <form action="<?= htmlspecialchars($confirm_action) ?>" method="POST" class="flex items-center justify-between gap-4">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
                         <!-- Pass original user input through hidden fields -->
                         <?php foreach ($original_input as $key => $value): ?>
                             <input type="hidden" name="original_input[<?= htmlspecialchars($key) ?>]" value="<?= htmlspecialchars((string)$value) ?>">
@@ -98,6 +99,7 @@ ob_start();
     <div class="text-center mt-8">
         <?php $confirm_action = $confirm_action ?? '/items/confirm'; ?>
         <form action="<?= htmlspecialchars($confirm_action) ?>" method="POST" class="inline">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
             <?php foreach ($original_input as $key => $value): ?>
                 <input type="hidden" name="original_input[<?= htmlspecialchars($key) ?>]" value="<?= htmlspecialchars((string)$value) ?>">
             <?php endforeach; ?>
