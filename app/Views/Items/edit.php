@@ -50,8 +50,33 @@ $img = !empty($display['image']) && preg_match('#^https?://#i', $display['image'
                 </div>
                 <div>
                     <label for="unit" class="block text-sm font-medium mb-1">Unit</label>
-                    <input id="unit" name="unit" type="text" value="<?php echo e($item['unit'] ?? ''); ?>"
-                           class="w-full border border-border-default rounded px-3 py-2 bg-surface-default">
+                    <?php
+                    $units = [
+                        '' => 'Select unit (optional)',
+                        'pcs' => 'pcs',
+                        'g' => 'g',
+                        'kg' => 'kg',
+                        'mg' => 'mg',
+                        'lb' => 'lb',
+                        'oz' => 'oz',
+                        'ml' => 'ml',
+                        'l' => 'L',
+                        'cup' => 'cup',
+                        'tbsp' => 'tbsp',
+                        'tsp' => 'tsp',
+                        'pinch' => 'pinch',
+                    ];
+                    $selectedUnit = $item['unit'] ?? '';
+                    ?>
+                    <select id="unit" name="unit" class="w-full border border-border-default rounded px-3 py-2 bg-surface-default">
+                        <?php foreach ($units as $val => $label): ?>
+                            <option value="<?php echo e($val); ?>" <?php echo ($selectedUnit === $val ? 'selected' : ''); ?>><?php echo e($label); ?></option>
+                        <?php endforeach; ?>
+                        <?php if ($selectedUnit && !array_key_exists($selectedUnit, $units)): ?>
+                            <option value="<?php echo e($selectedUnit); ?>" selected><?php echo e($selectedUnit); ?> (custom)</option>
+                        <?php endif; ?>
+                    </select>
+                    <?php if (!empty($errors['unit'])): ?><p class="text-red-600 text-sm mt-1"><?php echo e($errors['unit']); ?></p><?php endif; ?>
                 </div>
             </div>
 

@@ -1,0 +1,305 @@
+# Authentication
+
+Our GraphQL API currently supports two authentication methods that you can use depending on your case and needs JWT Authentication and API Token Authentication.
+
+## JWT Authentication
+
+{% hint style="info" %}
+Use JWT to implement the client-side authentication system only&#x20;
+{% endhint %}
+
+This method requires a valid user and password and returns a JWT that can be used to consume the GraphQL API.
+
+<mark style="color:green;">`POST`</mark> `https://production.suggestic.com/api/v1/login`
+
+#### Request Body
+
+| Name     | Type   | Description   |
+| -------- | ------ | ------------- |
+| email    | string | User email    |
+| password | string | User password |
+
+{% tabs %}
+{% tab title="200 A successfull authentication response." %}
+
+```
+{
+    "email": "test@suggestic.com",
+    "name": "Ernesto",
+    "phone": "",
+    "user_id": "4e9fb96d-3291-aa43-92f1-8226408eb0ac",
+    "is_premium": true,
+    "birthdate": "1984-03-10",
+    "avatar": "https://sg-data.storage.googleapis.com:443/4e9fb96d-3291-4f5e-92f1-8226408eb0ac/avatar",
+    "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjasdfadfa311CI6IjIwMTcwMTA5MTYzMSJ9.DIAAit7QDBBvoluIYp6lt-jC3cfEOgZ3sThEu0j_T7A",
+    "hashed_email": "790cd2c93f39629asdf2234s761de119b13fc2614f3998cb023cfd",
+    "program_id": "46477417-dc4e-425c-b3a9-f2bc9b129102",
+    "show_program_view": true,
+    "transaction_provider": "",
+    "transaction_duration": "",
+    "transaction_price": 0,
+    "profile_id": "7708db196-27a0-4aa2-999e-1e68203a83udd"
+}
+```
+
+{% endtab %}
+
+{% tab title="401 Incorrenct username or password was provided." %}
+
+```
+{
+    "detail": "Incorrect username/password"
+}
+```
+
+{% endtab %}
+{% endtabs %}
+
+Once this request is sent, the following information is displayed:
+
+{% tabs %}
+{% tab title="Response" %}
+
+```json
+{
+    "email": "lizalina@gmail.com",
+    "name": "lili",
+    "phone": "",
+    "user_id": "<user_id>",
+    "is_premium": false,
+    "birthdate": null,
+    "avatar": null,
+    "token": "<token>",
+    "refresh_token": "<refresh_token>",
+    "hashed_email": "59184e9bf7b070d500629ae7410aa1bce18ef6bf98655af15dbadadb58e1f137",
+    "program_id": "<program_id>",
+    "show_program_view": true,
+    "transaction_provider": "",
+    "transaction_duration": "",
+    "transaction_price": 0,
+    "profile_id": "<profile_id>"
+}
+```
+
+{% endtab %}
+{% endtabs %}
+
+### How to use a Bearer Authentication within graphQL
+
+Once you log in, open your [Grapqhl Playground](https://production.suggestic.com/graphql); in the authentication section, add the following header
+
+{% tabs %}
+{% tab title="HTTP HEADERS" %}
+
+```
+{
+  "Authorization": "Bearer <insert_your_token_here>"
+}
+```
+
+{% endtab %}
+{% endtabs %}
+
+{% hint style="info" %}
+When a JWT authentication is used in GraphQL, it is not required to add the sg-user header.
+{% endhint %}
+
+For example:
+
+The following query retrieves the information of a meal plan by giving the bearer token
+
+![](https://920729701-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2F-LwqSnBDpAb6mFZYLsuB%2Fuploads%2FMEX6e7fKJXhKVTPIB7m0%2Fimage.png?alt=media\&token=f9c452ff-2c84-44e0-a088-3325570adfa2)
+
+### cURL Request with Bearer token
+
+The bearer token is sent to the server with the `'Authorization: Bearer {token}'` authorization header.&#x20;
+
+In the following example, we are getting the shopping list request.
+
+{% tabs %}
+{% tab title="cURL Request" %}
+{% code overflow="wrap" %}
+
+```bash
+curl -XPOST 'https://production.suggestic.com/graphql' \
+  -H 'Authorization: Bearer <insert_your_bearer_token_here>' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{"query":"{\n  shoppingList { edges {node {ingredientLine quantity aisleName recipeName isDone unit  databaseId  errors   }  }  }}"}'
+```
+
+{% endcode %}
+{% endtab %}
+{% endtabs %}
+
+### Refresh Token
+
+For security purposes, the access token expires after 2 hours. Once expired, your client applications may use a refresh token to “refresh” the access token.
+
+You may obtain a refresh token using the `login` mutation.
+
+```graphql
+mutation {
+  login(userId: "<USERID>") {
+    refreshToken
+  }
+}
+```
+
+### Using JWT without a user's password
+
+If you are not using Suggestic as your identity provider, you can still obtain a JWT from the API using the `login` mutation. This should be done from your backend using the standard [API token authentication.](#api-token-authentication)
+
+{% code overflow="wrap" %}
+
+```graphql
+mutation {
+  login(userId: "<USERID>") {
+    accessToken
+  }
+}
+```
+
+{% endcode %}
+
+In this case, you can expect your authentication flow to be as follows:
+
+* Authenticate the user on your frontend with your implementation.
+* Request a JWT on your backend, on behalf of the user, via a request to the Suggestic API using your API key and the user’s ID.&#x20;
+* Pass the JWT to your frontend.
+* The frontend then uses that JWT for all future Suggestic API calls.
+
+## API Token Authentication
+
+{% hint style="info" %}
+Use the API authorization token provided  on *server*-*side* applications only
+{% endhint %}
+
+Use this authentication method to access the API "on behalf" of your users.&#x20;
+
+To use this method, you require a valid API token and a user id. Add these to a custom HTTP Header, as shown below.
+
+<mark style="color:green;">`POST`</mark> `https://production.suggestic.com/graphql`
+
+**Important:** if you are using a production API key, make sure you call the production environment on <http://production.suggestic.com/graphql>
+
+#### Headers
+
+| Name          | Type   | Description                                                                 |
+| ------------- | ------ | --------------------------------------------------------------------------- |
+| sg-user       | string | User UUID Eg. value: \`ffffe9fa-3b49-4050-80d1-06129a722d0b\`               |
+| Authorization | string | A valid token Eg. value: \`Token 7b9f6fd852faba099be1984c97124b7f8d776f26\` |
+
+{% tabs %}
+{% tab title="200 " %}
+
+```
+{
+  "data": { ... },
+  "errors": [ ... ]
+}
+```
+
+{% endtab %}
+{% endtabs %}
+
+{% hint style="danger" %}
+***Do not*** use your API token on client-side authentication. If so, please request a new token.
+{% endhint %}
+
+### Clients/Partners API Token
+
+Partners/clients which have an isolated database will need to authenticate by using a different HTTP header named  `Suggestic-Partner`. Use it as it is explained below:
+
+{% tabs %}
+{% tab title="HTTP Header" %}
+
+```python
+{
+  "Authorization": "Token <TOKEN>",
+  "Suggestic-Partner":"<PARTNER-SLUG>"
+}
+```
+
+{% endtab %}
+{% endtabs %}
+
+### Examples
+
+#### cURL Example
+
+To query GraphQL using cURL, make a `POST` request with a JSON payload. The payload must contain a string called `query`:
+
+{% tabs %}
+{% tab title="Query" %}
+
+```bash
+curl 'https://staging.suggestic.com/graphql' -XPOST \
+-H 'Content-Type: application/json' \
+-H 'Authorization: Token 7b9f6fd852faba099be1984c97124b7f8d776f26' \
+-H 'sg-user: e084268c-5487-4f35-9d74-9ce41de3992b' \
+-d '{"query": "{ myProfile { id programName } }"}'
+```
+
+{% endtab %}
+
+{% tab title="Response" %}
+
+```
+{
+  "data": {
+    "myProfile": {
+      "id": "e084268c-5487-4f35-9d74-9ce41de3992b",
+      "programName": "Anti-Inflammatory Diet"
+    }
+  }
+}
+```
+
+{% endtab %}
+{% endtabs %}
+
+{% hint style="warning" %}
+Note: The string value of "query" must escape newline characters, or the schema will not parse it correctly. For the POST body, use outer double quotes and escaped inner double quotes.
+{% endhint %}
+
+If you need to use your partner/client header, use the following cURL
+
+{% tabs %}
+{% tab title="Example" %}
+
+```java
+curl -XPOST 'https://production.suggestic.com/graphql' \
+-H 'Authorization: Token <API-Token>' \
+-H 'SG-User: <user-id>' \
+-H 'Suggestic-Partner: <PARTNER-SLUG>' \
+-H 'Content-Type: application/json' \
+```
+
+{% endtab %}
+{% endtabs %}
+
+#### Python Example
+
+```python
+import requests
+
+# HTTP Headers including sg-user for especific user context
+headers = {
+    "Authorization": "Token 7b9f6fd852faba099be1984c97124b7f8d776f26",
+    "sg-user": "e084268c-5487-4f35-9d74-9ce41de3992b"
+}
+# GraphQL query
+query = """{ myProfile { id programName } }"""
+
+# Make request
+r = requests.post(
+    "https://staging.suggestic.com/graphql",
+    headers=headers,
+    json={"query": query}
+)
+
+# print json response
+print(r.json())
+```
+
+If you need to use your partner/client header, replace `sg-user` with the `Suggestic-Partner` information

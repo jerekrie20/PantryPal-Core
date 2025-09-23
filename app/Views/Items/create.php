@@ -67,12 +67,39 @@ require_once VIEW_PATH . '/components/form_elements.php';
                         'error' => $errors['quantity'] ?? null
                 ]); ?>
 
-                <?php form_input('unit', 'Unit', 'text', [
-                        'placeholder' => 'e.g., L, kg, pcs',
-                        'required' => false,
-                        'value' => $input['unit'] ?? '',
-                        'error' => $errors['unit'] ?? null
-                ]); ?>
+                <div>
+                    <label for="unit" class="block text-sm font-medium text-text-heading mb-1">Unit</label>
+                    <?php
+                    $units = [
+                        '' => 'Select unit (optional)',
+                        'pcs' => 'pcs',
+                        'g' => 'g',
+                        'kg' => 'kg',
+                        'mg' => 'mg',
+                        'lb' => 'lb',
+                        'oz' => 'oz',
+                        'ml' => 'ml',
+                        'l' => 'L',
+                        'cup' => 'cup',
+                        'tbsp' => 'tbsp',
+                        'tsp' => 'tsp',
+                        'pinch' => 'pinch',
+                    ];
+                    $selectedUnit = $input['unit'] ?? '';
+                    ?>
+                    <select id="unit" name="unit" class="w-full border border-border-default rounded px-3 py-2 bg-surface-default focus:outline-none focus:ring-2 focus:ring-primary">
+                        <?php foreach ($units as $val => $label): ?>
+                            <option value="<?php echo htmlspecialchars($val); ?>" <?php echo ($selectedUnit === $val ? 'selected' : ''); ?>><?php echo htmlspecialchars($label); ?></option>
+                        <?php endforeach; ?>
+                        <?php if ($selectedUnit && !array_key_exists($selectedUnit, $units)): ?>
+                            <option value="<?php echo htmlspecialchars($selectedUnit); ?>" selected><?php echo htmlspecialchars($selectedUnit); ?> (custom)</option>
+                        <?php endif; ?>
+                    </select>
+                    <?php if (!empty($errors['unit'])): ?>
+                        <p class="text-red-600 text-sm mt-1"><?php echo htmlspecialchars($errors['unit']); ?></p>
+                    <?php endif; ?>
+                    <p class="text-xs text-text-muted mt-1">Pick a unit or leave blank.</p>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">

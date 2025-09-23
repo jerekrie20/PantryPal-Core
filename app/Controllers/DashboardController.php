@@ -6,13 +6,16 @@ use Helpers\View;
 use Models\Items;
 use Models\Ingredients;
 use Models\Products;
+use Models\Recipes;
 
 class DashboardController
 {
     protected Items $item;
+    protected Recipes $recipes;
 
     public function __construct(){
         $this->item = new Items();
+        $this->recipes = new Recipes();
     }
 
     /**
@@ -26,18 +29,18 @@ class DashboardController
         $userId   = $_SESSION['user_id'];
 
         $itemsPage = $this->item->findAll($userId);
+        $savedCount = 0;
+        try { $savedCount = $this->recipes->countSavedForUser((int)$userId); } catch (\Throwable $e) { $savedCount = 0; }
 
         $pantry_stats = [
             'total_items'      => $itemsPage['pagination']['totalItems'] ?? 0,
             'expiring_soon'    => $this->item->countExpiringSoon($userId, 3),
-            'recipes_available'=> 7,
+            'recipes_saved'    => $savedCount,
         ];
 
-        $rawItems = $this->item->findRecent($userId, 6);
+        $rawItems = $this->item->findRecentWithGlobal($userId, 6);
         $today    = new \DateTimeImmutable('today');
         $pantry_items = [];
-        $ingModel = new Ingredients();
-        $prodModel = new Products();
 
         foreach ($rawItems as $row) {
             $name = 'Item';
@@ -45,19 +48,13 @@ class DashboardController
             $image = null;
 
             if (!empty($row['ingredient_id'])) {
-                $ing = $ingModel->find((int)$row['ingredient_id']);
-                if ($ing) {
-                    $name = $ing['name'] ?? $name;
-                    $category = $this->stringifyCategory($ing['category'] ?? null);
-                    $image = $ing['image_url'] ?? null;
-                }
+                $name = $row['ingredient_name'] ?? $name;
+                $category = $this->stringifyCategory($row['ingredient_category'] ?? null);
+                $image = $row['ingredient_image_url'] ?? null;
             } elseif (!empty($row['product_id'])) {
-                $prod = $prodModel->find((int)$row['product_id']);
-                if ($prod) {
-                    $name = $prod['title'] ?? $name;
-                    $category = $this->stringifyCategory($prod['category'] ?? null);
-                    $image = $prod['image_url'] ?? null;
-                }
+                $name = $row['product_title'] ?? $name;
+                $category = $this->stringifyCategory($row['product_category'] ?? null);
+                $image = $row['product_image_url'] ?? null;
             }
 
             // Status/badge

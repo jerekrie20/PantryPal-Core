@@ -13,3 +13,9 @@ This directory contains the core application code for PantryPal.
 - **Helpers**: Contains utility functions and helper classes
 - **Config**: Contains configuration files
 - **Database**: Contains database-related code
+
+## Security
+
+- Do not store secrets in this directory or in versioned config files.
+- Use environment variables from the project `.env` (see `.env.example` in the root) for API keys and credentials.
+- Ensure `.env` is not committed; it is already ignored in `.gitignore`.

@@ -9,29 +9,50 @@ A vanilla PHP project with Vite for automatic refresh and Tailwind CSS for styli
 - PHP for backend logic
 - Automatic browser refresh on code changes
 
-## Setup
+## Quick Start
 
 1. Clone the repository
-2. Install dependencies:
+2. Copy .env.example to .env and fill in values (do NOT commit .env):
+   ```powershell
+   Copy-Item .env.example .env
+   # then edit .env to add your keys and credentials
+   ```
+3. Install dependencies:
    ```
    npm install
+   composer install
    ```
-3. Start the development server:
+4. Start the development servers:
    ```
    npm run dev
+   # Ensure your PHP server (e.g., XAMPP) points DocumentRoot to public/
    ```
-4. Make sure your PHP server (e.g., XAMPP, WAMP) is running
+
+## Environment & Security
+
+Important security practices for this project:
+
+- Never commit secrets: .env is already ignored by .gitignore. Keep real API keys and passwords only in your local .env.
+- Use .env.example as a template. Replace placeholder values locally and keep the example file safe to share.
+- If a secret was ever committed or shared, rotate it immediately with the provider (generate a new key, revoke the old one).
+- Avoid posting real keys in screenshots/issues. Redact values before sharing.
+- Prefer non-personal contact info in OFF user agent (e.g., contact@example.com) instead of a private email.
+
+Environment variables used (see .env.example):
+- SPOONACULAR_API_KEY, API_NINJAS_KEY, FDC_API_KEY
+- OFF_USER_AGENT (polite identifier for Open Food Facts requests)
+- DB_* for database connection (if applicable in your setup)
 
 ## Development
 
-- Edit PHP files in the root directory
+- Edit PHP files under `app/`
 - Edit JavaScript files in the `src/js` directory
 - Edit CSS files in the `src/css` directory
 - Tailwind CSS classes can be used directly in your HTML
 
 ## Building for Production
 
-To build the project for production:
+To build the frontend assets for production:
 
 ```
 npm run build
@@ -80,7 +101,7 @@ pantrypal_core/
 ## How It Works
 
 - In development mode, Vite serves the assets and provides HMR
-- PHP requests are proxied to your PHP server
+- PHP requests are proxied/served by your local PHP server
 - In production mode, the built assets are loaded from the `dist` directory
 - The PHP code detects whether to use development or production assets
 

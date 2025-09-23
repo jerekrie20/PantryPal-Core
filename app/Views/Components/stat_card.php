@@ -5,7 +5,7 @@
 ?>
 <div class="card p-6 flex flex-col justify-between">
     <div>
-        <h2 class="text-lg font-semibold text-text-heading"><?php echo htmlspecialchars($title); ?></h2>
+        <h2 class="text-lg font-semibold text-text-heading"><?php echo htmlspecialchars($title_card); ?></h2>
         <p class="text-4xl font-bold mt-2 <?php echo isset($accent_color) ? htmlspecialchars($accent_color) : 'text-text-base'; ?>"><?php echo htmlspecialchars($value); ?></p>
         <p class="text-sm text-text-muted mt-1"><?php echo htmlspecialchars($description); ?></p>
     </div>

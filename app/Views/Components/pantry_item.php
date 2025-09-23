@@ -18,8 +18,14 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
         </div>
     </div>
     <div class="flex items-center space-x-2 self-end sm:self-center flex-shrink-0">
-        <span class="badge <?php echo $item['badge_class']; ?> hidden md:inline-block"><?php echo htmlspecialchars($item['category']); ?></span>
-        <a href="/items/edit/<?php echo $item['id']; ?>" class="btn btn-subtle btn-sm" aria-label="Edit <?php echo htmlspecialchars($item['name']); ?>">Edit</a>
-        <button class="btn btn-danger btn-sm" aria-label="Delete <?php echo htmlspecialchars($item['name']); ?>">Delete</button>
+        <span class="badge <?php echo $item['badge_class']; ?> hidden md:inline-block max-w-xs md:max-w-sm lg:max-w-md overflow-hidden text-ellipsis whitespace-nowrap" title="<?php echo htmlspecialchars($item['category']); ?>"><?php echo htmlspecialchars($item['category']); ?></span>
+        <a href="/items/<?php echo $item['id']; ?>/edit" class="btn btn-subtle btn-sm" aria-label="Edit <?php echo htmlspecialchars($item['name']); ?>">Edit</a>
+        <?php if (isset($item['expired']) && $item['expired']) : ?>
+            <a href="/items/renew/<?php echo $item['id']; ?>" class="btn btn-subtle btn-sm" aria-label="Renew <?php echo htmlspecialchars($item['name']); ?>">Renew</a>
+        <?php endif; ?>
+        <form action="/items/<?php echo $item['id']; ?>/delete" method="post" class="inline" onsubmit="return confirm('Are you sure you want to delete &quot;<?php echo htmlspecialchars($item['name']); ?>&quot;? This action cannot be undone.');">
+            <button type="submit" class="btn btn-danger btn-sm" aria-label="Delete <?php echo htmlspecialchars($item['name']); ?>">Delete</button>
+        </form>
+
     </div>
 </li>

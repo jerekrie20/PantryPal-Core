@@ -76,11 +76,11 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
             <!-- Header Card -->
             <div class="card">
                 <div class="card-body">
-                    <div class="flex items-start gap-4">
+                    <div class="flex flex-col sm:flex-row items-start gap-4">
                         <img src="<?php echo e($imageSrc); ?>"
                              alt="Image of <?php echo e($item['name'] ?? 'Product'); ?>"
-                             class="w-32 h-32 object-cover rounded-lg bg-gray-100">
-                        <div>
+                             class="w-24 h-24 sm:w-32 sm:h-32 object-cover rounded-lg bg-gray-100 flex-shrink-0">
+                        <div class="min-w-0">
                             <h2 class="text-xl font-semibold"><?php echo e($item['name'] ?? 'Product'); ?></h2>
                             <p class="text-sm text-gray-600"><?php echo e($item['category'] ?? ''); ?></p>
                             <?php if (!empty($item['brand'])): ?><p class="text-sm text-gray-700">
@@ -370,9 +370,61 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
         <aside class="space-y-6">
             <div class="card">
                 <div class="card-header">Actions</div>
-                <div class="card-body space-x-2">
-                    <a class="btn btn-subtle" href="/items/edit/<?php echo (int)($item['id'] ?? 0); ?>">Edit</a>
-                    <a class="btn btn-danger" href="/items/delete/<?php echo (int)($item['id'] ?? 0); ?>">Delete</a>
+                <div class="card-body flex flex-col sm:flex-row gap-2">
+                    <a class="btn btn-subtle" href="/items/<?php echo (int)($item['id'] ?? 0); ?>/edit">Edit</a>
+                    <form action="/items/<?php echo (int)($item['id'] ?? 0); ?>/delete" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete &quot;<?php echo htmlspecialchars($item['name'] ?? 'this item'); ?>&quot;? This action cannot be undone.');">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Related Recipes Card -->
+            <div class="card">
+                <div class="card-header">Recipes with this Product</div>
+                <div class="card-body">
+                    <?php if (!empty($recipesList)): ?>
+                        <div class="space-y-3">
+                            <?php foreach ($recipesList as $r): ?>
+                                <div class="flex items-center gap-3">
+                                    <?php
+                                    $img = (!empty($r['image']) && preg_match('#^https?://#i', $r['image'])) ? $r['image'] : ('https://placehold.co/56x56/E8F5E9/36454F?text=' . urlencode($r['title'] ?? 'R'));
+                                    ?>
+                                    <img src="<?php echo e($img); ?>" alt="Recipe image" class="w-14 h-14 object-cover rounded" />
+                                    <div class="flex-1">
+                                        <div class="text-sm font-semibold"><?php echo e($r['title'] ?? 'Recipe'); ?></div>
+                                        <div class="flex gap-2 mt-1">
+                                            <?php if (!empty($r['db_id'])): ?>
+                                                <a href="/recipes/view/<?php echo (int)$r['db_id']; ?>" class="btn btn-cta btn-xs">Details</a>
+                                            <?php endif; ?>
+                                            <?php if (!empty($r['sourceUrl'])): ?>
+                                                <a href="<?php echo e($r['sourceUrl']); ?>" target="_blank" rel="noopener" class="btn btn-subtle btn-xs">Source</a>
+                                            <?php endif; ?>
+                                            <form action="/recipes/save" method="POST" class="inline">
+                                                <input type="hidden" name="id" value="<?php echo e((string)($r['id'] ?? '')); ?>" />
+                                                <input type="hidden" name="title" value="<?php echo e($r['title'] ?? 'Recipe'); ?>" />
+                                                <input type="hidden" name="image" value="<?php echo e($r['image'] ?? ''); ?>" />
+                                                <input type="hidden" name="sourceUrl" value="<?php echo e($r['sourceUrl'] ?? ''); ?>" />
+                                                <input type="hidden" name="payload" value='<?php echo e(json_encode($r)); ?>' />
+                                                <?php 
+                                                    $prov = 'spoonacular';
+                                                    if (!empty($r['provider'])) { $prov = (string)$r['provider']; }
+                                                    elseif (!empty($r['api_source'])) { $prov = (string)$r['api_source']; }
+                                                    elseif (!isset($r['id']) || !is_numeric($r['id'])) { $prov = 'suggestic'; }
+                                                ?>
+                                                <input type="hidden" name="provider" value="<?php echo e($prov); ?>" />
+                                                <button type="submit" class="btn btn-secondary btn-xs">Save</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="text-sm text-text-muted">No local recipes found yet.</p>
+                    <?php endif; ?>
+                    <?php if (!empty($item['name'])): ?>
+                        <a href="/recipes?q=<?php echo urlencode($item['name']); ?>&api=1" class="btn btn-cta btn-sm mt-3">Search Online for &quot;<?php echo e($item['name']); ?>&quot;</a>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -439,7 +491,7 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                         <?php endif; ?>
 
                         <?php if (!empty($nutrientsList) && is_array($nutrientsList)): ?>
-                            <dl class="grid grid-cols-2 md:grid-cols-2 gap-2">
+                            <dl class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                                 <div>
                                     <span class="font-medium">Calories:</span> <?php echo $cal !== null ? e((string)round($cal)) . ' ' . e($calUnit) : '—'; ?>
                                 </div>
@@ -473,7 +525,7 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                             </dl>
 
                             <?php if ($breakdown && (isset($breakdown['percentProtein']) || isset($breakdown['percentFat']) || isset($breakdown['percentCarbs']))): ?>
-                                <div class="mt-3 grid grid-cols-3 gap-3 text-sm">
+                                <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                                     <div><span class="text-gray-600">Protein</span>
                                         <div class="font-medium"><?php echo isset($breakdown['percentProtein']) ? e((string)round($breakdown['percentProtein'])) . '%' : '—'; ?></div>
                                     </div>
@@ -491,14 +543,6 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                     <?php else: ?>
                         <p class="text-sm text-gray-600">Nutrition details are unavailable.</p>
                     <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- Recipe Finder placeholder -->
-            <div class="card">
-                <div class="card-header">Recipe Finder</div>
-                <div class="card-body text-sm text-gray-600">
-                    Find recipes using <?php echo e($item['name'] ?? 'this product'); ?> (coming soon).
                 </div>
             </div>
 

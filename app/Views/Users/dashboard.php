@@ -42,12 +42,12 @@ ob_start();
     include VIEW_PATH . '/Components/stat_card.php';
     unset($accent_color); // Unset optional variables
 
-    // Recipes Available Card
-    $title_card = "Recipes Available";
-    $value = $pantry_stats['recipes_available'];
-    $description = "Based on your current ingredients";
-    $link_href = "/recipes/suggested";
-    $link_text = "Find a Recipe";
+    // Recipes Saved Card
+    $title_card = "Recepies Saved";
+    $value = $pantry_stats['recipes_saved'];
+    $description = "Bookmarked by you";
+    $link_href = "/recipes";
+    $link_text = "View Saved";
     include VIEW_PATH . '/Components/stat_card.php';
     unset($link_href, $link_text); // Unset optional variables
     ?>

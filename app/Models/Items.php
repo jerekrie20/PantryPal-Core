@@ -41,7 +41,17 @@ class Items
         $totalPages = (int)ceil($totalItems / max(1, $itemsPerPage));
         $offset = ($page - 1) * $itemsPerPage;
 
-        $sql = "SELECT i.* FROM items i"
+        // Eager-load a few display fields from related tables to avoid N+1 queries in views
+        $sql = "SELECT i.*, 
+                       ing.name        AS ingredient_name,
+                       ing.category    AS ingredient_category,
+                       ing.image_url   AS ingredient_image_url,
+                       p.title         AS product_title,
+                       p.category      AS product_category,
+                       p.image_url     AS product_image_url
+                FROM items i
+                LEFT JOIN ingredients ing ON ing.id = i.ingredient_id
+                LEFT JOIN products p      ON p.id = i.product_id"
             . (!empty($userId) ? " WHERE i.user_id = :user_id" : "") .
             " ORDER BY i.created_at DESC, i.id DESC
                   LIMIT :limit OFFSET :offset";
@@ -83,7 +93,24 @@ class Items
     /** Backward-compat wrapper: previously joined global tables; now items-only. */
     public function findRecentWithGlobal(int $userId, int $limit = 6): array
     {
-        return $this->findRecent($userId, $limit);
+        $sql = "SELECT i.id, i.ingredient_id, i.product_id, i.expiration_date, i.created_at,
+                       ing.name      AS ingredient_name,
+                       ing.category  AS ingredient_category,
+                       ing.image_url AS ingredient_image_url,
+                       p.title       AS product_title,
+                       p.category    AS product_category,
+                       p.image_url   AS product_image_url
+                FROM items i
+                LEFT JOIN ingredients ing ON ing.id = i.ingredient_id
+                LEFT JOIN products p      ON p.id = i.product_id
+                WHERE i.user_id = :user_id
+                ORDER BY i.created_at DESC, i.id DESC
+                LIMIT :limit";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit',   $limit,   PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
 

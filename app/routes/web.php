@@ -7,17 +7,18 @@ use Controllers\ItemsController;
 use Controllers\IngredientsController;
 use Controllers\ProductsController;
 use Controllers\UserController;
+use Controllers\RecipesController;
 use Middleware\AuthMiddleware;
 
 // Define application routes
 
-//Guests
+// Guests
 $router->get('/', [HomeController::class, 'index']);
-$router->get('/overview', function () {
-    require VIEW_PATH . '/Learning/overview.html';
+$router->get('/about', function () {
+    require VIEW_PATH . '/Pages/about.php';
 });
-$router->get('/theme', function () {
-    require VIEW_PATH . '/Learning/theme.php';
+$router->get('/features', function () {
+    require VIEW_PATH . '/Pages/features.php';
 });
 $router->get('/login', function () {
     require VIEW_PATH . '/Pages/login.php';
@@ -28,6 +29,25 @@ $router->get('/register', function () {
 $router->post('/login', [UserController::class, 'index']);
 $router->post('/register', [UserController::class, 'create']);
 
+// Hidden owner-only routes for Learning/Theme
+$router->get('/__internal/learning', function () {
+    $ownerId = 1; // adjust if needed
+    if (!isset($_SESSION['user_id']) || (int)$_SESSION['user_id'] !== $ownerId) {
+        http_response_code(404);
+        require VIEW_PATH . '/Pages/404.php';
+        return;
+    }
+    require VIEW_PATH . '/Learning/overview.html';
+});
+$router->get('/__internal/theme', function () {
+    $ownerId = 1; // adjust if needed
+    if (!isset($_SESSION['user_id']) || (int)$_SESSION['user_id'] !== $ownerId) {
+        http_response_code(404);
+        require VIEW_PATH . '/Pages/404.php';
+        return;
+    }
+    require VIEW_PATH . '/Learning/theme.php';
+});
 
 // --- Authenticated Routes ---
 // All routes defined inside this group will first run the AuthMiddleware.
@@ -57,6 +77,13 @@ $router->group(['middleware' => [AuthMiddleware::class]], function ($router) {
     $router->post('/products', [ProductsController::class, 'store']);
     $router->post('/products/confirm', [ProductsController::class, 'confirm']);
     $router->get('/products/view/{id:int}', [ProductsController::class, 'show']);
+
+    // Recipes
+    $router->get('/recipes', [RecipesController::class, 'index']);
+    $router->get('/recipes/suggested', [RecipesController::class, 'suggested']);
+    $router->get('/recipes/view/{id:int}', [RecipesController::class, 'show']);
+    $router->post('/recipes/save', [RecipesController::class, 'save']);
+    $router->post('/recipes/unsave', [RecipesController::class, 'unsave']);
 
 });
 

@@ -5,6 +5,7 @@ namespace Controllers;
 use Helpers\View;
 use Models\Items;
 use Models\Ingredients;
+use Models\Recipes;
 use Services\FoodService;
 
 /**
@@ -294,6 +295,17 @@ class IngredientsController
             return View::render('Ingredients/show', [
                 'title' => 'Ingredient Details',
                 'item'  => $item,
+                'recipesList' => (function() use ($item) {
+                    $list = [];
+                    try {
+                        $term = isset($item['name']) ? (string)$item['name'] : '';
+                        if ($term !== '') {
+                            $model = new Recipes();
+                            $list = $model->searchLocalByQuery($term, 6);
+                        }
+                    } catch (\Throwable $e) { $list = []; }
+                    return $list;
+                })(),
             ]);
 
         } catch (\Throwable $e) {

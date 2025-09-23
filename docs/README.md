@@ -42,3 +42,7 @@ Documentation can be written in Markdown format for easy readability both in cod
 5. Organize documentation logically
 6. Include a table of contents for longer documents
 7. Link related documentation together
+
+## Security Note
+
+Do not include real secrets (API keys, passwords) in documentation examples or screenshots. Use placeholders (e.g., `YOUR_API_KEY_HERE`) and refer readers to the root `.env.example` for environment configuration. If a secret is accidentally disclosed, rotate it immediately with the provider.

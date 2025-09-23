@@ -1,0 +1,389 @@
+<?php
+
+namespace Services\Recipes;
+
+use GuzzleHttp\Client;
+
+class SuggesticProvider implements RecipesProvider
+{
+    private Client $http;
+    private ?string $apiKey;
+    private ?string $sgUser;
+    private ?string $partner;
+    
+    // Maximum items Suggestic allows per page in recipeSearch (conservative)
+    private int $pageLimit = 30;
+
+    public function __construct(?string $apiKey = null)
+    {
+        $this->apiKey = $apiKey
+            ?? ($_ENV['SUGGESTIC_API_KEY'] ?? null)
+            ?? ($_SERVER['SUGGESTIC_API_KEY'] ?? null)
+            ?? (getenv('SUGGESTIC_API_KEY') ?: null);
+
+        $this->sgUser = ($_ENV['SUGGESTIC_USER_ID'] ?? null)
+            ?? ($_SERVER['SUGGESTIC_USER_ID'] ?? null)
+            ?? (getenv('SUGGESTIC_USER_ID') ?: null);
+
+        $this->partner = ($_ENV['SUGGESTIC_PARTNER'] ?? null)
+            ?? ($_SERVER['SUGGESTIC_PARTNER'] ?? null)
+            ?? (getenv('SUGGESTIC_PARTNER') ?: null);
+
+        $this->http = new Client([
+            'base_uri' => 'https://production.suggestic.com/',
+            'timeout' => 10,
+        ]);
+    }
+
+    public function isConfigured(): bool
+    {
+        // Token + sg-user are both required for Token auth flows
+        return !empty($this->apiKey) && !empty($this->sgUser);
+    }
+
+    public function searchByQuery(string $query, int $number = 12): array
+    {
+        if (!$this->isConfigured()) return [];
+
+        $first = max(1, min($this->pageLimit, (int)$number));
+
+        // 1) Relay connection shape (edges/node)
+        $gqlConn = <<<'GQL'
+query RecipeSearchConn($query: String!, $first: Int!) {
+  recipeSearch(query: $query, first: $first) {
+    edges {
+      node {
+        id
+        databaseId
+        name
+        numberOfServings
+        ingredientLines
+        ingredients { name }
+        instructions
+        source { recipeUrl }
+        mainImage
+      }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}
+GQL;
+
+        $data = $this->exec($gqlConn, ['query' => $query, 'first' => $first], $err1);
+        if ($data && isset($data['data']['recipeSearch']['edges'])) {
+            $edges = $data['data']['recipeSearch']['edges'] ?? [];
+            $out = [];
+            foreach ($edges as $edge) {
+                if (!empty($edge['node']) && is_array($edge['node'])) {
+                    $out[] = $this->normalizeNode($edge['node']);
+                    if (count($out) >= $first) break;
+                }
+            }
+            if ($out) return $out;
+            // empty results here could be legit; fall through to return []
+            return [];
+        }
+
+        // 2) Plain list shape (no edges)
+        $gqlList = <<<'GQL'
+query RecipeSearchList($query: String!, $first: Int!) {
+  recipeSearch(query: $query, first: $first) {
+    id
+    databaseId
+    name
+    numberOfServings
+    ingredientLines
+    ingredients { name }
+    instructions
+    source { recipeUrl }
+    mainImage
+  }
+}
+GQL;
+
+        $data = $this->exec($gqlList, ['query' => $query, 'first' => $first], $err2);
+
+        if ($data && isset($data['data']['recipeSearch']) && is_array($data['data']['recipeSearch'])) {
+            $arr = $data['data']['recipeSearch'];
+            $out = [];
+            foreach ($arr as $node) {
+                if (is_array($node)) {
+                    $out[] = $this->normalizeNode($node);
+                    if (count($out) >= $first) break;
+                }
+            }
+            return $out;
+        }
+
+        // If both attempts fail due to validation, log once for debugging
+        if ($err1 || $err2) {
+            error_log('Suggestic recipeSearch failed. connErr=' . ($err1 ?: 'none') . ' listErr=' . ($err2 ?: 'none'));
+        }
+
+        return [];
+    }
+
+    /**
+     * Paged search using cursor-based pagination. Returns one page of results and whether more pages exist.
+     * @return array{results: array, hasNext: bool}
+     */
+    public function searchPaged(string $query, int $page = 1, int $perPage = 10): array
+    {
+        if (!$this->isConfigured()) return ['results' => [], 'hasNext' => false];
+        $page = max(1, (int)$page);
+        $perPage = max(1, min($this->pageLimit, (int)$perPage));
+
+        $gql = <<<'GQL'
+query RecipeSearchConn($query: String!, $first: Int!, $after: String) {
+  recipeSearch(query: $query, first: $first, after: $after) {
+    edges {
+      node {
+        id
+        databaseId
+        name
+        numberOfServings
+        ingredientLines
+        ingredients { name }
+        instructions
+        source { recipeUrl }
+        mainImage
+      }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}
+GQL;
+
+        $after = null;
+        $hasNext = false;
+        $err = null;
+        // Advance to the requested page by iterating cursors
+        for ($p = 1; $p <= $page; $p++) {
+            $vars = ['query' => $query, 'first' => $perPage, 'after' => $after];
+            $data = $this->exec($gql, $vars, $err);
+            if (!$data || !isset($data['data']['recipeSearch'])) {
+                return ['results' => [], 'hasNext' => false];
+            }
+            $conn = $data['data']['recipeSearch'];
+            $hasNext = (bool)($conn['pageInfo']['hasNextPage'] ?? false);
+            $after = $conn['pageInfo']['endCursor'] ?? null;
+            if ($p === $page) {
+                $out = [];
+                $edges = $conn['edges'] ?? [];
+                foreach ($edges as $edge) {
+                    if (!empty($edge['node']) && is_array($edge['node'])) {
+                        $out[] = $this->normalizeNode($edge['node']);
+                    }
+                }
+                return ['results' => $out, 'hasNext' => $hasNext];
+            }
+            if (!$hasNext) {
+                // Requested page exceeds available pages
+                return ['results' => [], 'hasNext' => false];
+            }
+        }
+        return ['results' => [], 'hasNext' => false];
+    }
+
+    public function findByIngredients(array $ingredients, int $number = 12): array
+    {
+        // Query Suggestic in a less restrictive way: search by individual pantry terms and merge
+        $terms = array_values(array_unique(array_filter(array_map(function($s){
+            $t = trim((string)$s);
+            // keep only reasonably short words/phrases
+            return $t !== '' ? (strlen($t) > 64 ? substr($t, 0, 64) : $t) : '';
+        }, $ingredients))));
+        if (!$terms) return [];
+
+        // Prefer up to 5 concise terms to avoid over-constraining the search
+        usort($terms, function($a, $b){ return strlen($a) <=> strlen($b); });
+        $terms = array_slice($terms, 0, 5);
+
+        $target = max(1, min(30, (int)$number));
+        $seen = [];
+        $out = [];
+
+        foreach ($terms as $t) {
+            if (count($out) >= $target) break;
+            $needed = $target - count($out);
+            $results = $this->searchByQuery($t, $needed);
+            foreach ($results as $r) {
+                // de-dup by title+image to be resilient across providers
+                $key = strtolower(trim(($r['title'] ?? '') . '|' . ($r['image'] ?? '')));
+                if ($key === '' || isset($seen[$key])) continue;
+                $seen[$key] = true;
+                $out[] = $r;
+                if (count($out) >= $target) break;
+            }
+        }
+
+        // As a fallback, try a combined query of the first two terms if still underfilled
+        if (count($out) < $target && count($terms) >= 2) {
+            $needed = $target - count($out);
+            $comboQ = $terms[0] . ' ' . $terms[1];
+            $results = $this->searchByQuery($comboQ, $needed);
+            foreach ($results as $r) {
+                $key = strtolower(trim(($r['title'] ?? '') . '|' . ($r['image'] ?? '')));
+                if ($key === '' || isset($seen[$key])) continue;
+                $seen[$key] = true;
+                $out[] = $r;
+                if (count($out) >= $target) break;
+            }
+        }
+
+        return $out;
+    }
+
+    public function browseAll(array $filters = [], int $page = 1, int $perPage = 12): array
+    {
+        if (!$this->isConfigured()) return ['results' => [], 'total' => 0];
+        $seed = '';
+        foreach (['type', 'cuisine', 'diet'] as $k) {
+            if (!empty($filters[$k]) && is_string($filters[$k])) {
+                $seed = (string)$filters[$k];
+                break;
+            }
+        }
+        if ($seed === '') $seed = 'dinner';
+        $results = $this->searchByQuery($seed, $perPage);
+        return ['results' => $results, 'total' => 0];
+    }
+
+    /**
+     * Fetch a single recipe by global GraphQL id (preferred for Suggestic) and return raw data.
+     * Returns [] on error.
+     */
+    public function getRecipeById(string $id): array
+    {
+        if (!$this->isConfigured()) return [];
+        $gql = <<<'GQL'
+query GetRecipe($id: ID!) {
+  recipe(id: $id) {
+    id
+    databaseId
+    name
+    numberOfServings
+    ingredientLines
+    ingredients { name }
+    instructions
+    source { recipeUrl }
+    mainImage
+    nutrientsPerServing {
+      calories
+      protein
+      carbs
+      netcarbs
+      fat
+      saturatedFat
+      transFat
+      monounsaturatedFat
+      polyunsaturatedFat
+      sugar
+      fiber
+      cholesterol
+      sodium
+      potassium
+      calcium
+      iron
+      vitaminA
+      vitaminC
+    }
+  }
+}
+GQL;
+
+        $err = null;
+        $data = $this->exec($gql, ['id' => $id], $err);
+        if (!$data || !empty($data['errors'])) {
+            if ($err) error_log('SuggesticProvider::getRecipeById error: ' . $err);
+            return [];
+        }
+        $r = $data['data']['recipe'] ?? null;
+        return is_array($r) ? $r : [];
+    }
+
+    private function exec(string $gql, array $vars, ?string &$err = null): ?array
+    {
+        $err = null;
+        try {
+            $headers = [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Token ' . $this->apiKey, // Token auth per Suggestic
+                'sg-user' => $this->sgUser,            // required user context
+            ];
+            if (!empty($this->partner)) {
+                $headers['Suggestic-Partner'] = $this->partner;
+            }
+
+
+            $resp = $this->http->post('graphql', [
+                'headers' => $headers,
+                'json' => ['query' => $gql, 'variables' => $vars],
+            ]);
+            $json = json_decode((string)$resp->getBody(), true);
+            if (isset($json['errors'][0]['message'])) {
+                $err = $json['errors'][0]['message'];
+            }
+
+            return $json;
+        } catch (\Throwable $e) {
+            $err = $e->getMessage();
+            error_log('SuggesticProvider exec error: ' . $err);
+            return null;
+        }
+    }
+
+    private function normalizeNode(array $n): array
+    {
+        // Prefer full ingredientLines; else fallback to ingredients names
+        $ings = [];
+        if (!empty($n['ingredientLines']) && is_array($n['ingredientLines'])) {
+            foreach ($n['ingredientLines'] as $line) {
+                $t = is_string($line) ? trim($line) : '';
+                if ($t !== '') $ings[] = $t;
+            }
+        } elseif (!empty($n['ingredients']) && is_array($n['ingredients'])) {
+            foreach ($n['ingredients'] as $ing) {
+                if (isset($ing['name']) && is_string($ing['name'])) {
+                    $t = trim($ing['name']);
+                    if ($t !== '') $ings[] = $t;
+                }
+            }
+        }
+
+        // Instructions: array or string
+        $steps = [];
+        if (!empty($n['instructions']) && is_array($n['instructions'])) {
+            foreach ($n['instructions'] as $s) {
+                if (is_string($s)) {
+                    $t = trim($s);
+                    if ($t !== '') $steps[] = rtrim($t, '.');
+                }
+            }
+        } elseif (!empty($n['instructions']) && is_string($n['instructions'])) {
+            $parts = preg_split('/\n+|\r+|\.(\s|$)/u', $n['instructions']);
+            foreach ($parts as $s) {
+                $s = trim($s);
+                if ($s !== '') $steps[] = rtrim($s, '.');
+            }
+        }
+
+        $sourceUrl = null;
+        if (!empty($n['source']) && is_array($n['source'])) {
+            $sourceUrl = $n['source']['recipeUrl'] ?? null;
+        }
+
+        return [
+            'id' => $n['id'] ?? ($n['databaseId'] ?? null),
+            'title' => $n['name'] ?? 'Recipe',
+            'image' => $n['mainImage'] ?? null,
+            'sourceUrl' => $sourceUrl,
+            'servings' => $n['numberOfServings'] ?? null,
+            'ingredients_list' => $ings,
+            'instructions_list' => $steps,
+            'usedIngredients' => [],
+            'missedIngredients' => [],
+            'provider' => 'suggestic',
+        ];
+    }
+}

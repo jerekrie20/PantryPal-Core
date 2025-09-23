@@ -1,0 +1,183 @@
+# Nutrients Per Serving
+
+The `nutrientsPerServing` object contains the nutritional values of the associated recipe per serving.
+
+The `nutrientsPerServing` is the value from
+
+&#x20;                                        `nutritionalInfo * servingWeight`
+
+For instance, this allows users to log a fraction of a serving.
+
+&#x20;Please note that the weight of each serving is not standardized and depends on each recipe.
+
+### List of Fields
+
+Please note that fields not documented here may be out of date or deprecated.&#x20;
+
+| **Nutrient**         | **Name**                              | **Unit** |
+| -------------------- | ------------------------------------- | -------- |
+| `ash`                | Ash                                   | g        |
+| `cholesterol`        | Cholesterol                           | mg       |
+| `choline`            | Choline                               | mg       |
+| `copper`             | Copper                                | mg       |
+| `energy`             | Calories                              | Kcal     |
+| `fiber`              | Fiber                                 | g        |
+| `iodine`             | Iodine                                | ug       |
+| `sugar`              | Sugar                                 | g        |
+| `saturatedFat`       | Saturated Fat                         | g        |
+| `monounsaturatedFat` | Monounsaturated Fat                   | g        |
+| `polyunsaturatedFat` | Polyunsaturated Fat                   | g        |
+| `transFat`           | Trans Fat                             | g        |
+| `magnesium`          | Magnesium                             | mg       |
+| `manganese`          | Manganese                             | mg       |
+| `molybdenum`         | Molybdenum                            | ug       |
+| `selenium`           | Selenium                              | ug       |
+| `sodium`             | Sodium                                | mg       |
+| `potassium`          | Potassium                             | mg       |
+| `phosphorus`         | Phosphorus                            | mg       |
+| `zinc`               | Zinc                                  | mg       |
+| `vitaminA`           | Vitamin A                             | IU       |
+| `vitaminB1`          | Vitamin B1 (Thiamin)                  | mg       |
+| `vitaminB2`          | Vitamin B2 (Riboflavin)               | mg       |
+| `vitaminB3`          | Vitamin B3 (Niacin)                   | mg       |
+| `vitaminB5`          | VitaminB5 (Pantothenic acid)          | mg       |
+| `vitaminB6`          | Vitamin B6                            | mg       |
+| `vitaminB7`          | Vitamin B7 (Biotin)                   | ug       |
+| `vitaminB9`          | Vitamin B9 (Folic acid)               | ug       |
+| `vitaminB12`         | Vitamin B12                           | mcg      |
+| `vitaminC`           | Vitamin C                             | mg       |
+| `vitaminD`           | Vitamin D                             | mcg      |
+| `vitaminE`           | Vitamin E (alpha-tocopherol)          | mg       |
+| `calcium`            | Calcium                               | mg       |
+| `iron`               | Iron                                  | mg       |
+| `netcarbs`           | Net Carbohydrates (carbs minus fiber) | g        |
+| `protein`            | Protein                               | g        |
+| `carbs`              | Carbohydrates                         | g        |
+| `fat`                | Total lipid (fat                      | g        |
+| `dha`                | DHA                                   | g        |
+| `dpa`                | DPA                                   | g        |
+| `epa`                | EPA                                   | g        |
+| `ala`                | ALA                                   | g        |
+| `omega3`             | Omega 3 (DHA, DPA, EPA, ALA)          | g        |
+| `nitrogen`           | Nitrogen                              | g        |
+| `starch`             | Starch                                | g        |
+| `sucrose`            | Sucrose                               | g        |
+| `glucose`            | Glucose (dextrose)                    | g        |
+| `fructose`           | Fructose                              | g        |
+| `lactose`            | Lactose                               | g        |
+| `maltose`            | Maltose                               | g        |
+
+{% hint style="info" %}
+**Note:** Use these units as a base to calculate what you require. For other units, please use your preferred tools to convert between related *units.*&#x20;
+{% endhint %}
+
+### Example
+
+{% tabs %}
+{% tab title="Query" %}
+
+```graphql
+{
+  recipe(id: "UmVjaXBlOjFkMWIzYzU4LTk3Y2MtNDJlMi05NGEyLTA0OTdjMjVjNjhjYQ==") {
+    name
+    nutrientsPerServing {
+      calories
+      sugar
+      fiber
+      saturatedFat
+      monounsaturatedFat
+      polyunsaturatedFat
+      transFat
+      copper
+      cholesterol
+      choline
+      iodine
+      magnesium
+      manganese
+      molybdenum
+      phosphorus
+      potassium
+      selenium
+      sodium
+      zinc
+      potassium
+      vitaminB1
+      vitaminB2
+      vitaminB3
+      vitaminB5
+      vitaminB6
+      vitaminB7
+      vitaminB9
+      vitaminA
+      vitaminC
+      calcium
+      iron
+      netcarbs
+      protein
+      carbs
+      fat
+      dha
+      dpa
+      epa
+      omega3
+    }
+  }
+}
+```
+
+{% endtab %}
+
+{% tab title="Response" %}
+
+```javascript
+{
+  "data": {
+    "recipe": {
+      "name": "Three Bean Salad With Corn & Peppers",
+      "nutrientsPerServing": {
+        "calories": 279.4,
+        "sugar": 4.76,
+        "fiber": 14.24,
+        "saturatedFat": 0.93,
+        "monounsaturatedFat": 2.88,
+        "polyunsaturatedFat": 1.43,
+        "transFat": 0.02,
+        "copper": 0,
+        "cholesterol": 4.76,
+        "choline": null,
+        "iodine": null,
+        "magnesium": 56.68,
+        "manganese": 0.4,
+        "molybdenum": null,
+        "phosphorus": 166.22,
+        "potassium": 827.01,
+        "selenium": 4.94,
+        "sodium": 745.67,
+        "zinc": 1.06,
+        "vitaminB1": 0.38,
+        "vitaminB2": 0.16,
+        "vitaminB3": 1.67,
+        "vitaminB5": 0.42,
+        "vitaminB6": 0.15,
+        "vitaminB7": null,
+        "vitaminB9": 1.91,
+        "vitaminA": 2.58,
+        "vitaminC": 15.14,
+        "calcium": 95.92,
+        "iron": 4.15,
+        "netcarbs": 40.95,
+        "protein": 13.79,
+        "carbs": 42.9,
+        "fat": 5.85,
+        "dha": 0.01,
+        "dpa": 0,
+        "epa": 0,
+        "omega3": 0.11
+      }
+    }
+  }
+}
+```
+
+{% endtab %}
+{% endtabs %}

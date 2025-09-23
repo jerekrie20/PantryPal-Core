@@ -7,6 +7,7 @@ use Helpers\View;
 use Models\Items;
 use Models\Ingredients;
 use Models\Products;
+use Models\Recipes;
 use Services\FoodService;
 
 class ItemsController
@@ -280,6 +281,18 @@ class ItemsController
             return View::render($view, [
                 'title' => $title,
                 'item'  => $item,
+                                // Preload related recipes locally by the item's display name
+                                'recipesList' => (function() use ($item) {
+                                    $list = [];
+                                    try {
+                                        $term = isset($item['name']) ? (string)$item['name'] : '';
+                                        if ($term !== '') {
+                                            $model = new Recipes();
+                                            $list = $model->searchLocalByQuery($term, 6);
+                                        }
+                                    } catch (\Throwable $e) { $list = []; }
+                                    return $list;
+                                })(),
             ]);
 
         } catch (\Throwable $e) {
@@ -538,10 +551,22 @@ class ItemsController
 
         $validator->check($rules);
 
-        if (!$validator->passed()) {
+        // Cross-field validation: expiration_date not before purchase_date
+        $errors = $validator->errors();
+        $pd = $_POST['purchase_date'] ?? null;
+        $ed = $_POST['expiration_date'] ?? null;
+        if (!empty($pd) && !empty($ed)) {
+            $pdObj = \DateTime::createFromFormat('Y-m-d', (string)$pd);
+            $edObj = \DateTime::createFromFormat('Y-m-d', (string)$ed);
+            if ($pdObj && $edObj && $edObj < $pdObj) {
+                $errors['expiration_date'] = 'Expiration date cannot be before the purchase date';
+            }
+        }
+
+        if (!empty($errors)) {
             return View::render('Items/create', [
                 'title' => 'Add New Item',
-                'errors' => $validator->errors(),
+                'errors' => $errors,
                 'input' => $_POST
             ]);
         }
@@ -614,14 +639,45 @@ class ItemsController
             foreach ($data as $k => $v) {
                 if ($v === '') $data[$k] = null;
             }
+
+            $errors = [];
+            // Quantity numeric
             if (!is_numeric($data['quantity'] ?? null)) {
+                $errors['quantity'] = 'Quantity must be numeric';
+            }
+            // Unit max length 10
+            if (isset($data['unit']) && $data['unit'] !== null && strlen((string)$data['unit']) > 10) {
+                $errors['unit'] = 'Unit must be 10 characters or fewer';
+            }
+            // Dates format and logical order
+            $pd = $data['purchase_date'] ?? null;
+            $ed = $data['expiration_date'] ?? null;
+            $pdObj = null; $edObj = null;
+            if ($pd !== null) {
+                $pdObj = \DateTime::createFromFormat('Y-m-d', (string)$pd);
+                if (!$pdObj || $pdObj->format('Y-m-d') !== (string)$pd) {
+                    $errors['purchase_date'] = 'Purchase date must be a valid date (YYYY-MM-DD)';
+                }
+            }
+            if ($ed !== null) {
+                $edObj = \DateTime::createFromFormat('Y-m-d', (string)$ed);
+                if (!$edObj || $edObj->format('Y-m-d') !== (string)$ed) {
+                    $errors['expiration_date'] = 'Expiration date must be a valid date (YYYY-MM-DD)';
+                }
+            }
+            if ($pdObj && $edObj && $edObj < $pdObj) {
+                $errors['expiration_date'] = 'Expiration date cannot be before the purchase date';
+            }
+
+            if (!empty($errors)) {
                 return View::render('Items/edit', [
                     'title' => 'Edit Item',
-                    'errors' => ['quantity' => 'Quantity must be numeric'],
+                    'errors' => $errors,
                     'item' => array_merge(['id'=>$id], $data),
                     'display' => ['name' => $_POST['display_name'] ?? 'Item', 'category' => $_POST['display_category'] ?? null, 'image' => $_POST['display_image'] ?? null],
                 ]);
             }
+
             $ok = $this->items->update($id, $data, (int)$userId);
             if (!$ok) {
                 return View::render('Items/edit', [
@@ -648,6 +704,16 @@ class ItemsController
                 http_response_code(401);
                 return View::render('Pages/401', ['title' => 'Unauthorized']);
             }
+            $item = $this->items->find($id);
+            if (!$item) {
+                http_response_code(404);
+                return View::render('Pages/404', ['title' => 'Item Not Found']);
+            }
+            if ((int)($item['user_id'] ?? 0) !== (int)$userId) {
+                http_response_code(403);
+                return View::render('Pages/403', ['title' => 'Forbidden']);
+            }
+
             $this->items->delete($id, (int)$userId);
             header('Location: /dashboard');
             exit;
