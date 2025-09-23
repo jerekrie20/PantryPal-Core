@@ -305,6 +305,24 @@ GQL;
     private function exec(string $gql, array $vars, ?string &$err = null): ?array
     {
         $err = null;
+        // Cache key based on GraphQL query + vars
+        $ckey = null;
+        $useCache = false;
+        try {
+            if (class_exists('Helpers\\Cache')) {
+                $ckey = 'sg:gql:' . sha1($gql . '|' . json_encode($vars));
+                $useCache = \Helpers\Cache::ready();
+                if ($useCache) {
+                    $cached = \Helpers\Cache::get($ckey);
+                    if (is_array($cached)) {
+                        return $cached; // return cached JSON array
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore cache errors
+        }
+
         try {
             $headers = [
                 'Content-Type' => 'application/json',
@@ -315,7 +333,6 @@ GQL;
                 $headers['Suggestic-Partner'] = $this->partner;
             }
 
-
             $resp = $this->http->post('graphql', [
                 'headers' => $headers,
                 'json' => ['query' => $gql, 'variables' => $vars],
@@ -323,6 +340,11 @@ GQL;
             $json = json_decode((string)$resp->getBody(), true);
             if (isset($json['errors'][0]['message'])) {
                 $err = $json['errors'][0]['message'];
+            }
+
+            // Cache successful responses briefly (10 minutes)
+            if ($useCache && is_array($json) && empty($json['errors'])) {
+                try { \Helpers\Cache::set($ckey, $json, 600); } catch (\Throwable $e) { /* ignore */ }
             }
 
             return $json;

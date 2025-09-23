@@ -1,12 +1,15 @@
 <?php
 // Security headers and CSP
 $env = getenv('APP_ENV') ?: 'development';
-header('X-Frame-Options: SAMEORIGIN');
+header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
-header('Referrer-Policy: no-referrer-when-downgrade');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 
 if ($env === 'production') {
-    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:");
+    // Enforce HTTPS long-term (enable only when HTTPS is fully configured site-wide)
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
+    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://production.suggestic.com; font-src 'self' data:; frame-ancestors 'none'");
 } else {
     $vite = getenv('VITE_DEV_SERVER') ?: 'https://localhost:5173';
 
@@ -23,7 +26,8 @@ if ($env === 'production') {
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' {$vite}; " .
         "style-src 'self' 'unsafe-inline'; " .
         "img-src 'self' https: data:; " .
-        "connect-src 'self' {$vite} {$ws}; " .
-        "font-src 'self' data:"
+        "connect-src 'self' {$vite} {$ws} https://production.suggestic.com; " .
+        "font-src 'self' data:; " .
+        "frame-ancestors 'none'"
     );
 }

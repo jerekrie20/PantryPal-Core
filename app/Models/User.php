@@ -97,8 +97,17 @@ class User
 
     public function logout()
     {
-        session_unset();
-        session_destroy();
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        // Regenerate session ID to invalidate any fixation remnants
+        @session_regenerate_id(true);
+        // Clear all session data
+        $_SESSION = [];
+        // Delete the session cookie
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], (bool)$params['secure'], (bool)$params['httponly']);
+        }
+        @session_destroy();
     }
 
     public function createUser($data): false|string

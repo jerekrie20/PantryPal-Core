@@ -9,6 +9,7 @@ use Controllers\ProductsController;
 use Controllers\UserController;
 use Controllers\RecipesController;
 use Middleware\AuthMiddleware;
+use Middleware\CsrfMiddleware;
 
 // Define application routes
 
@@ -26,35 +27,62 @@ $router->get('/login', function () {
 $router->get('/register', function () {
     require VIEW_PATH . '/Pages/register.php';
 });
-$router->post('/login', [UserController::class, 'index']);
-$router->post('/register', [UserController::class, 'create']);
+// Protect guest POST routes with CSRF
+$router->group(['middleware' => [CsrfMiddleware::class]], function ($router) {
+    $router->post('/login', [UserController::class, 'index']);
+    $router->post('/register', [UserController::class, 'create']);
+});
 
-// Hidden owner-only routes for Learning/Theme
+// Internal routes gated by env flag and admin role
 $router->get('/__internal/learning', function () {
-    $ownerId = 1; // adjust if needed
-    if (!isset($_SESSION['user_id']) || (int)$_SESSION['user_id'] !== $ownerId) {
-        http_response_code(404);
-        require VIEW_PATH . '/Pages/404.php';
-        return;
-    }
+    $enabled = getenv('INTERNAL_TOOLS_ENABLED') ?: '';
+    if (strtolower((string)$enabled) !== 'true') { http_response_code(404); require VIEW_PATH . '/Pages/404.php'; return; }
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $isAdmin = !empty($_SESSION['is_admin']);
+    if (!$isAdmin) { http_response_code(403); require VIEW_PATH . '/Pages/403.php'; return; }
     require VIEW_PATH . '/Learning/overview.html';
 });
 $router->get('/__internal/theme', function () {
-    $ownerId = 1; // adjust if needed
-    if (!isset($_SESSION['user_id']) || (int)$_SESSION['user_id'] !== $ownerId) {
-        http_response_code(404);
-        require VIEW_PATH . '/Pages/404.php';
-        return;
-    }
+    $enabled = getenv('INTERNAL_TOOLS_ENABLED') ?: '';
+    if (strtolower((string)$enabled) !== 'true') { http_response_code(404); require VIEW_PATH . '/Pages/404.php'; return; }
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $isAdmin = !empty($_SESSION['is_admin']);
+    if (!$isAdmin) { http_response_code(403); require VIEW_PATH . '/Pages/403.php'; return; }
     require VIEW_PATH . '/Learning/theme.php';
 });
 
+$router->get('/__internal/redis-test', function () {
+    $env = getenv('APP_ENV') ?: 'development';
+    if ($env === 'production') { http_response_code(404); echo 'Not Found'; return; }
+    $enabled = getenv('INTERNAL_TOOLS_ENABLED') ?: '';
+    if (strtolower((string)$enabled) !== 'true') { http_response_code(404); echo 'Not Found'; return; }
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $isAdmin = !empty($_SESSION['is_admin']);
+    if (!$isAdmin) { http_response_code(403); echo 'Forbidden'; return; }
+    header('Content-Type: text/plain');
+    try {
+        $ready = \Helpers\Cache::ready();
+        if (!$ready) {
+            echo "redis: not connected\n";
+            // Keep diagnostics concise in non-production environments
+            echo 'Predis\\Client: ' . (class_exists('Predis\\Client') ? 'yes' : 'no') . ", ext-redis: " . (class_exists('Redis') ? 'yes' : 'no') . "\n";
+            return;
+        }
+        $k = 'pp:test:' . bin2hex(random_bytes(4));
+        \Helpers\Cache::set($k, 'bar', 30);
+        $v = \Helpers\Cache::get($k);
+        echo "set/get => ".$v."\n";
+    } catch (\Throwable $e) {
+        echo 'error: ' . $e->getMessage();
+    }
+});
+
 // --- Authenticated Routes ---
-// All routes defined inside this group will first run the AuthMiddleware.
-$router->group(['middleware' => [AuthMiddleware::class]], function ($router) {
+// All routes defined inside this group will first run the AuthMiddleware and CSRF for POSTs.
+$router->group(['middleware' => [AuthMiddleware::class, CsrfMiddleware::class]], function ($router) {
 
     $router->get('/dashboard', [DashboardController::class, 'index']);
-    $router->get('/logout', [UserController::class, 'logout']);
+    $router->post('/logout', [UserController::class, 'logout']);
 
     // Items Routes (existing)
     $router->get('/items', [ItemsController::class, 'index']); // Display all items

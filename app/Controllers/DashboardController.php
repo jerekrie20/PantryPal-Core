@@ -28,17 +28,30 @@ class DashboardController
         $username = $_SESSION['username'];
         $userId   = $_SESSION['user_id'];
 
-        $itemsPage = $this->item->findAll($userId);
-        $savedCount = 0;
-        try { $savedCount = $this->recipes->countSavedForUser((int)$userId); } catch (\Throwable $e) { $savedCount = 0; }
+        // Cache keys
+        $statsKey  = 'pp:user:' . (int)$userId . ':dashboard:stats:v1';
+        $recentKey = 'pp:user:' . (int)$userId . ':items:recent:v1';
+        $pantry_stats = \Helpers\Cache::get($statsKey);
+        $rawItems = \Helpers\Cache::get($recentKey);
 
-        $pantry_stats = [
-            'total_items'      => $itemsPage['pagination']['totalItems'] ?? 0,
-            'expiring_soon'    => $this->item->countExpiringSoon($userId, 3),
-            'recipes_saved'    => $savedCount,
-        ];
+        if (!is_array($pantry_stats) || !is_array($rawItems)) {
+            // Compute fresh values when cache miss
+            $itemsPage = $this->item->findAll($userId);
+            $savedCount = 0;
+            try { $savedCount = $this->recipes->countSavedForUser((int)$userId); } catch (\Throwable $e) { $savedCount = 0; }
 
-        $rawItems = $this->item->findRecentWithGlobal($userId, 6);
+            $pantry_stats = [
+                'total_items'      => $itemsPage['pagination']['totalItems'] ?? 0,
+                'expiring_soon'    => $this->item->countExpiringSoon($userId, 3),
+                'recipes_saved'    => $savedCount,
+            ];
+
+            $rawItems = $this->item->findRecentWithGlobal($userId, 6);
+            // Cache briefly to keep dashboard snappy
+            try { \Helpers\Cache::set($statsKey, $pantry_stats, 120); } catch (\Throwable $e) { /* ignore */ }
+            try { \Helpers\Cache::set($recentKey, $rawItems, 60); } catch (\Throwable $e) { /* ignore */ }
+        }
+
         $today    = new \DateTimeImmutable('today');
         $pantry_items = [];
 

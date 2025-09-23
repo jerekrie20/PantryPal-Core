@@ -66,6 +66,11 @@ class IngredientsController
                 'entered_name' => $rawName,
                 'entered_brand' => $brand,
             ]);
+            // Invalidate dashboard caches
+            try {
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+            } catch (\Throwable $e) { /* ignore */ }
             header('Location: /dashboard');
             exit;
         }
@@ -133,6 +138,11 @@ class IngredientsController
                 'entered_name' => $rawName,
                 'entered_brand' => $brand,
             ]);
+            // Invalidate dashboard caches
+            try {
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+            } catch (\Throwable $e) { /* ignore */ }
             header('Location: /dashboard');
             exit;
         }
@@ -165,6 +175,11 @@ class IngredientsController
                 'entered_name' => $rawName,
                 'entered_brand' => $brand,
             ]);
+            // Invalidate dashboard caches
+            try {
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+            } catch (\Throwable $e) { /* ignore */ }
             header('Location: /dashboard');
             exit;
         }
@@ -189,6 +204,11 @@ class IngredientsController
             'entered_name' => $rawName,
             'entered_brand' => $brand,
         ]);
+        // Invalidate dashboard caches
+        try {
+            \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
+            \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+        } catch (\Throwable $e) { /* ignore */ }
         header('Location: /dashboard');
         exit;
     }

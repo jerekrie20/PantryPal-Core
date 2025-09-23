@@ -345,6 +345,12 @@ class RecipesController
             $recipeId = $this->recipes->upsertFromProvider($data, null, $src);
             $this->recipes->saveForUser($recipeId, (int)$userId);
 
+            // Invalidate related caches
+            try {
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':recipes:savedCount');
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+            } catch (\Throwable $e) { /* ignore */ }
+
             // Redirect back to previous page
             $back = $_SERVER['HTTP_REFERER'] ?? '/recipes';
             header('Location: ' . $back);
@@ -368,6 +374,11 @@ class RecipesController
             $rid = isset($_POST['recipe_id']) ? (int)$_POST['recipe_id'] : 0;
             if ($rid > 0) {
                 $this->recipes->unsaveForUser($rid, (int)$userId);
+                // Invalidate related caches
+                try {
+                    \Helpers\Cache::del('pp:user:' . (int)$userId . ':recipes:savedCount');
+                    \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+                } catch (\Throwable $e) { /* ignore */ }
             }
             $back = $_SERVER['HTTP_REFERER'] ?? '/recipes';
             header('Location: ' . $back);

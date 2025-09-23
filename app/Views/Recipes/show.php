@@ -27,11 +27,13 @@ $img = (!empty($recipe['image']) && preg_match('#^https?://#i', $recipe['image']
   <div class="flex gap-2">
     <?php if (!empty($isSaved)): ?>
       <form action="/recipes/unsave" method="POST">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
         <input type="hidden" name="recipe_id" value="<?php echo (int)($recipe['db_id'] ?? 0); ?>" />
         <button type="submit" class="btn btn-secondary btn-md">Unsave</button>
       </form>
     <?php else: ?>
       <form action="/recipes/save" method="POST">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
         <input type="hidden" name="id" value="<?php echo e((string)($recipe['id'] ?? '')); ?>" />
         <input type="hidden" name="title" value="<?php echo e($recipe['title'] ?? 'Recipe'); ?>" />
         <input type="hidden" name="image" value="<?php echo e($recipe['image'] ?? ''); ?>" />

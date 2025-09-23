@@ -62,6 +62,25 @@ This will create a `dist` directory with optimized assets. The PHP files will au
 
 ## Project Structure
 
+## Database Setup (MySQL)
+
+For fresh installs or when initializing a new environment, use the canonical schema file first and then (optionally) apply additional production indexes.
+
+1) Apply the canonical schema (idempotent):
+   - File: app/Database/migrations/database.sql
+   - Example (Windows PowerShell with MySQL in PATH):
+     mysql -u your_user -p your_db < app/Database/migrations/database.sql
+
+2) Optionally add performance indexes and constraints (can be applied later):
+   - File: app/Database/migrations/20250923_prod_indexes.sql
+   - Example:
+     mysql -u your_user -p your_db < app/Database/migrations/20250923_prod_indexes.sql
+
+Notes:
+- database.sql contains tables, primary keys, and foreign keys tailored to the codebase (including recipes with Suggestic support and the saved_recipes composite primary key).
+- The file 20250923_000001_initial_schema.sql is kept for reference only; prefer database.sql for new setups.
+- Re-running the prod index script may produce duplicate index errors in MySQL; those can be ignored.
+
 The project follows a structured organization to separate concerns and maintain clean code:
 
 ```

@@ -134,6 +134,7 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
                             <a href="<?php echo e($r['sourceUrl']); ?>" target="_blank" rel="noopener" class="btn btn-subtle btn-sm">Source</a>
                         <?php endif; ?>
                         <form action="/recipes/save" method="POST" class="inline">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
                             <input type="hidden" name="id" value="<?php echo e((string)($r['id'] ?? '')); ?>" />
                             <input type="hidden" name="title" value="<?php echo e($r['title'] ?? 'Recipe'); ?>" />
                             <input type="hidden" name="image" value="<?php echo e($r['image'] ?? ''); ?>" />

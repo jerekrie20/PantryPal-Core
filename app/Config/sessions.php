@@ -13,3 +13,12 @@ session_set_cookie_params([
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
+
+// CSRF token generation (per-session)
+if (empty($_SESSION['csrf_token'])) {
+    try {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    } catch (\Throwable $e) {
+        $_SESSION['csrf_token'] = sha1(uniqid('', true));
+    }
+}

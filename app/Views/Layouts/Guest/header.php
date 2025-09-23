@@ -21,7 +21,10 @@
                 <a href="/features" class="font-medium text-gray-600 hover:text-primary">Features</a>
                 <?php if (!empty($_SESSION['user_id'])) { ?>
                     <a href="/dashboard" class="font-medium text-gray-600 hover:text-primary">Dashboard</a>
-                    <a href="/logout" class="font-medium text-gray-600 hover:text-primary">Logout</a>
+                    <form action="/logout" method="POST" class="inline">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
+                        <button type="submit" class="font-medium text-gray-600 hover:text-primary">Logout</button>
+                    </form>
                 <?php } else { ?>
                     <a href="/login" class="font-medium text-gray-600 hover:text-primary">Login</a>
                 <?php } ?>
@@ -42,7 +45,10 @@
 
                             <?php if (!empty($_SESSION['user_id'])) { ?>
                                 <a href="/dashboard" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Dashboard</a>
-                                <a href="/logout" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Logout</a>
+                                <form action="/logout" method="POST" class="block">
+                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
+                                    <button type="submit" class="w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Logout</button>
+                                </form>
                             <?php } else { ?>
                                 <a href="/login" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Login</a>
                             <?php } ?>

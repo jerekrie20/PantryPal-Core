@@ -1,60 +1,67 @@
-# Node.js dependencies
-node_modules/
-
-# Production build
-dist/
-
-# SSL certificates and keys
-ssl/
-*.pem
-*.key
-*.crt
-
-# PHP Composer
-vendor/
-composer.phar
-
-# Database and credentials
-app/Database/
-
-# Environment variables
+# Environment and secrets
 .env
 .env.*
 !.env.example
+.envrc
 
-# Logs
-logs/
-storage/logs/
+connection.php
+
+# PHP/Composer
+/vendor/
+composer.phar
+
+# Node/Vite
+/node_modules/
+public/build/
+public/hot
+.vite
+.eslintcache
+.stylelintcache
+.tsbuildinfo
+
+# Logs and runtime
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Caches and coverage
+logs/
+storage/
+storage/logs/
+storage/framework/
+tmp/
 .cache/
+.sass-cache/
+
+# Test artifacts and coverage
 coverage/
 .phpunit.result.cache
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+# IDE/editor
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.vscode/
+.fleet/
+.history/
+*.iml
 
 # OS files
 .DS_Store
 Thumbs.db
-desktop.ini
+ehthumbs.db
+Desktop.ini
 
-# Temporary files
-*.tmp
-*.temp
-*.bak
-*.orig
-*.rej
+# SSL and certificates (never commit real keys)
+ssl/
+*.pem
+*.key
+*.crt
+*.pfx
+
+# Build outputs
+dist/
+build/
+
+# Misc package managers debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment overrides
+*.local.php

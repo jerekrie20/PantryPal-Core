@@ -687,6 +687,11 @@ class ItemsController
                     'display' => ['name' => $_POST['display_name'] ?? 'Item', 'category' => $_POST['display_category'] ?? null, 'image' => $_POST['display_image'] ?? null],
                 ]);
             }
+            // Invalidate dashboard caches after successful update
+            try {
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+            } catch (\Throwable $e) { /* ignore */ }
             header('Location: /items/view/' . (int)$id);
             exit;
         } catch (\Throwable $e) {
@@ -715,6 +720,11 @@ class ItemsController
             }
 
             $this->items->delete($id, (int)$userId);
+            // Invalidate dashboard caches after delete
+            try {
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+            } catch (\Throwable $e) { /* ignore */ }
             header('Location: /dashboard');
             exit;
         } catch (\Throwable $e) {
