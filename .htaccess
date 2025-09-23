@@ -1,11 +1,23 @@
-# Forward everything to public/ unless the file/folder exists
+# Root-level Apache rules to route requests into the public/ directory
+# Fixes 403 on homepage when the document root is the project root
+
+Options -Indexes
+
 RewriteEngine On
 RewriteBase /
 
-# If the requested path is a real file or folder here, serve it
-RewriteCond %{REQUEST_FILENAME} -f [OR]
+# Serve existing files/directories directly
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Otherwise, forward into the app’s public/ directory
+# Ensure default index points to public/index.php
+DirectoryIndex public/index.php
+
+# Send the bare root to public/
+RewriteRule ^$ public/ [L]
+
+# For all other requests not already under /public, route into /public
+RewriteCond %{REQUEST_URI} !^/public/
 RewriteRule ^(.*)$ public/$1 [L]
