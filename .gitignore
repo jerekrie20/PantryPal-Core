@@ -55,7 +55,6 @@ ssl/
 # Build outputs
 build/
 /dist/
-/public/dist/
 
 # Misc package managers debug logs
 npm-debug.log*
