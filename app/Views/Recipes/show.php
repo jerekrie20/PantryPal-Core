@@ -132,4 +132,4 @@ $img = (!empty($recipe['image']) && preg_match('#^https?://#i', $recipe['image']
 
 <?php
 $content = ob_get_clean();
-require_once VIEW_PATH . '/layouts/Users/layout.php';
+require_once VIEW_PATH . '/Layouts/Users/layout.php';

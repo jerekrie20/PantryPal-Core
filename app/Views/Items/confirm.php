@@ -112,5 +112,5 @@ ob_start();
 
 <?php
 $content = ob_get_clean();
-require_once VIEW_PATH . '/layouts/Users/layout.php';
+require_once VIEW_PATH . '/Layouts/Users/layout.php';
 ?>

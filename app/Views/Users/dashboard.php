@@ -74,5 +74,5 @@ ob_start();
 $content = ob_get_clean();
 
 // Include the main application layout, which will render the content
-require_once VIEW_PATH . '/layouts/Users/layout.php';
+require_once VIEW_PATH . '/Layouts/Users/layout.php';
 ?>

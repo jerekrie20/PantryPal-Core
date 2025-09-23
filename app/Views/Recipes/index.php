@@ -201,4 +201,4 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
 
 <?php
 $content = ob_get_clean();
-require_once VIEW_PATH . '/layouts/Users/layout.php';
+require_once VIEW_PATH . '/Layouts/Users/layout.php';
