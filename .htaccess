@@ -1,0 +1,11 @@
+# Forward everything to public/ unless the file/folder exists
+RewriteEngine On
+RewriteBase /
+
+# If the requested path maps to a real file or directory here, serve it
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Otherwise, send the request into the public/ directory
+RewriteRule ^(.*)$ public/$1 [L]
