@@ -18,7 +18,7 @@ export default defineConfig(({ command, mode }) => {
         base,
 
         build: {
-            outDir: 'dist',
+            outDir: 'public/dist',
             manifest: true,
             sourcemap: false,
             copyPublicDir: false,

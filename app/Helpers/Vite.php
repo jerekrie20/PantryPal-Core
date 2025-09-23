@@ -5,7 +5,7 @@ class Vite {
     public static function tags(): string {
         $devServer = getenv('VITE_DEV_SERVER') ?: 'https://localhost:5173';
         $entry     = 'src/js/main.js';
-        $manifest  = APP_ROOT . '/dist/manifest.json';
+        $manifest  = APP_ROOT . '/public/dist/manifest.json';
         $env       = getenv('APP_ENV') ?: 'development';
         $isDev     = ($env !== 'production') && is_dir(APP_ROOT . '/node_modules');
 
