@@ -489,7 +489,7 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
-                        <p class="text-sm text-text-muted">No local recipes found yet.</p>
+                        <p class="text-sm text-text-muted">No recipes found yet.</p>
                     <?php endif; ?>
                     <?php if (!empty($item['name'])): ?>
                         <a href="/recipes?q=<?php echo urlencode($item['name']); ?>&api=1"

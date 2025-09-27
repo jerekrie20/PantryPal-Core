@@ -287,8 +287,76 @@ class ItemsController
                                     try {
                                         $term = isset($item['name']) ? (string)$item['name'] : '';
                                         if ($term !== '') {
+                                            // Normalize the term similarly to RecipesController::normalizePantryTerm
+                                            $t = trim($term);
+                                            $t = preg_replace("/^['\"]+|['\"]+$/", '', (string)$t);
+                                            $t = preg_replace('/\([^)]+\)/', '', $t);
+                                            if (strpos($t, ',') !== false) { $parts = array_map('trim', explode(',', $t)); foreach ($parts as $p) { if ($p !== '') { $t = $p; break; } } }
+                                            $t = str_replace(['–','—','-','/'], ' ', $t);
+                                            $t = strtolower($t);
+                                            $stop = ['raw','california','with','and','or','value','pack','bottle','bottles','enhancing','minerals','purified','drinking','boneless','skinless','shredded','sliced','ground','fresh','large','small','organic','original','classic'];
+                                            $tokens = preg_split('/\s+/', $t);
+                                            $clean = [];
+                                            foreach ($tokens as $tok) {
+                                                $tok = trim($tok);
+                                                if ($tok === '') continue;
+                                                if (preg_match('/^\d+[a-zA-Z-]*$/', $tok)) continue;
+                                                if (in_array($tok, $stop, true)) continue;
+                                                $clean[] = $tok;
+                                            }
+                                            if ($clean) { $t = implode(' ', $clean); } else { $t = trim(preg_replace('/\s+/', ' ', $t)); }
+                                            $map = [
+                                                'milk chocolate' => 'chocolate',
+                                                'milk chocolate chips' => 'chocolate',
+                                                'semi sweet chocolate' => 'chocolate',
+                                                'semisweet chocolate' => 'chocolate',
+                                                'dark chocolate' => 'chocolate',
+                                                'white chocolate' => 'chocolate',
+                                                'chocolate chips' => 'chocolate',
+                                                'honeycrisp apples' => 'apple',
+                                                'honeycrisp apple' => 'apple',
+                                            ];
+                                            if (isset($map[$t])) { $t = $map[$t]; }
+                                            else {
+                                                if (str_contains($t, 'apple')) {
+                                                    $appleCultivars = ['honeycrisp','gala','fuji','granny smith','pink lady','ambrosia','mcintosh','golden delicious','red delicious','braeburn','jonagold'];
+                                                    foreach ($appleCultivars as $cv) {
+                                                        if (str_starts_with($t, $cv.' ') || $t === $cv || str_starts_with($t, $cv.' apple') || str_starts_with($t, $cv.' apples')) { $t = 'apple'; break; }
+                                                    }
+                                                    if ($t === 'apples') $t = 'apple';
+                                                }
+                                            }
+                                            $t = trim(preg_replace('/\s+/', ' ', $t));
+                                            if ($t === '') { return []; }
+
                                             $model = new Recipes();
-                                            $list = $model->searchLocalByQuery($term, 6);
+                                            // Local search by ingredient keyword (AND with single term)
+                                            $local = $model->findByIngredientsLocal([$t], 6, true);
+                                            $list = $local;
+
+                                            // If underfilled, top up from Suggestic API if configured
+                                            if (count($list) < 6) {
+                                                $needed = 6 - count($list);
+                                                try {
+                                                    $prov = new \Services\Recipes\SuggesticProvider();
+                                                    if ($prov->isConfigured()) {
+                                                        $apiResults = $prov->findByIngredients([$t], $needed);
+                                                        // De-dup by title|image and persist to DB for Details links
+                                                        $seen = [];
+                                                        foreach ($list as $r0) {
+                                                            $k0 = strtolower(trim(($r0['title'] ?? '').'|'.($r0['image'] ?? '')));
+                                                            if ($k0 !== '') $seen[$k0] = true;
+                                                        }
+                                                        foreach ($apiResults as $r) {
+                                                            $k = strtolower(trim(($r['title'] ?? '').'|'.($r['image'] ?? '')));
+                                                            if ($k === '' || isset($seen[$k])) continue;
+                                                            try { $id = $model->upsertFromProvider($r, null, ($r['provider'] ?? 'suggestic')); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                                                            $list[] = $r; $seen[$k] = true;
+                                                            if (count($list) >= 6) break;
+                                                        }
+                                                    }
+                                                } catch (\Throwable $e) { /* ignore provider errors */ }
+                                            }
                                         }
                                     } catch (\Throwable $e) { $list = []; }
                                     return $list;
