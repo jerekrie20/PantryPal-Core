@@ -26,7 +26,7 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
             <input type="text" name="q" placeholder="Search recipes (e.g., chicken pasta)" value="<?php echo e($query ?? ''); ?>"
                    class="flex-1 min-w-0 border border-border-default rounded px-3 py-2 bg-surface-default" />
             <button type="submit" name="api" value="1" class="btn btn-cta btn-md sm:w-auto w-full">Web Search</button>
-            <a href="/recipes/suggested" class="btn btn-secondary btn-md sm:w-auto w-full">Use My Pantry</a>
+            <button type="button" id="toggle-pantry" class="btn btn-secondary btn-md sm:w-auto w-full">Use My Pantry</button>
         </div>
         <?php if (empty($mode) || $mode !== 'browse_api'): ?>
             <div class="flex items-center gap-3">
@@ -39,6 +39,49 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
                 <span class="text-xs text-text-muted">Use pages to see more results.</span>
             </div>
         <?php endif; ?>
+
+        <div id="pantry-area" class="<?php echo (!empty($_GET['pantry']) ? '' : 'hidden '); ?>mt-3 border border-border-default rounded p-3 bg-surface-subtle">
+            <div class="flex items-center justify-between">
+                <h3 class="font-semibold">Select items from your pantry</h3>
+                <button type="button" id="close-pantry" class="text-sm text-text-muted hover:underline">Hide</button>
+            </div>
+            <?php if (!empty($pantryKeywords) && is_array($pantryKeywords)): ?>
+                <?php 
+                  $selected = isset($pantrySelected) && is_array($pantrySelected) ? $pantrySelected : (isset($_GET['pantry']) && is_array($_GET['pantry']) ? array_map('strval', $_GET['pantry']) : []);
+                  $pmode = isset($pantryMode) ? $pantryMode : (isset($_GET['pantry_mode']) ? (string)$_GET['pantry_mode'] : 'all');
+                  $pmode = ($pmode === 'any') ? 'any' : 'all';
+                ?>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-3">
+                    <?php foreach ($pantryKeywords as $kw): if (!is_string($kw) || $kw==='') continue; ?>
+                        <?php $isChecked = in_array($kw, $selected, true); ?>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" name="pantry[]" value="<?php echo e($kw); ?>" class="accent-primary-600" <?php echo $isChecked ? 'checked' : ''; ?> />
+                            <span><?php echo e(ucwords($kw)); ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+                <div class="mt-3 flex flex-wrap items-center gap-4">
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="text-text-muted">Match</span>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="radio" name="pantry_mode" value="all" <?php echo ($pmode==='all'?'checked':''); ?> /> AlL
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="radio" name="pantry_mode" value="any" <?php echo ($pmode==='any'?'checked':''); ?> /> Any
+                        </label>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Search with Selected</button>
+                        <button type="button" id="clear-pantry-selection" class="btn btn-secondary btn-sm">Clear Selection</button>
+                    </div>
+                </div>
+            <?php else: ?>
+                <div class="mt-2 text-sm text-text-muted">
+                    No pantry items found. Add items in your pantry first.
+                    <a href="/items" class="text-primary-600 hover:underline">Go to My Pantry</a>
+                </div>
+            <?php endif; ?>
+        </div>
 
         <?php if (!empty($mode) && $mode === 'browse_api'): ?>
             <input type="hidden" name="browse" value="1" />
@@ -88,7 +131,12 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
             </div>
         <?php endif; ?>
 
-        <?php if (!empty($mode) && $mode === 'suggested' && !empty($pantryKeywords) && is_array($pantryKeywords)): ?>
+        <?php 
+            $sel = isset($pantrySelected) && is_array($pantrySelected) ? $pantrySelected : (isset($_GET['pantry']) && is_array($_GET['pantry']) ? array_map('strval', $_GET['pantry']) : []);
+            if (!empty($sel)):
+        ?>
+            <p class="text-xs text-text-muted">Using your pantry: <?php echo e(implode(', ', $sel)); ?></p>
+        <?php elseif (!empty($mode) && $mode === 'suggested' && !empty($pantryKeywords) && is_array($pantryKeywords)): ?>
             <p class="text-xs text-text-muted">Using your pantry: <?php echo e(implode(', ', $pantryKeywords)); ?></p>
         <?php endif; ?>
 
@@ -198,6 +246,38 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
         <?php endif; ?>
     </div>
 <?php endif; ?>
+
+<script>
+(function(){
+  var form = document.querySelector('form[action="/recipes"]');
+  if (!form) return;
+  var toggleBtn = document.getElementById('toggle-pantry');
+  var closeBtn = document.getElementById('close-pantry');
+  var clearBtn = document.getElementById('clear-pantry-selection');
+  var area = document.getElementById('pantry-area');
+  if (toggleBtn && area) {
+    toggleBtn.addEventListener('click', function(){ area.classList.toggle('hidden'); });
+  }
+  if (closeBtn && area) {
+    closeBtn.addEventListener('click', function(){ area.classList.add('hidden'); });
+  }
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function(){
+      var boxes = form.querySelectorAll('input[name="pantry[]"]:checked');
+      boxes.forEach(function(cb){ cb.checked = false; });
+    });
+  }
+  form.addEventListener('submit', function(){
+    var boxes = form.querySelectorAll('input[name="pantry[]"]:checked');
+    var selected = [];
+    boxes.forEach(function(cb){ var v = (cb.value || '').trim(); if (v) selected.push(v); });
+    if (selected.length) {
+      var qInput = form.querySelector('input[name="q"]');
+      if (qInput) { qInput.value = selected.join(', '); }
+    }
+  });
+})();
+</script>
 
 <?php
 $content = ob_get_clean();
