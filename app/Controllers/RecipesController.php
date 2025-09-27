@@ -61,6 +61,22 @@ class RecipesController
             $error = null;
             $mode = 'saved';
             $pagination = null;
+            // Collect pantry keywords for the toggleable pantry UI on the search page
+            $names = $this->collectPantryNames((int)$userId);
+            // Selected subset from query (Use My Pantry selections)
+            $selectedPantry = [];
+            if (!empty($_GET['pantry']) && is_array($_GET['pantry'])) {
+                foreach ($_GET['pantry'] as $v) {
+                    $t = $this->normalizePantryTerm((string)$v);
+                    if ($t !== '') $selectedPantry[] = $t;
+                }
+                // de-dup
+                $selectedPantry = array_values(array_unique($selectedPantry));
+            }
+            // Pantry match mode: all (AND) or any (OR). Default to 'all'.
+            $pantryMode = isset($_GET['pantry_mode']) ? strtolower(trim((string)$_GET['pantry_mode'])) : 'all';
+            if ($pantryMode !== 'any' && $pantryMode !== 'all') { $pantryMode = 'all'; }
+            $requireAll = ($pantryMode === 'all');
 
             // Determine source label for the active provider
             $srcName = ($this->provider instanceof SuggesticProvider) ? 'suggestic' : 'spoonacular';
@@ -112,6 +128,72 @@ class RecipesController
                         'total' => null,
                         'totalPages' => null,
                     ];
+                }
+            } elseif (!empty($selectedPantry)) {
+                // Use selected pantry items (subset) to search DB and top up with API
+                $mode = 'search';
+                $local = $this->recipes->findByIngredientsLocalPaged($selectedPantry, $page, $perPage, $requireAll);
+                $recipes = $local['results'] ?? [];
+                $total = (int)($local['total'] ?? 0);
+                $pagination = [
+                    'currentPage' => $page,
+                    'perPage' => $perPage,
+                    'total' => $total,
+                    'totalPages' => (int)max(1, ($total ? ceil($total / $perPage) : 1)),
+                ];
+                $seen = [];
+                foreach ($recipes as $r) {
+                    $dbid = $r['db_id'] ?? null; $k = $dbid ? ('db:' . $dbid) : ('title:' . ($r['title'] ?? ''));
+                    $seen[$k] = true;
+                }
+                if (count($recipes) < $perPage && $this->provider->isConfigured()) {
+                    $needed = $perPage - count($recipes);
+                    $apiResults = $this->provider->findByIngredients($selectedPantry, $needed);
+                    // Post-filter for AND mode so that all selected terms appear in title or ingredients list
+                    if ($requireAll) {
+                        $apiResults = array_values(array_filter($apiResults, function($r) use ($selectedPantry){
+                            $hay = strtolower((string)($r['title'] ?? ''));
+                            if (!empty($r['ingredients_list']) && is_array($r['ingredients_list'])) {
+                                $hay .= ' ' . strtolower(implode(' ', $r['ingredients_list']));
+                            }
+                            foreach ($selectedPantry as $t) {
+                                if ($t === '') continue;
+                                if (strpos($hay, strtolower($t)) === false) return false;
+                            }
+                            return true;
+                        }));
+                    }
+                    foreach ($apiResults as $r) {
+                        try { $id = $this->recipes->upsertFromProvider($r, null, $srcName); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                        $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
+                        if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
+                    }
+                }
+                // Spoonacular fallback if enabled later
+                if (count($recipes) < $perPage && $this->spoon && $this->spoon->isConfigured()) {
+                    $needed = $perPage - count($recipes);
+                    $apiResults = $this->spoon->findByIngredients($selectedPantry, $needed);
+                    if ($requireAll) {
+                        $apiResults = array_values(array_filter($apiResults, function($r) use ($selectedPantry){
+                            $hay = strtolower((string)($r['title'] ?? ''));
+                            if (!empty($r['ingredients_list']) && is_array($r['ingredients_list'])) {
+                                $hay .= ' ' . strtolower(implode(' ', $r['ingredients_list']));
+                            }
+                            foreach ($selectedPantry as $t) {
+                                if ($t === '') continue;
+                                if (strpos($hay, strtolower($t)) === false) return false;
+                            }
+                            return true;
+                        }));
+                    }
+                    foreach ($apiResults as $r) {
+                        try { $id = $this->recipes->upsertFromProvider($r, null, 'spoonacular'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                        $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
+                        if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
+                    }
+                }
+                if ($total === 0 && !$this->provider->isConfigured() && !($this->spoon && $this->spoon->isConfigured())) {
+                    $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
                 }
             } elseif ($q === '') {
                 // Default: show user's saved recipes from DB
@@ -213,6 +295,9 @@ class RecipesController
                 'mode' => $mode,
                 'filters' => $filters,
                 'pagination' => $pagination,
+                'pantryKeywords' => $names,
+                'pantrySelected' => $selectedPantry,
+                'pantryMode' => $pantryMode,
             ]);
         } catch (\Throwable $e) {
             error_log('RecipesController::index error: '.$e->getMessage());
@@ -592,6 +677,85 @@ class RecipesController
         return $norm;
     }
 
+    /** Normalize a pantry term into a concise ingredient-like query. */
+    private function normalizePantryTerm(string $s): string
+    {
+        $s = trim($s);
+        if ($s === '') return '';
+        // strip surrounding quotes
+        $s = preg_replace("/^['\"]+|['\"]+$/", '', $s);
+        // remove parentheses content
+        $s = preg_replace('/\([^\)]*\)/', '', $s);
+        // split on comma, take the first meaningful segment
+        if (strpos($s, ',') !== false) {
+            $parts = array_map('trim', explode(',', $s));
+            foreach ($parts as $p) { if ($p !== '') { $s = $p; break; } }
+        }
+        // normalize dashes to spaces and lowercase
+        $s = str_replace(['–','—','-','/'], ' ', $s);
+        $s = strtolower($s);
+        // remove descriptor/packaging stopwords
+        $stop = ['raw','california','with','and','or','value','pack','bottle','bottles','enhancing','minerals','purified','drinking','boneless','skinless','shredded','sliced','ground','fresh','large','small','organic','original','classic'];
+        $tokens = preg_split('/\s+/', $s);
+        $clean = [];
+        foreach ($tokens as $t) {
+            $t = trim($t);
+            if ($t === '') continue;
+            // drop numbers and x-pack like terms
+            if (preg_match('/^\d+[a-zA-Z-]*$/', $t)) continue;
+            if (in_array($t, $stop, true)) continue;
+            $clean[] = $t;
+        }
+        if ($clean) {
+            $s = implode(' ', $clean);
+        } else {
+            $s = trim(preg_replace('/\s+/', ' ', $s));
+        }
+
+        // Canonicalize overly specific variants to base ingredients
+        $exactMap = [
+            'milk chocolate' => 'chocolate',
+            'milk chocolate chips' => 'chocolate',
+            'semi sweet chocolate' => 'chocolate',
+            'semisweet chocolate' => 'chocolate',
+            'dark chocolate' => 'chocolate',
+            'white chocolate' => 'chocolate',
+            'chocolate chips' => 'chocolate',
+            'honeycrisp apples' => 'apple',
+            'honeycrisp apple' => 'apple',
+        ];
+        if (isset($exactMap[$s])) {
+            $s = $exactMap[$s];
+        } else {
+            // Apple cultivars → apple
+            $appleCultivars = ['honeycrisp','gala','fuji','granny smith','pink lady','ambrosia','mcintosh','golden delicious','red delicious','braeburn','jonagold'];
+            if (str_contains($s, 'apple')) {
+                foreach ($appleCultivars as $cv) {
+                    if (str_starts_with($s, $cv.' ') || $s === $cv || str_starts_with($s, $cv.' apple') || str_starts_with($s, $cv.' apples')) {
+                        $s = 'apple';
+                        break;
+                    }
+                }
+            }
+            // Normalize any trailing plurals for core items
+            if ($s === 'apples') $s = 'apple';
+        }
+
+        // special cases: common meats and cuts keep last two tokens
+        $meatCuts = ['thighs','breast','breasts','legs','drumsticks','wings','tenderloins','steak','steaks','loin','loins','ribs'];
+        $parts = preg_split('/\s+/', $s);
+        if (count($parts) >= 3) {
+            $last = end($parts);
+            if (in_array($last, $meatCuts, true)) {
+                $s = $parts[count($parts)-2] . ' ' . $parts[count($parts)-1];
+            }
+        }
+        // collapse spaces and trim length
+        $s = trim(preg_replace('/\s+/', ' ', $s));
+        if (strlen($s) > 64) $s = substr($s, 0, 64);
+        return $s;
+    }
+
     /** Collect pantry ingredient/product names for the given user. */
     private function collectPantryNames(int $userId): array
     {
@@ -620,12 +784,9 @@ class RecipesController
                 $names[] = (string)$row['entered_name'];
             }
         }
-        // de-dup and limit length
+        // Normalize, de-dup and limit length
         $names = array_values(array_unique(array_filter(array_map(function($s){
-            $s = trim((string)$s);
-            // keep it short to likely match ingredients
-            if (strlen($s) > 64) $s = substr($s, 0, 64);
-            return $s;
+            return $this->normalizePantryTerm((string)$s);
         }, $names))));
         // Keep a reasonable number for the API call
         if (count($names) > 15) $names = array_slice($names, 0, 15);

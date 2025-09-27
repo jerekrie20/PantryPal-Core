@@ -200,21 +200,25 @@ class Recipes
         }
     }
 
-    /** Find locally by ingredient keywords in title/raw. */
-    public function findByIngredientsLocal(array $names, int $limit = 12): array
+    /** Find locally by ingredient keywords in title/raw. If $requireAll true, all names must match (AND), otherwise any (OR). */
+    public function findByIngredientsLocal(array $names, int $limit = 12, bool $requireAll = false): array
     {
         $names = array_values(array_filter(array_map(fn($s)=> trim((string)$s), $names)));
         if (!$names) return [];
-        // Build OR conditions on title and raw_payload JSON string
+        // Build conditions on title and raw_payload JSON string
         $conds = [];
         $params = [];
         $i = 0;
         foreach ($names as $n) {
-            $key = ':k' . (++$i);
-            $conds[] = "title LIKE $key";
-            $params[$key] = '%' . $n . '%';
+            $i++;
+            $keyTitle = ':k' . $i . 't';
+            $keyRaw   = ':k' . $i . 'r';
+            $conds[] = "(title LIKE $keyTitle OR (raw_payload IS NOT NULL AND raw_payload LIKE $keyRaw))";
+            $params[$keyTitle] = '%' . $n . '%';
+            $params[$keyRaw]   = '%' . $n . '%';
         }
-        $sql = "SELECT * FROM recipes WHERE (" . implode(' OR ', $conds) . ") ORDER BY id DESC LIMIT :lim";
+        $join = $requireAll ? ' AND ' : ' OR ';
+        $sql = "SELECT * FROM recipes WHERE (" . implode($join, $conds) . ") ORDER BY id DESC LIMIT :lim";
         $st = $this->db->prepare($sql);
         foreach ($params as $k => $v) {
             $st->bindValue($k, $v, PDO::PARAM_STR);
@@ -225,8 +229,8 @@ class Recipes
         return array_map([$this, 'normalize'], $rows);
     }
 
-    /** Paged local search by ingredient keywords with total count. */
-    public function findByIngredientsLocalPaged(array $names, int $page = 1, int $perPage = 12): array
+    /** Paged local search by ingredient keywords with total count. If $requireAll true, all names must match (AND), otherwise any (OR). */
+    public function findByIngredientsLocalPaged(array $names, int $page = 1, int $perPage = 12, bool $requireAll = false): array
     {
         $names = array_values(array_filter(array_map(fn($s)=> trim((string)$s), $names)));
         if (!$names) return ['results' => [], 'total' => 0];
@@ -234,11 +238,15 @@ class Recipes
         $params = [];
         $i = 0;
         foreach ($names as $n) {
-            $key = ':k' . (++$i);
-            $conds[] = "title LIKE $key";
-            $params[$key] = '%' . $n . '%';
+            $i++;
+            $keyTitle = ':k' . $i . 't';
+            $keyRaw   = ':k' . $i . 'r';
+            $conds[] = "(title LIKE $keyTitle OR (raw_payload IS NOT NULL AND raw_payload LIKE $keyRaw))";
+            $params[$keyTitle] = '%' . $n . '%';
+            $params[$keyRaw]   = '%' . $n . '%';
         }
-        $where = '(' . implode(' OR ', $conds) . ')';
+        $join = $requireAll ? ' AND ' : ' OR ';
+        $where = '(' . implode($join, $conds) . ')';
         // total
         $countSql = "SELECT COUNT(*) FROM recipes WHERE $where";
         $stc = $this->db->prepare($countSql);

@@ -47,6 +47,13 @@ class SuggesticProvider implements RecipesProvider
 
         $first = max(1, min($this->pageLimit, (int)$number));
 
+        // Prefer the docs-endorsed search by name or ingredient which returns onPlan + otherResults
+        $out = $this->searchByNameOrIngredientInternal($query, $first, $errNOI);
+        if (!empty($out)) {
+            return $out;
+        }
+
+        // Fallback to recipeSearch (Relay connection then list) in case the above is not enabled in tenant
         // 1) Relay connection shape (edges/node)
         $gqlConn = <<<'GQL'
 query RecipeSearchConn($query: String!, $first: Int!) {
@@ -80,8 +87,7 @@ GQL;
                 }
             }
             if ($out) return $out;
-            // empty results here could be legit; fall through to return []
-            return [];
+            // empty results here could be legit; fall through to next fallback
         }
 
         // 2) Plain list shape (no edges)
@@ -115,9 +121,9 @@ GQL;
             return $out;
         }
 
-        // If both attempts fail due to validation, log once for debugging
-        if ($err1 || $err2) {
-            error_log('Suggestic recipeSearch failed. connErr=' . ($err1 ?: 'none') . ' listErr=' . ($err2 ?: 'none'));
+        // If attempts fail due to validation, log once for debugging
+        if (!empty($errNOI) || $err1 || $err2) {
+            error_log('Suggestic search fallback. nameOrIngErr=' . ($errNOI ?: 'none') . ' connErr=' . ($err1 ?: 'none') . ' listErr=' . ($err2 ?: 'none'));
         }
 
         return [];
@@ -187,13 +193,50 @@ GQL;
 
     public function findByIngredients(array $ingredients, int $number = 12): array
     {
-        // Query Suggestic in a less restrictive way: search by individual pantry terms and merge
+        // Normalize terms from pantry items / inputs
         $terms = array_values(array_unique(array_filter(array_map(function($s){
             $t = trim((string)$s);
+            if ($t === '') return '';
+            // strip quotes and parentheticals
+            $t = preg_replace("/^['\"]+|['\"]+$/", '', $t);
+            $t = preg_replace('/\([^\)]*\)/', '', $t);
+            // only take first segment before comma
+            if (strpos($t, ',') !== false) { $t = trim(explode(',', $t)[0]); }
+            // normalize dashes and slashes to spaces, lowercase
+            $t = strtolower(str_replace(['–','—','-','/'], ' ', $t));
+            // collapse whitespace
+            $t = trim(preg_replace('/\s+/', ' ', $t));
             // keep only reasonably short words/phrases
             return $t !== '' ? (strlen($t) > 64 ? substr($t, 0, 64) : $t) : '';
         }, $ingredients))));
         if (!$terms) return [];
+
+        // Canonicalize specific variants to base ingredients for better recall
+        $canon = function(string $t): string {
+            $map = [
+                'milk chocolate' => 'chocolate',
+                'milk chocolate chips' => 'chocolate',
+                'semi sweet chocolate' => 'chocolate',
+                'semisweet chocolate' => 'chocolate',
+                'dark chocolate' => 'chocolate',
+                'white chocolate' => 'chocolate',
+                'chocolate chips' => 'chocolate',
+                'honeycrisp apples' => 'apple',
+                'honeycrisp apple' => 'apple',
+            ];
+            if (isset($map[$t])) return $map[$t];
+            if (str_contains($t, 'apple')) {
+                $appleCultivars = ['honeycrisp','gala','fuji','granny smith','pink lady','ambrosia','mcintosh','golden delicious','red delicious','braeburn','jonagold'];
+                foreach ($appleCultivars as $cv) {
+                    if (str_starts_with($t, $cv.' ') || $t === $cv || str_starts_with($t, $cv.' apple') || str_starts_with($t, $cv.' apples')) {
+                        return 'apple';
+                    }
+                }
+                if ($t === 'apples') return 'apple';
+            }
+            return $t;
+        };
+        $terms = array_values(array_unique(array_map($canon, $terms)));
 
         // Prefer up to 5 concise terms to avoid over-constraining the search
         usort($terms, function($a, $b){ return strlen($a) <=> strlen($b); });
@@ -203,12 +246,51 @@ GQL;
         $seen = [];
         $out = [];
 
+        // 1) Try Suggestic's mustIngredients endpoint to match ALL selected terms
+        $errMI = null;
+        $mustResults = $this->searchByIngredientsMustInternal($terms, $target, $errMI);
+        foreach ($mustResults as $r) {
+            $key = strtolower(trim(($r['title'] ?? '') . '|' . ($r['image'] ?? '')));
+            if ($key === '' || isset($seen[$key])) continue;
+            $seen[$key] = true;
+            $out[] = $r;
+            if (count($out) >= $target) break;
+        }
+
+        // If nothing matched strictly, try a broadened pass collapsing to single tokens (e.g., "milk chocolate"->"chocolate")
+        if (empty($out)) {
+            $broad = [];
+            foreach ($terms as $t) {
+                $parts = preg_split('/\s+/', $t);
+                if (count($parts) >= 2) {
+                    $broad[] = end($parts); // last token often is canonical noun (e.g., chocolate, apples)
+                } else {
+                    $broad[] = $t;
+                }
+            }
+            $broad = array_values(array_unique(array_map(function($x){ return $x === 'apples' ? 'apple' : $x; }, $broad)));
+            if ($broad !== $terms) {
+                $must2 = $this->searchByIngredientsMustInternal($broad, $target, $errMI2);
+                foreach ($must2 as $r) {
+                    $key = strtolower(trim(($r['title'] ?? '') . '|' . ($r['image'] ?? '')));
+                    if ($key === '' || isset($seen[$key])) continue;
+                    $seen[$key] = true;
+                    $out[] = $r;
+                    if (count($out) >= $target) break;
+                }
+            }
+        }
+
+        // 2) If still under target, broaden by searching per-term (OR-like) using name-or-ingredient search
         foreach ($terms as $t) {
             if (count($out) >= $target) break;
             $needed = $target - count($out);
-            $results = $this->searchByQuery($t, $needed);
+            $results = $this->searchByNameOrIngredientInternal($t, $needed, $errNOI);
+            if (!$results) {
+                // Fallback to generic recipeSearch
+                $results = $this->searchByQuery($t, $needed);
+            }
             foreach ($results as $r) {
-                // de-dup by title+image to be resilient across providers
                 $key = strtolower(trim(($r['title'] ?? '') . '|' . ($r['image'] ?? '')));
                 if ($key === '' || isset($seen[$key])) continue;
                 $seen[$key] = true;
@@ -217,11 +299,14 @@ GQL;
             }
         }
 
-        // As a fallback, try a combined query of the first two terms if still underfilled
+        // 3) As a last attempt, try a combined query of the first two terms if still underfilled
         if (count($out) < $target && count($terms) >= 2) {
             $needed = $target - count($out);
             $comboQ = $terms[0] . ' ' . $terms[1];
-            $results = $this->searchByQuery($comboQ, $needed);
+            $results = $this->searchByNameOrIngredientInternal($comboQ, $needed, $errNOI2);
+            if (!$results) {
+                $results = $this->searchByQuery($comboQ, $needed);
+            }
             foreach ($results as $r) {
                 $key = strtolower(trim(($r['title'] ?? '') . '|' . ($r['image'] ?? '')));
                 if ($key === '' || isset($seen[$key])) continue;
@@ -353,6 +438,76 @@ GQL;
             error_log('SuggesticProvider exec error: ' . $err);
             return null;
         }
+    }
+
+    /**
+     * Docs-based API: searchRecipeByNameOrIngredient(query: String!)
+     * Merges onPlan and otherResults lists and returns up to $limit normalized recipes.
+     */
+    private function searchByNameOrIngredientInternal(string $query, int $limit, ?string &$err = null): array
+    {
+        $err = null;
+        $gql = <<<'GQL'
+query SearchByNameOrIngredient($query: String!) {
+  searchRecipeByNameOrIngredient(query: $query) {
+    onPlan { id name author adherence ingredients { name } ingredientLines source { recipeUrl } mainImage numberOfServings }
+    otherResults { id name author adherence ingredients { name } ingredientLines source { recipeUrl } mainImage numberOfServings }
+  }
+}
+GQL;
+        $data = $this->exec($gql, ['query' => $query], $err);
+        if (!$data || !isset($data['data']['searchRecipeByNameOrIngredient'])) return [];
+        $obj = $data['data']['searchRecipeByNameOrIngredient'];
+        $list = [];
+        foreach (['onPlan','otherResults'] as $k) {
+            if (!empty($obj[$k]) && is_array($obj[$k])) {
+                foreach ($obj[$k] as $node) {
+                    if (is_array($node)) $list[] = $this->normalizeNode($node);
+                    if (count($list) >= $limit) break 2;
+                }
+            }
+        }
+        return $list;
+    }
+
+    /**
+     * Docs-based API: searchRecipesByIngredients(mustIngredients: [String]!)
+     * Returns up to $limit normalized recipes.
+     */
+    private function searchByIngredientsMustInternal(array $must, int $limit, ?string &$err = null): array
+    {
+        $err = null;
+        // sanitize must list
+        $must = array_values(array_filter(array_map(function($s){ $t = trim((string)$s); return $t === '' ? null : $t; }, $must)));
+        if (!$must) return [];
+        $gql = <<<'GQL'
+query SearchByMustIngredients($must: [String!]!) {
+  searchRecipesByIngredients(mustIngredients: $must) {
+    edges {
+      node {
+        id
+        name
+        numberOfServings
+        ingredientLines
+        ingredients { name }
+        source { recipeUrl }
+        mainImage
+      }
+    }
+  }
+}
+GQL;
+        $data = $this->exec($gql, ['must' => $must], $err);
+        if (!$data || !isset($data['data']['searchRecipesByIngredients'])) return [];
+        $edges = $data['data']['searchRecipesByIngredients']['edges'] ?? [];
+        $out = [];
+        foreach ($edges as $edge) {
+            if (!empty($edge['node']) && is_array($edge['node'])) {
+                $out[] = $this->normalizeNode($edge['node']);
+                if (count($out) >= $limit) break;
+            }
+        }
+        return $out;
     }
 
     private function normalizeNode(array $n): array
