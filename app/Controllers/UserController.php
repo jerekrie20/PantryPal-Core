@@ -59,6 +59,7 @@ class UserController
             session_regenerate_id(true);
             $_SESSION['user_id'] = $userArray['id'];
             $_SESSION['username'] = $userArray['username'];
+            $_SESSION['is_admin'] = !empty($userArray['is_admin']) ? (int)$userArray['is_admin'] : 0;
             // Rotate CSRF token on login
             try { $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); } catch (\Throwable $e) { $_SESSION['csrf_token'] = sha1(uniqid('', true)); }
 

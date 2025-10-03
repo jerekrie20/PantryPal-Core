@@ -18,6 +18,9 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
         <h1 class="text-3xl font-bold text-text-heading"><?php echo e($title ?? 'Recipes'); ?></h1>
         <p class="text-text-muted mt-1">Find recipes by searching the web or using your pantry.</p>
     </div>
+    <div class="mt-3 sm:mt-0">
+        <a href="/recipes/create" class="btn btn-subtle">Add Recipe</a>
+    </div>
 </section>
 
 <div class="card p-4 md:p-6 mb-6">
@@ -26,6 +29,7 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
             <input type="text" name="q" placeholder="Search recipes (e.g., chicken pasta)" value="<?php echo e($query ?? ''); ?>"
                    class="flex-1 min-w-0 border border-border-default rounded px-3 py-2 bg-surface-default" />
             <button type="submit" name="api" value="1" class="btn btn-cta btn-md sm:w-auto w-full">Web Search</button>
+            <button type="submit" name="ugc" value="1" class="btn btn-secondary btn-md sm:w-auto w-full">User Recipes</button>
             <button type="button" id="toggle-pantry" class="btn btn-secondary btn-md sm:w-auto w-full">Use My Pantry</button>
         </div>
         <?php if (empty($mode) || $mode !== 'browse_api'): ?>

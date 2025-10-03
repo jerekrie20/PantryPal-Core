@@ -229,6 +229,78 @@ class Recipes
         return array_map([$this, 'normalize'], $rows);
     }
 
+    /** Like searchLocalByQuery but restricted to user-generated recipes (user_id IS NOT NULL). */
+    public function searchLocalUserByQuery(string $q, int $limit = 12): array
+    {
+        $q = trim($q);
+        if ($q === '') return [];
+        $like = '%' . $q . '%';
+        try {
+            $sql = "SELECT * FROM recipes
+                    WHERE user_id IS NOT NULL AND (
+                        (title LIKE :q)
+                        OR (raw_payload IS NOT NULL AND JSON_EXTRACT(raw_payload, '$.summary') LIKE :q)
+                        OR (raw_payload IS NOT NULL AND JSON_SEARCH(raw_payload, 'one', :pat, NULL, '$') IS NOT NULL)
+                    )
+                    ORDER BY id DESC
+                    LIMIT :lim";
+            $st = $this->db->prepare($sql);
+            $st->bindValue(':q', $like, PDO::PARAM_STR);
+            $st->bindValue(':pat', $like, PDO::PARAM_STR);
+            $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+            $st->execute();
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            return array_map([$this, 'normalize'], $rows);
+        } catch (\Throwable $e) {
+            try {
+                $sql2 = "SELECT * FROM recipes
+                         WHERE user_id IS NOT NULL AND (
+                            (title LIKE :q)
+                            OR (raw_payload IS NOT NULL AND raw_payload LIKE :pat)
+                         )
+                         ORDER BY id DESC
+                         LIMIT :lim";
+                $st2 = $this->db->prepare($sql2);
+                $st2->bindValue(':q', $like, PDO::PARAM_STR);
+                $st2->bindValue(':pat', $like, PDO::PARAM_STR);
+                $st2->bindValue(':lim', $limit, PDO::PARAM_INT);
+                $st2->execute();
+                $rows = $st2->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                return array_map([$this, 'normalize'], $rows);
+            } catch (\Throwable $e2) {
+                return [];
+            }
+        }
+    }
+
+    /** Ingredient keyword search limited to user-generated recipes (user_id IS NOT NULL). */
+    public function findByIngredientsLocalUser(array $names, int $limit = 12, bool $requireAll = false): array
+    {
+        $names = array_values(array_filter(array_map(fn($s)=> trim((string)$s), $names)));
+        if (!$names) return [];
+        $conds = [];
+        $params = [];
+        $i = 0;
+        foreach ($names as $n) {
+            $i++;
+            $keyTitle = ':k' . $i . 't';
+            $keyRaw   = ':k' . $i . 'r';
+            $conds[] = "(title LIKE $keyTitle OR (raw_payload IS NOT NULL AND raw_payload LIKE $keyRaw))";
+            $params[$keyTitle] = '%' . $n . '%';
+            $params[$keyRaw]   = '%' . $n . '%';
+        }
+        $join = $requireAll ? ' AND ' : ' OR ';
+        $sql = "SELECT * FROM recipes WHERE user_id IS NOT NULL AND (" . implode($join, $conds) . ") ORDER BY id DESC LIMIT :lim";
+        $st = $this->db->prepare($sql);
+        foreach ($params as $k => $v) {
+            $st->bindValue($k, $v, PDO::PARAM_STR);
+        }
+        $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+        $st->execute();
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map([$this, 'normalize'], $rows);
+    }
+
     /** Paged local search by ingredient keywords with total count. If $requireAll true, all names must match (AND), otherwise any (OR). */
     public function findByIngredientsLocalPaged(array $names, int $page = 1, int $perPage = 12, bool $requireAll = false): array
     {
@@ -247,6 +319,44 @@ class Recipes
         }
         $join = $requireAll ? ' AND ' : ' OR ';
         $where = '(' . implode($join, $conds) . ')';
+        // total
+        $countSql = "SELECT COUNT(*) FROM recipes WHERE $where";
+        $stc = $this->db->prepare($countSql);
+        foreach ($params as $k => $v) $stc->bindValue($k, $v, PDO::PARAM_STR);
+        $stc->execute();
+        $total = (int)$stc->fetchColumn();
+        // page
+        $perPage = max(1, $perPage);
+        $page = max(1, $page);
+        $offset = ($page - 1) * $perPage;
+        $sql = "SELECT * FROM recipes WHERE $where ORDER BY id DESC LIMIT :lim OFFSET :off";
+        $st = $this->db->prepare($sql);
+        foreach ($params as $k => $v) $st->bindValue($k, $v, PDO::PARAM_STR);
+        $st->bindValue(':lim', $perPage, PDO::PARAM_INT);
+        $st->bindValue(':off', $offset, PDO::PARAM_INT);
+        $st->execute();
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return ['results' => array_map([$this, 'normalize'], $rows), 'total' => $total];
+    }
+
+    /** Paged ingredient search for user-generated recipes only (user_id IS NOT NULL). */
+    public function findByIngredientsLocalPagedUser(array $names, int $page = 1, int $perPage = 12, bool $requireAll = false): array
+    {
+        $names = array_values(array_filter(array_map(fn($s)=> trim((string)$s), $names)));
+        if (!$names) return ['results' => [], 'total' => 0];
+        $conds = [];
+        $params = [];
+        $i = 0;
+        foreach ($names as $n) {
+            $i++;
+            $keyTitle = ':k' . $i . 't';
+            $keyRaw   = ':k' . $i . 'r';
+            $conds[] = "(title LIKE $keyTitle OR (raw_payload IS NOT NULL AND raw_payload LIKE $keyRaw))";
+            $params[$keyTitle] = '%' . $n . '%';
+            $params[$keyRaw]   = '%' . $n . '%';
+        }
+        $join = $requireAll ? ' AND ' : ' OR ';
+        $where = 'user_id IS NOT NULL AND (' . implode($join, $conds) . ')';
         // total
         $countSql = "SELECT COUNT(*) FROM recipes WHERE $where";
         $stc = $this->db->prepare($countSql);
@@ -386,6 +496,49 @@ class Recipes
         $st->execute();
         $row = $st->fetch(PDO::FETCH_ASSOC);
         return $row ?: false;
+    }
+
+    /** Admin: update basic recipe fields (title, description, image_url, source_url). */
+    public function updateBasic(int $id, array $data): bool
+    {
+        if ($id <= 0) return false;
+        $fields = [];
+        $params = [':id' => $id];
+        $map = [
+            'title' => PDO::PARAM_STR,
+            'description' => PDO::PARAM_STR,
+            'image_url' => PDO::PARAM_STR,
+            'source_url' => PDO::PARAM_STR,
+            'api_source' => PDO::PARAM_STR,
+            'api_id' => PDO::PARAM_STR,
+            'user_id' => PDO::PARAM_INT,
+            'raw_payload' => PDO::PARAM_STR,
+        ];
+        foreach ($map as $k => $type) {
+            if (array_key_exists($k, $data)) {
+                $fields[] = "$k = :$k";
+                $params[":$k"] = $data[$k];
+            }
+        }
+        if (!$fields) return false;
+        $sql = "UPDATE recipes SET " . implode(', ', $fields) . " WHERE id = :id";
+        $st = $this->db->prepare($sql);
+        foreach ($params as $k => $v) {
+            $type = $map[ltrim($k, ':')] ?? PDO::PARAM_STR;
+            if ($k === ':id') $type = PDO::PARAM_INT;
+            if ($v === null) $type = PDO::PARAM_NULL;
+            $st->bindValue($k, $v, $type);
+        }
+        return $st->execute();
+    }
+
+    /** Admin: delete a recipe and cascading relations */
+    public function deleteById(int $id): bool
+    {
+        if ($id <= 0) return false;
+        $st = $this->db->prepare("DELETE FROM recipes WHERE id = :id");
+        $st->bindValue(':id', $id, PDO::PARAM_INT);
+        return $st->execute();
     }
 
     /** Unsave (remove bookmark) */

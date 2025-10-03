@@ -75,6 +75,74 @@ class Items
         ];
     }
 
+    /** Admin: paged/filterable items list across all users */
+    public function findAllAdminPaged(array $filters, int $page = 1, int $perPage = 25): array
+    {
+        $where = [];
+        $params = [];
+        if (!empty($filters['user_id'])) {
+            $where[] = 'i.user_id = :uid';
+            $params[':uid'] = (int)$filters['user_id'];
+        }
+        $q = isset($filters['q']) ? trim((string)$filters['q']) : '';
+        if ($q !== '') {
+            $where[] = '(i.entered_name LIKE :q OR ing.name LIKE :q OR p.title LIKE :q)';
+            $params[':q'] = '%' . $q . '%';
+        }
+        $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+        // Count
+        $countSql = "SELECT COUNT(i.id)
+                     FROM items i
+                     LEFT JOIN ingredients ing ON ing.id = i.ingredient_id
+                     LEFT JOIN products p      ON p.id = i.product_id
+                     $whereSql";
+        $stc = $this->db->prepare($countSql);
+        foreach ($params as $k => $v) {
+            $stc->bindValue($k, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stc->execute();
+        $total = (int)$stc->fetchColumn();
+
+        // Page
+        $perPage = max(1, min(100, (int)$perPage));
+        $page = max(1, (int)$page);
+        $offset = ($page - 1) * $perPage;
+
+        $sql = "SELECT i.*, 
+                       ing.name        AS ingredient_name,
+                       ing.category    AS ingredient_category,
+                       ing.image_url   AS ingredient_image_url,
+                       p.title         AS product_title,
+                       p.category      AS product_category,
+                       p.image_url     AS product_image_url
+                FROM items i
+                LEFT JOIN ingredients ing ON ing.id = i.ingredient_id
+                LEFT JOIN products p      ON p.id = i.product_id
+                $whereSql
+                ORDER BY i.created_at DESC, i.id DESC
+                LIMIT :lim OFFSET :off";
+        $st = $this->db->prepare($sql);
+        foreach ($params as $k => $v) {
+            $st->bindValue($k, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $st->bindValue(':lim', $perPage, PDO::PARAM_INT);
+        $st->bindValue(':off', $offset, PDO::PARAM_INT);
+        $st->execute();
+        $items = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $totalPages = (int)max(1, ceil($total / max(1, $perPage)));
+        return [
+            'items' => $items,
+            'pagination' => [
+                'currentPage' => $page,
+                'perPage' => $perPage,
+                'totalItems' => $total,
+                'totalPages' => $totalPages,
+            ],
+        ];
+    }
+
     /** Dashboard: recent items (items-only). */
     public function findRecent(int $userId, int $limit = 6): array
     {

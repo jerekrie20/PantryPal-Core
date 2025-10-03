@@ -7,15 +7,18 @@ use Models\Items;
 use Models\Ingredients;
 use Models\Products;
 use Models\Recipes;
+use Models\Updates;
 
 class DashboardController
 {
     protected Items $item;
     protected Recipes $recipes;
+    protected Updates $updates;
 
     public function __construct(){
         $this->item = new Items();
         $this->recipes = new Recipes();
+        $this->updates = new Updates();
     }
 
     /**
@@ -117,11 +120,16 @@ class DashboardController
             ];
         }
 
+        // Admin/user updates
+        $updates = [];
+        try { $updates = $this->updates->listActiveForUser((int)$userId, 5); } catch (\Throwable $e) { $updates = []; }
+
         $data = [
             'title'         => 'Dashboard',
             'username'      => $username,
             'pantry_stats'  => $pantry_stats,
-            'pantry_items'  => $pantry_items
+            'pantry_items'  => $pantry_items,
+            'updates'       => $updates,
         ];
 
         return View::render('/Users/dashboard', $data);

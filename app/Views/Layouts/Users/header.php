@@ -7,6 +7,8 @@ global $username;
 
 // Ensure the new avatar component is available to be used in this file.
 require_once VIEW_PATH . '/Components/avatar.php';
+if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+$csrf = $_SESSION['csrf_token'] ?? '';
 ?>
 <header class="bg-bg-component shadow-sm sticky top-0 z-50">
     <div class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -20,7 +22,13 @@ require_once VIEW_PATH . '/Components/avatar.php';
                 <a href="/dashboard" class="btn btn-subtle btn-md hidden sm:inline-flex">Dashboard</a>
                 <a href="/recipes" class="btn btn-subtle btn-md hidden sm:inline-flex">Recipes</a>
                 <a href="/items" class="btn btn-subtle btn-md hidden sm:inline-flex">Items</a>
-                <a href="/logout" class="btn btn-subtle btn-md hidden sm:inline-flex">Logout</a>
+                <?php if (!empty($_SESSION['is_admin'])): ?>
+                <a href="/admin" class="btn btn-subtle btn-md hidden sm:inline-flex">Admin</a>
+                <?php endif; ?>
+                <form action="/logout" method="POST" class="hidden sm:inline-block">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8'); ?>" />
+                    <button type="submit" class="btn btn-subtle btn-md">Logout</button>
+                </form>
 
                 <!-- Mobile hamburger -->
                 <button id="mobile-nav-toggle" class="inline-flex sm:hidden items-center justify-center rounded p-2 text-text-muted hover:text-text-heading focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand" aria-label="Open main menu" aria-controls="mobile-nav-panel" aria-expanded="false">
@@ -48,7 +56,13 @@ require_once VIEW_PATH . '/Components/avatar.php';
             <a href="/dashboard" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Dashboard</a>
             <a href="/recipes" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Recipes</a>
             <a href="/items" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Items</a>
-            <a href="/logout" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Logout</a>
+            <?php if (!empty($_SESSION['is_admin'])): ?>
+            <a href="/admin" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Admin</a>
+            <?php endif; ?>
+            <form action="/logout" method="POST" class="block">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8'); ?>" />
+                <button type="submit" class="block w-full text-left px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Logout</button>
+            </form>
         </nav>
     </div>
 

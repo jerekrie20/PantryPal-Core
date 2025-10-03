@@ -45,6 +45,7 @@ class RecipesController
             $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
             $forceApi = isset($_GET['api']) && (string)$_GET['api'] === '1';
             $browse = isset($_GET['browse']) && (string)$_GET['browse'] === '1';
+            $ugcOnly = isset($_GET['ugc']) && (string)$_GET['ugc'] === '1'; // user-generated recipes only
             $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
             // Default to 10 per page for web search; cap to provider limit (30)
             $perPage = isset($_GET['perPage']) ? max(1, min(30, (int)$_GET['perPage'])) : 10;
@@ -132,7 +133,11 @@ class RecipesController
             } elseif (!empty($selectedPantry)) {
                 // Use selected pantry items (subset) to search DB and top up with API
                 $mode = 'search';
-                $local = $this->recipes->findByIngredientsLocalPaged($selectedPantry, $page, $perPage, $requireAll);
+                if ($ugcOnly) {
+                    $local = $this->recipes->findByIngredientsLocalPagedUser($selectedPantry, $page, $perPage, $requireAll);
+                } else {
+                    $local = $this->recipes->findByIngredientsLocalPaged($selectedPantry, $page, $perPage, $requireAll);
+                }
                 $recipes = $local['results'] ?? [];
                 $total = (int)($local['total'] ?? 0);
                 $pagination = [
@@ -146,54 +151,57 @@ class RecipesController
                     $dbid = $r['db_id'] ?? null; $k = $dbid ? ('db:' . $dbid) : ('title:' . ($r['title'] ?? ''));
                     $seen[$k] = true;
                 }
-                if (count($recipes) < $perPage && $this->provider->isConfigured()) {
-                    $needed = $perPage - count($recipes);
-                    $apiResults = $this->provider->findByIngredients($selectedPantry, $needed);
-                    // Post-filter for AND mode so that all selected terms appear in title or ingredients list
-                    if ($requireAll) {
-                        $apiResults = array_values(array_filter($apiResults, function($r) use ($selectedPantry){
-                            $hay = strtolower((string)($r['title'] ?? ''));
-                            if (!empty($r['ingredients_list']) && is_array($r['ingredients_list'])) {
-                                $hay .= ' ' . strtolower(implode(' ', $r['ingredients_list']));
-                            }
-                            foreach ($selectedPantry as $t) {
-                                if ($t === '') continue;
-                                if (strpos($hay, strtolower($t)) === false) return false;
-                            }
-                            return true;
-                        }));
+                // When UGC-only, do not top up from API — show only user-created recipes
+                if (!$ugcOnly) {
+                    if (count($recipes) < $perPage && $this->provider->isConfigured()) {
+                        $needed = $perPage - count($recipes);
+                        $apiResults = $this->provider->findByIngredients($selectedPantry, $needed);
+                        // Post-filter for AND mode so that all selected terms appear in title or ingredients list
+                        if ($requireAll) {
+                            $apiResults = array_values(array_filter($apiResults, function($r) use ($selectedPantry){
+                                $hay = strtolower((string)($r['title'] ?? ''));
+                                if (!empty($r['ingredients_list']) && is_array($r['ingredients_list'])) {
+                                    $hay .= ' ' . strtolower(implode(' ', $r['ingredients_list']));
+                                }
+                                foreach ($selectedPantry as $t) {
+                                    if ($t === '') continue;
+                                    if (strpos($hay, strtolower($t)) === false) return false;
+                                }
+                                return true;
+                            }));
+                        }
+                        foreach ($apiResults as $r) {
+                            try { $id = $this->recipes->upsertFromProvider($r, null, $srcName); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                            $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
+                            if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
+                        }
                     }
-                    foreach ($apiResults as $r) {
-                        try { $id = $this->recipes->upsertFromProvider($r, null, $srcName); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                        $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
-                        if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
+                    // Spoonacular fallback if enabled later
+                    if (count($recipes) < $perPage && $this->spoon && $this->spoon->isConfigured()) {
+                        $needed = $perPage - count($recipes);
+                        $apiResults = $this->spoon->findByIngredients($selectedPantry, $needed);
+                        if ($requireAll) {
+                            $apiResults = array_values(array_filter($apiResults, function($r) use ($selectedPantry){
+                                $hay = strtolower((string)($r['title'] ?? ''));
+                                if (!empty($r['ingredients_list']) && is_array($r['ingredients_list'])) {
+                                    $hay .= ' ' . strtolower(implode(' ', $r['ingredients_list']));
+                                }
+                                foreach ($selectedPantry as $t) {
+                                    if ($t === '') continue;
+                                    if (strpos($hay, strtolower($t)) === false) return false;
+                                }
+                                return true;
+                            }));
+                        }
+                        foreach ($apiResults as $r) {
+                            try { $id = $this->recipes->upsertFromProvider($r, null, 'spoonacular'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                            $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
+                            if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
+                        }
                     }
-                }
-                // Spoonacular fallback if enabled later
-                if (count($recipes) < $perPage && $this->spoon && $this->spoon->isConfigured()) {
-                    $needed = $perPage - count($recipes);
-                    $apiResults = $this->spoon->findByIngredients($selectedPantry, $needed);
-                    if ($requireAll) {
-                        $apiResults = array_values(array_filter($apiResults, function($r) use ($selectedPantry){
-                            $hay = strtolower((string)($r['title'] ?? ''));
-                            if (!empty($r['ingredients_list']) && is_array($r['ingredients_list'])) {
-                                $hay .= ' ' . strtolower(implode(' ', $r['ingredients_list']));
-                            }
-                            foreach ($selectedPantry as $t) {
-                                if ($t === '') continue;
-                                if (strpos($hay, strtolower($t)) === false) return false;
-                            }
-                            return true;
-                        }));
+                    if ($total === 0 && !$this->provider->isConfigured() && !($this->spoon && $this->spoon->isConfigured())) {
+                        $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
                     }
-                    foreach ($apiResults as $r) {
-                        try { $id = $this->recipes->upsertFromProvider($r, null, 'spoonacular'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                        $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
-                        if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
-                    }
-                }
-                if ($total === 0 && !$this->provider->isConfigured() && !($this->spoon && $this->spoon->isConfigured())) {
-                    $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
                 }
             } elseif ($q === '') {
                 // Default: show user's saved recipes from DB
@@ -253,37 +261,43 @@ class RecipesController
                     }
                 } else {
                     // Local-first search
-                    $recipes = $this->recipes->searchLocalByQuery($q, $perPage);
-                    $seen = [];
-                    foreach ($recipes as $r) {
-                        $dbid = $r['db_id'] ?? null; $k = $dbid ? ('db:' . $dbid) : ('title:' . ($r['title'] ?? ''));
-                        $seen[$k] = true;
-                    }
-                    if (count($recipes) < $perPage) {
-                        $needed = $perPage - count($recipes);
-                        if ($this->provider->isConfigured()) {
-                            $apiResults = $this->provider->searchByQuery($q, $needed);
-                            foreach ($apiResults as $r) {
-                                try { $id = $this->recipes->upsertFromProvider($r, null, $srcName); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                                $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
-                                if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
-                            }
+                    if ($ugcOnly) {
+                        // Only user-generated recipes
+                        $recipes = $this->recipes->searchLocalUserByQuery($q, $perPage);
+                        $mode = 'search';
+                    } else {
+                        $recipes = $this->recipes->searchLocalByQuery($q, $perPage);
+                        $seen = [];
+                        foreach ($recipes as $r) {
+                            $dbid = $r['db_id'] ?? null; $k = $dbid ? ('db:' . $dbid) : ('title:' . ($r['title'] ?? ''));
+                            $seen[$k] = true;
                         }
-                        // Fallback to Spoonacular if still underfilled
-                        if (count($recipes) < $perPage && $this->spoon && $this->spoon->isConfigured()) {
+                        if (count($recipes) < $perPage) {
                             $needed = $perPage - count($recipes);
-                            $apiResults = $this->spoon->searchByQuery($q, $needed);
-                            foreach ($apiResults as $r) {
-                                try { $id = $this->recipes->upsertFromProvider($r, null, 'spoonacular'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                                $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
-                                if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
+                            if ($this->provider->isConfigured()) {
+                                $apiResults = $this->provider->searchByQuery($q, $needed);
+                                foreach ($apiResults as $r) {
+                                    try { $id = $this->recipes->upsertFromProvider($r, null, $srcName); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                                    $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
+                                    if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
+                                }
+                            }
+                            // Fallback to Spoonacular if still underfilled
+                            if (count($recipes) < $perPage && $this->spoon && $this->spoon->isConfigured()) {
+                                $needed = $perPage - count($recipes);
+                                $apiResults = $this->spoon->searchByQuery($q, $needed);
+                                foreach ($apiResults as $r) {
+                                    try { $id = $this->recipes->upsertFromProvider($r, null, 'spoonacular'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                                    $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
+                                    if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
+                                }
                             }
                         }
+                        if (empty($recipes) && !$this->provider->isConfigured() && !($this->spoon && $this->spoon->isConfigured())) {
+                            $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
+                        }
+                        $mode = 'search';
                     }
-                    if (empty($recipes) && !$this->provider->isConfigured() && !($this->spoon && $this->spoon->isConfigured())) {
-                        $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
-                    }
-                    $mode = 'search';
                 }
             }
 
@@ -791,5 +805,130 @@ class RecipesController
         // Keep a reasonable number for the API call
         if (count($names) > 15) $names = array_slice($names, 0, 15);
         return $names;
+    }
+
+    /** Render form for creating a user recipe */
+    public function create(): string
+    {
+        try {
+            if (session_status() !== \PHP_SESSION_ACTIVE) { @session_start(); }
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) {
+                http_response_code(401);
+                return View::render('Pages/401', ['title' => 'Unauthorized']);
+            }
+            return View::render('Recipes/recipe_form', [
+                'title' => 'Add Recipe',
+            ]);
+        } catch (\Throwable $e) {
+            error_log('RecipesController::create error: '.$e->getMessage());
+            http_response_code(500);
+            return View::render('Pages/500', ['title' => 'Server Error']);
+        }
+    }
+
+    /** Handle POST to create a user recipe */
+    public function store()
+    {
+        try {
+            if (session_status() !== \PHP_SESSION_ACTIVE) { @session_start(); }
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) {
+                http_response_code(401);
+                return View::render('Pages/401', ['title' => 'Unauthorized']);
+            }
+            $title = trim((string)($_POST['title'] ?? ''));
+            if ($title === '') {
+                return View::render('Recipes/recipe_form', [
+                    'title' => 'Add Recipe',
+                    'error' => 'Title is required.',
+                    'input' => $_POST,
+                ]);
+            }
+            $ingInput = trim((string)($_POST['ingredients_list'] ?? ''));
+            $instrInput = trim((string)($_POST['instructions_list'] ?? ''));
+            $ingredients = $ingInput !== '' ? $this->parseArrayInput($ingInput) : null;
+            $instructions = $instrInput !== '' ? $this->parseArrayInput($instrInput) : null;
+
+            $data = [
+                'title' => $title,
+                'description' => $_POST['description'] ?? null,
+                'image' => $_POST['image_url'] ?? null,
+                'sourceUrl' => $_POST['source_url'] ?? null,
+                'id' => null,
+                'ingredients_list' => $ingredients,
+                'instructions_list' => $instructions,
+            ];
+            $rid = $this->recipes->upsertFromProvider($data, (int)$userId, 'manual');
+
+            $nutritionInput = trim((string)($_POST['nutrition_per_serving'] ?? ''));
+            if ($rid && $nutritionInput !== '') {
+                $per = $this->parseNutritionInput($nutritionInput);
+                if (is_array($per) && !empty($per)) {
+                    $this->recipes->upsertNutrition((int)$rid, $per);
+                }
+            }
+
+            header('Location: /recipes?ugc=1');
+            exit;
+        } catch (\Throwable $e) {
+            error_log('RecipesController::store error: '.$e->getMessage());
+            http_response_code(500);
+            return View::render('Pages/500', ['title' => 'Server Error']);
+        }
+    }
+
+    // --- Helpers copied from AdminController parsers (user-friendly inputs) ---
+    private function parseArrayInput(string $input): array
+    {
+        $input = trim($input);
+        if ($input === '') return [];
+        $first = $input[0]; $last = substr($input, -1);
+        if (($first === '[' && $last === ']') || ($first === '"' && $last === '"')) {
+            $decoded = json_decode($input, true);
+            if (is_array($decoded)) {
+                $arr = [];
+                foreach ($decoded as $v) { if (is_string($v)) { $t = trim($v); if ($t !== '') $arr[] = $t; } }
+                return $arr;
+            }
+        }
+        $parts = preg_split('/\r?\n+|,/', $input);
+        $out = [];
+        foreach ($parts as $p) { $t = trim((string)$p); if ($t !== '') $out[] = $t; }
+        return $out;
+    }
+
+    private function parseNutritionInput(string $input): array
+    {
+        $input = trim($input);
+        if ($input === '') return [];
+        if ($input[0] === '{' && substr($input, -1) === '}') {
+            $obj = json_decode($input, true);
+            if (is_array($obj)) return $obj;
+        }
+        $lines = preg_split('/\r?\n+|,/', $input);
+        $out = [];
+        foreach ($lines as $line) {
+            $line = trim((string)$line);
+            if ($line === '') continue;
+            // Accept formats like "Calories: 250 kcal" or "Protein 12 g"
+            if (strpos($line, ':') !== false) {
+                [$k, $v] = array_map('trim', explode(':', $line, 2));
+            } else {
+                $parts = preg_split('/\s+/', $line);
+                $k = array_shift($parts);
+                $v = implode(' ', $parts);
+            }
+            // Extract amount and unit
+            if (preg_match('/([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z%]+)?/u', $v, $m)) {
+                $amount = isset($m[1]) ? (float)$m[1] : null;
+                $unit = isset($m[2]) ? $m[2] : '';
+                if ($k !== '' && $amount !== null) {
+                    $label = ucwords(trim($k));
+                    $out[$label] = ['amount' => $amount, 'unit' => $unit ?: ''];
+                }
+            }
+        }
+        return $out;
     }
 }

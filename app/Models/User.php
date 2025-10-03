@@ -61,7 +61,7 @@ class User
         $password = $data['password'];
 
         // It's good practice to select the user's ID as well
-        $stmt = $this->db->prepare("SELECT id,username,email,password_hash FROM users WHERE email = :email");
+        $stmt = $this->db->prepare("SELECT id,username,email,password_hash,is_admin FROM users WHERE email = :email");
 
         $stmt->execute(['email' => $email]);
 
@@ -132,13 +132,85 @@ class User
         }
     }
 
+    public function listAll(int $limit = 100): array
+    {
+        $st = $this->db->prepare("SELECT id, username, email, IFNULL(is_admin, 0) AS is_admin, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT :lim");
+        $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+        $st->execute();
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** Admin: paged/filterable list of users */
+    public function listPaged(array $filters, int $page = 1, int $perPage = 25): array
+    {
+        $where = [];
+        $params = [];
+        $q = isset($filters['q']) ? trim((string)$filters['q']) : '';
+        if ($q !== '') {
+            $where[] = '(username LIKE :q OR email LIKE :q)';
+            $params[':q'] = '%' . $q . '%';
+        }
+        if (isset($filters['is_admin']) && $filters['is_admin'] !== '') {
+            $where[] = 'IFNULL(is_admin,0) = :adm';
+            $params[':adm'] = (int)$filters['is_admin'] ? 1 : 0;
+        }
+        $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+        // Count
+        $stc = $this->db->prepare("SELECT COUNT(*) FROM users $whereSql");
+        foreach ($params as $k => $v) {
+            $stc->bindValue($k, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stc->execute();
+        $total = (int)$stc->fetchColumn();
+
+        // Page
+        $perPage = max(1, min(100, (int)$perPage));
+        $page = max(1, (int)$page);
+        $offset = ($page - 1) * $perPage;
+        $sql = "SELECT id, username, email, IFNULL(is_admin, 0) AS is_admin, created_at
+                FROM users $whereSql
+                ORDER BY created_at DESC, id DESC
+                LIMIT :lim OFFSET :off";
+        $st = $this->db->prepare($sql);
+        foreach ($params as $k => $v) {
+            $st->bindValue($k, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $st->bindValue(':lim', $perPage, PDO::PARAM_INT);
+        $st->bindValue(':off', $offset, PDO::PARAM_INT);
+        $st->execute();
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $totalPages = (int)max(1, ceil($total / max(1, $perPage)));
+        return [
+            'rows' => $rows,
+            'pagination' => [
+                'currentPage' => $page,
+                'perPage' => $perPage,
+                'totalItems' => $total,
+                'totalPages' => $totalPages,
+            ],
+        ];
+    }
+
     protected function updateUser()
     {
     }
 
-    function deleteUser()
+    public function toggleAdmin(int $id): bool
     {
+        // Flip is_admin (NULL treated as 0)
+        $sql = "UPDATE users SET is_admin = IFNULL(1 - is_admin, 1) WHERE id = :id";
+        $st = $this->db->prepare($sql);
+        $st->bindValue(':id', $id, PDO::PARAM_INT);
+        return $st->execute();
     }
 
+    public function deleteById(int $id): bool
+    {
+        $st = $this->db->prepare("DELETE FROM users WHERE id = :id");
+        $st->bindValue(':id', $id, PDO::PARAM_INT);
+        return $st->execute();
+    }
 
 }

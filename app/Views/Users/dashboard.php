@@ -25,6 +25,27 @@ ob_start();
     </a>
 </section>
 
+<!-- Admin Updates -->
+<?php if (!empty($updates)): ?>
+<section class="mb-6" aria-label="Updates">
+    <h2 class="text-2xl font-bold text-text-heading mb-3">Updates</h2>
+    <div class="space-y-3">
+        <?php foreach ($updates as $u): ?>
+            <div class="bg-bg-component rounded-lg p-4 shadow">
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="font-semibold text-text-heading"><?php echo htmlspecialchars($u['title'] ?? 'Update'); ?></h3>
+                    <span class="text-xs text-text-muted"><?php echo htmlspecialchars(substr((string)($u['created_at'] ?? ''), 0, 16)); ?></span>
+                </div>
+                <p class="text-text-default whitespace-pre-line"><?php echo nl2br(htmlspecialchars($u['message'] ?? '')); ?></p>
+                <?php if (!empty($u['author_username'])): ?>
+                    <div class="mt-2 text-xs text-text-muted">Posted by <?php echo htmlspecialchars($u['author_username']); ?></div>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</section>
+<?php endif; ?>
+
 <!-- Stat Cards -->
 <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" aria-label="Pantry Statistics">
     <?php
