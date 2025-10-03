@@ -110,6 +110,9 @@ require VIEW_PATH . '/Admin/partials/nav.php';
 </tbody>
 </table>
 </div>
+<?php if (empty($users)): ?>
+  <div class="mt-4 text-sm text-text-muted">No users found. Try adjusting the filters.</div>
+<?php endif; ?>
 <?php if (!empty($pagination) && is_array($pagination)): $p = $pagination; $cur = (int)($p['currentPage'] ?? 1); $tot = (int)($p['totalPages'] ?? 1); ?>
 <div class="mt-4 flex items-center justify-between text-sm text-text-muted">
   <div>Page <?php echo $cur; ?> of <?php echo $tot; ?> · <?php echo (int)($p['totalItems'] ?? 0); ?> results</div>

@@ -109,6 +109,8 @@ class Items
         $page = max(1, (int)$page);
         $offset = ($page - 1) * $perPage;
 
+        $lim = (int)$perPage; if ($lim < 1) { $lim = 25; } if ($lim > 100) { $lim = 100; }
+        $off = (int)$offset; if ($off < 0) { $off = 0; }
         $sql = "SELECT i.*, 
                        ing.name        AS ingredient_name,
                        ing.category    AS ingredient_category,
@@ -121,13 +123,11 @@ class Items
                 LEFT JOIN products p      ON p.id = i.product_id
                 $whereSql
                 ORDER BY i.created_at DESC, i.id DESC
-                LIMIT :lim OFFSET :off";
+                LIMIT $lim OFFSET $off";
         $st = $this->db->prepare($sql);
         foreach ($params as $k => $v) {
             $st->bindValue($k, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
-        $st->bindValue(':lim', $perPage, PDO::PARAM_INT);
-        $st->bindValue(':off', $offset, PDO::PARAM_INT);
         $st->execute();
         $items = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 

@@ -168,16 +168,17 @@ class User
         $perPage = max(1, min(100, (int)$perPage));
         $page = max(1, (int)$page);
         $offset = ($page - 1) * $perPage;
+        // Inline LIMIT/OFFSET integers for maximum compatibility across PDO drivers
+        $lim = (int)$perPage; if ($lim < 1) { $lim = 25; } if ($lim > 100) { $lim = 100; }
+        $off = (int)$offset; if ($off < 0) { $off = 0; }
         $sql = "SELECT id, username, email, IFNULL(is_admin, 0) AS is_admin, created_at
                 FROM users $whereSql
                 ORDER BY created_at DESC, id DESC
-                LIMIT :lim OFFSET :off";
+                LIMIT $lim OFFSET $off";
         $st = $this->db->prepare($sql);
         foreach ($params as $k => $v) {
             $st->bindValue($k, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
-        $st->bindValue(':lim', $perPage, PDO::PARAM_INT);
-        $st->bindValue(':off', $offset, PDO::PARAM_INT);
         $st->execute();
         $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 

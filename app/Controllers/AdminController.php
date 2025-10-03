@@ -245,8 +245,8 @@ class AdminController
         $dbProp = $ref->getProperty('db');
         $dbProp->setAccessible(true);
         $db = $dbProp->getValue($this->recipes);
-        $st = $db->prepare("SELECT * FROM recipes ORDER BY created_at DESC, id DESC LIMIT :lim");
-        $st->bindValue(':lim', $limit, \PDO::PARAM_INT);
+        $lim = (int)$limit; if ($lim < 1) { $lim = 25; } if ($lim > 1000) { $lim = 1000; }
+        $st = $db->prepare("SELECT * FROM recipes ORDER BY created_at DESC, id DESC LIMIT $lim");
         $st->execute();
         return $st;
     }
@@ -289,13 +289,13 @@ class AdminController
 
         // Page
         $offset = ($page - 1) * $perPage;
-        $sql = "SELECT * FROM recipes $whereSql ORDER BY created_at DESC, id DESC LIMIT :lim OFFSET :off";
+        $lim = (int)$perPage; if ($lim < 1) { $lim = 25; } if ($lim > 100) { $lim = 100; }
+        $off = (int)$offset; if ($off < 0) { $off = 0; }
+        $sql = "SELECT * FROM recipes $whereSql ORDER BY created_at DESC, id DESC LIMIT $lim OFFSET $off";
         $st = $db->prepare($sql);
         foreach ($params as $k => $v) {
             $st->bindValue($k, $v, is_int($v) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
         }
-        $st->bindValue(':lim', $perPage, \PDO::PARAM_INT);
-        $st->bindValue(':off', $offset, \PDO::PARAM_INT);
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
