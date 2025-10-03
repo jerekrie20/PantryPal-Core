@@ -801,4 +801,45 @@ class ItemsController
             return View::render('Pages/500', ['title' => 'Server Error']);
         }
     }
+
+    public function renew(int $id)
+    {
+        try {
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) {
+                http_response_code(401);
+                return View::render('Pages/401', ['title' => 'Unauthorized']);
+            }
+            // Ensure item exists and belongs to the user
+            $item = $this->items->findWithGlobalById($id, (int)$userId);
+            if (!$item) {
+                http_response_code(404);
+                return View::render('Pages/404', ['title' => 'Item Not Found']);
+            }
+
+            // Simple renew rule: set expiration_date to today + 7 days
+            $today = new \DateTimeImmutable('today');
+            $newExp = $today->modify('+7 days')->format('Y-m-d');
+
+            $ok = $this->items->update($id, ['expiration_date' => $newExp], (int)$userId);
+            if (!$ok) {
+                // If nothing updated (e.g., same value), still redirect back to view
+                header('Location: /items/view/' . (int)$id);
+                exit;
+            }
+
+            // Invalidate caches after renew
+            try {
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
+                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+            } catch (\Throwable $e) { /* ignore */ }
+
+            header('Location: /items/view/' . (int)$id);
+            exit;
+        } catch (\Throwable $e) {
+            error_log('ItemsController::renew error: '.$e->getMessage());
+            http_response_code(500);
+            return View::render('Pages/500', ['title' => 'Server Error']);
+        }
+    }
 }

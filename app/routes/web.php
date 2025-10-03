@@ -92,6 +92,7 @@ $router->group(['middleware' => [AuthMiddleware::class, CsrfMiddleware::class]],
     $router->post('/items', [ItemsController::class, 'store']); // Store data from the forms
     $router->post('/items/confirm', [ItemsController::class, 'storeConfirmed']); // Confirm selection from API choices
     $router->get('/items/view/{id:int}', [ItemsController::class, 'show']); // View a specific item
+    $router->get('/items/renew/{id:int}', [ItemsController::class, 'renew']); // Renew an item (quick action)
     $router->get('/items/{id:int}/edit', [ItemsController::class, 'edit']); // Display the form for update
     $router->post('/items/{id:int}', [ItemsController::class, 'update']); // Update data from the form
     $router->post('/items/{id:int}/delete', [ItemsController::class, 'destroy']); // Delete an item
