@@ -15,36 +15,19 @@ ob_start();
 
 <!-- Dashboard Header -->
 <section class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8" aria-labelledby="dashboard-heading">
-    <div>
+    <div class="max-w-prose">
         <h1 id="dashboard-heading" class="text-3xl font-bold text-text-heading">Welcome Back, <?php echo htmlspecialchars($username); ?>!</h1>
         <p class="text-text-muted mt-1">Here's a snapshot of your pantry today.</p>
     </div>
-    <a href="/items/create" class="btn btn-cta btn-md mt-4 sm:mt-0">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" role="img" aria-hidden="true"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
-        <span>Add New Item</span>
-    </a>
-</section>
-
-<!-- Admin Updates -->
-<?php if (!empty($updates)): ?>
-<section class="mb-6" aria-label="Updates">
-    <h2 class="text-2xl font-bold text-text-heading mb-3">Updates</h2>
-    <div class="space-y-3">
-        <?php foreach ($updates as $u): ?>
-            <div class="bg-bg-component rounded-lg p-4 shadow">
-                <div class="flex items-center justify-between mb-1">
-                    <h3 class="font-semibold text-text-heading"><?php echo htmlspecialchars($u['title'] ?? 'Update'); ?></h3>
-                    <span class="text-xs text-text-muted"><?php echo htmlspecialchars(substr((string)($u['created_at'] ?? ''), 0, 16)); ?></span>
-                </div>
-                <p class="text-text-default whitespace-pre-line"><?php echo nl2br(htmlspecialchars($u['message'] ?? '')); ?></p>
-                <?php if (!empty($u['author_username'])): ?>
-                    <div class="mt-2 text-xs text-text-muted">Posted by <?php echo htmlspecialchars($u['author_username']); ?></div>
-                <?php endif; ?>
-            </div>
-        <?php endforeach; ?>
+    <!-- Action Buttons -->
+    <div class="flex flex-wrap items-center gap-3 mt-4 sm:mt-0">
+        <a href="/items/create" class="btn btn-cta btn-md">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" role="img" aria-hidden="true"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+            <span>Add New Item</span>
+        </a>
+        <a href="#updates" class="btn btn-secondary btn-md">News/Announcements</a>
     </div>
 </section>
-<?php endif; ?>
 
 <!-- Stat Cards -->
 <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" aria-label="Pantry Statistics">
@@ -89,6 +72,27 @@ ob_start();
         </ul>
     </div>
 </section>
+
+<!-- Admin Updates -->
+<?php if (!empty($updates)): ?>
+    <section class="mt-8" aria-label="Updates" id="updates">
+        <h2 class="text-2xl font-bold text-text-heading mb-3">Updates</h2>
+        <div class="space-y-3">
+            <?php foreach ($updates as $u): ?>
+                <div class="bg-bg-component rounded-lg p-4 shadow">
+                    <div class="flex items-center justify-between mb-1">
+                        <h3 class="font-semibold text-text-heading"><?php echo htmlspecialchars($u['title'] ?? 'Update'); ?></h3>
+                        <span class="text-xs text-text-muted"><?php echo htmlspecialchars(substr((string)($u['created_at'] ?? ''), 0, 16)); ?></span>
+                    </div>
+                    <p class="text-text-default whitespace-pre-line"><?php echo nl2br(htmlspecialchars($u['message'] ?? '')); ?></p>
+                    <?php if (!empty($u['author_username'])): ?>
+                        <div class="mt-2 text-xs text-text-muted">Posted by <?php echo htmlspecialchars($u['author_username']); ?></div>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+<?php endif; ?>
 
 <?php
 // Get the captured content and assign it to a variable for the layout
