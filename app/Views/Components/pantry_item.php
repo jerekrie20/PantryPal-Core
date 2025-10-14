@@ -24,6 +24,7 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
             <a href="/items/renew/<?php echo $item['id']; ?>" class="btn btn-subtle btn-sm" aria-label="Renew <?php echo htmlspecialchars($item['name']); ?>">Renew</a>
         <?php endif; ?>
         <form action="/items/<?php echo $item['id']; ?>/delete" method="post" class="inline" onsubmit="return confirm('Are you sure you want to delete &quot;<?php echo htmlspecialchars($item['name']); ?>&quot;? This action cannot be undone.');">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
             <button type="submit" class="btn btn-danger btn-sm" aria-label="Delete <?php echo htmlspecialchars($item['name']); ?>">Delete</button>
         </form>
 
