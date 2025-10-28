@@ -6,6 +6,7 @@ use GuzzleHttp\Client;
 use Models\Items;
 use Models\Recipes;
 use Models\Ingredients;
+use Services\AI\LangCacheClient;
 
 /**
  * AI Cooking Assistant - Context-aware helper for pantry and recipe questions
@@ -18,6 +19,7 @@ class CookingAssistant
     private ?int $userId;
     private ?array $pageContext;
     private array $conversationHistory = [];
+    private ?LangCacheClient $langCache;
 
     public function __construct(?int $userId = null, ?array $pageContext = null)
     {
@@ -29,6 +31,14 @@ class CookingAssistant
         if (empty($this->apiKey)) {
             throw new \RuntimeException('ANTHROPIC_API_KEY not configured in .env file');
         }
+
+        // Initialize LangCache if enabled
+        try {
+            $this->langCache = new LangCacheClient();
+        } catch (\Exception $e) {
+            error_log('LangCache initialization failed: ' . $e->getMessage());
+            $this->langCache = null;
+        }
     }
     
     /**
@@ -38,31 +48,64 @@ class CookingAssistant
     {
         // Get user context (pantry items and saved recipes)
         $context = $this->buildUserContext();
-        
+
         // Build system prompt that restricts AI to app-related topics
         $systemPrompt = $this->buildSystemPrompt($context);
-        
+
         // Add user message to history
         $this->conversationHistory[] = [
             'role' => 'user',
             'content' => $userMessage
         ];
-        
+
         try {
-            $response = $this->callClaudeAPI($systemPrompt, $this->conversationHistory);
-            
+            // Check LangCache first for semantic match
+            $cached = null;
+            $attributes = ['userId' => (string)$this->userId];
+            if ($this->pageContext && isset($this->pageContext['type'])) {
+                $attributes['pageType'] = $this->pageContext['type'];
+                if (isset($this->pageContext['id'])) {
+                    $attributes['pageId'] = (string)$this->pageContext['id'];
+                }
+            }
+
+            if ($this->langCache && $this->langCache->isEnabled()) {
+                $cached = $this->langCache->searchCache($userMessage, $attributes);
+            }
+
+            if ($cached && isset($cached['response'])) {
+                // Use cached response (semantic match found!)
+                $response = [
+                    'content' => $cached['response'],
+                    'usage' => [],
+                    'cached' => true,
+                    'similarity' => $cached['similarity'] ?? null
+                ];
+            } else {
+                // Call Claude API
+                $response = $this->callClaudeAPI($systemPrompt, $this->conversationHistory);
+                $response['cached'] = false;
+
+                // Store response in LangCache for future semantic matches
+                if ($this->langCache && $this->langCache->isEnabled()) {
+                    $this->langCache->storeResponse($userMessage, $response['content'], $attributes);
+                }
+            }
+
             // Add assistant response to history
             $this->conversationHistory[] = [
                 'role' => 'assistant',
                 'content' => $response['content']
             ];
-            
+
             return [
                 'success' => true,
                 'message' => $response['content'],
-                'usage' => $response['usage'] ?? []
+                'usage' => $response['usage'] ?? [],
+                'cached' => $response['cached'] ?? false,
+                'similarity' => $response['similarity'] ?? null
             ];
-            
+
         } catch (\Exception $e) {
             error_log('CookingAssistant error: ' . $e->getMessage());
             return [

@@ -90,31 +90,34 @@ GQL;
             // empty results here could be legit; fall through to next fallback
         }
 
-        // 2) Plain list shape (no edges)
+        // 2) Simplified connection fallback (still using edges but minimal fields)
         $gqlList = <<<'GQL'
-query RecipeSearchList($query: String!, $first: Int!) {
+query RecipeSearchSimple($query: String!, $first: Int!) {
   recipeSearch(query: $query, first: $first) {
-    id
-    databaseId
-    name
-    numberOfServings
-    ingredientLines
-    ingredients { name }
-    instructions
-    source { recipeUrl }
-    mainImage
+    edges {
+      node {
+        databaseId
+        name
+        numberOfServings
+        ingredientLines
+        ingredients { name }
+        instructions
+        source { recipeUrl }
+        mainImage
+      }
+    }
   }
 }
 GQL;
 
         $data = $this->exec($gqlList, ['query' => $query, 'first' => $first], $err2);
 
-        if ($data && isset($data['data']['recipeSearch']) && is_array($data['data']['recipeSearch'])) {
-            $arr = $data['data']['recipeSearch'];
+        if ($data && isset($data['data']['recipeSearch']['edges'])) {
+            $edges = $data['data']['recipeSearch']['edges'] ?? [];
             $out = [];
-            foreach ($arr as $node) {
-                if (is_array($node)) {
-                    $out[] = $this->normalizeNode($node);
+            foreach ($edges as $edge) {
+                if (!empty($edge['node']) && is_array($edge['node'])) {
+                    $out[] = $this->normalizeNode($edge['node']);
                     if (count($out) >= $first) break;
                 }
             }
