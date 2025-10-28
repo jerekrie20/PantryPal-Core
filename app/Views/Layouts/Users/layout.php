@@ -25,5 +25,10 @@
 
     <?php require_once VIEW_PATH . '/Layouts/Users/footer.php'; ?>
 </div>
+
+<?php
+// Include AI Chat Widget on all authenticated pages
+require_once VIEW_PATH . '/Components/ai_chat.php';
+?>
 </body>
 </html>

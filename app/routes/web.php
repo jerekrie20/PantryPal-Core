@@ -9,6 +9,7 @@ use Controllers\ProductsController;
 use Controllers\UserController;
 use Controllers\RecipesController;
 use Controllers\AdminController;
+use Controllers\AIController;
 use Middleware\AuthMiddleware;
 use Middleware\CsrfMiddleware;
 use Middleware\AdminMiddleware;
@@ -35,49 +36,8 @@ $router->group(['middleware' => [CsrfMiddleware::class]], function ($router) {
     $router->post('/register', [UserController::class, 'create']);
 });
 
-// Internal routes gated by env flag and admin role
-$router->get('/__internal/learning', function () {
-    $enabled = getenv('INTERNAL_TOOLS_ENABLED') ?: '';
-    if (strtolower((string)$enabled) !== 'true') { http_response_code(404); require VIEW_PATH . '/Pages/404.php'; return; }
-    if (session_status() === PHP_SESSION_NONE) session_start();
-    $isAdmin = !empty($_SESSION['is_admin']);
-    if (!$isAdmin) { http_response_code(403); require VIEW_PATH . '/Pages/403.php'; return; }
-    require VIEW_PATH . '/Learning/overview.html';
-});
-$router->get('/__internal/theme', function () {
-    $enabled = getenv('INTERNAL_TOOLS_ENABLED') ?: '';
-    if (strtolower((string)$enabled) !== 'true') { http_response_code(404); require VIEW_PATH . '/Pages/404.php'; return; }
-    if (session_status() === PHP_SESSION_NONE) session_start();
-    $isAdmin = !empty($_SESSION['is_admin']);
-    if (!$isAdmin) { http_response_code(403); require VIEW_PATH . '/Pages/403.php'; return; }
-    require VIEW_PATH . '/Learning/theme.php';
-});
-
-$router->get('/__internal/redis-test', function () {
-    $env = getenv('APP_ENV') ?: 'development';
-    if ($env === 'production') { http_response_code(404); echo 'Not Found'; return; }
-    $enabled = getenv('INTERNAL_TOOLS_ENABLED') ?: '';
-    if (strtolower((string)$enabled) !== 'true') { http_response_code(404); echo 'Not Found'; return; }
-    if (session_status() === PHP_SESSION_NONE) session_start();
-    $isAdmin = !empty($_SESSION['is_admin']);
-    if (!$isAdmin) { http_response_code(403); echo 'Forbidden'; return; }
-    header('Content-Type: text/plain');
-    try {
-        $ready = \Helpers\Cache::ready();
-        if (!$ready) {
-            echo "redis: not connected\n";
-            // Keep diagnostics concise in non-production environments
-            echo 'Predis\\Client: ' . (class_exists('Predis\\Client') ? 'yes' : 'no') . ", ext-redis: " . (class_exists('Redis') ? 'yes' : 'no') . "\n";
-            return;
-        }
-        $k = 'pp:test:' . bin2hex(random_bytes(4));
-        \Helpers\Cache::set($k, 'bar', 30);
-        $v = \Helpers\Cache::get($k);
-        echo "set/get => ".$v."\n";
-    } catch (\Throwable $e) {
-        echo 'error: ' . $e->getMessage();
-    }
-});
+// Internal/diagnostic routes (development tools)
+require_once APP_PATH . '/routes/internals.php';
 
 // --- Authenticated Routes ---
 // All routes defined inside this group will first run the AuthMiddleware and CSRF for POSTs.
@@ -121,6 +81,10 @@ $router->group(['middleware' => [AuthMiddleware::class, CsrfMiddleware::class]],
     // Save/Unsave
     $router->post('/recipes/save', [RecipesController::class, 'save']);
     $router->post('/recipes/unsave', [RecipesController::class, 'unsave']);
+
+    // AI Cooking Assistant
+    $router->post('/api/ai/chat', [AIController::class, 'chat']);
+    $router->get('/api/ai/usage', [AIController::class, 'usage']);
 
 });
 

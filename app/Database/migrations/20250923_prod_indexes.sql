@@ -26,3 +26,6 @@ CREATE INDEX idx_products_title_brand ON products (title, brand);
  ALTER TABLE saved_recipes
   ADD CONSTRAINT fk_saved_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   ADD CONSTRAINT fk_saved_recipe FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE;
+
+
+ALTER TABLE users ADD COLUMN is_premium TINYINT(1) DEFAULT 0;
