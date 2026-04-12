@@ -239,7 +239,9 @@ class Items
         if ($prodId === null) $st->bindValue(':product_id', null, PDO::PARAM_NULL);
         else                  $st->bindValue(':product_id', $prodId, PDO::PARAM_INT);
 
-        $st->bindValue(':quantity', (string)$data['quantity']);
+        $qty = (isset($data['quantity']) && $data['quantity'] !== null && $data['quantity'] !== '') ? $data['quantity'] : null;
+        if ($qty === null) $st->bindValue(':quantity', null, PDO::PARAM_NULL);
+        else               $st->bindValue(':quantity', $qty);
         $st->bindValue(':unit', $data['unit'] ?? null);
         $st->bindValue(':purchase_date', $data['purchase_date'] ?? null);
         $st->bindValue(':expiration_date', $data['expiration_date'] ?? null);

@@ -417,10 +417,13 @@ class RecipesController
                 }
             }
 
+            $pantryIngredients = $this->collectPantryNames((int)$userId, 200);
+
             return View::render('Recipes/show', [
                 'title' => $normalized['title'] ?? 'Recipe',
                 'recipe' => $normalized,
                 'isSaved' => $isSaved,
+                'pantryIngredients' => $pantryIngredients,
             ]);
         } catch (\Throwable $e) {
             error_log('RecipesController::show error: ' . $e->getMessage());
@@ -641,7 +644,7 @@ class RecipesController
     }
 
     /** Collect pantry ingredient/product names for the given user. */
-    private function collectPantryNames(int $userId): array
+    private function collectPantryNames(int $userId, int $limit = 15): array
     {
         $page = $this->items->findAll($userId, 1, 200); // take up to 200 items with joined fields
         $rows = $page['items'] ?? [];
@@ -673,7 +676,7 @@ class RecipesController
             return $this->normalizePantryTerm((string)$s);
         }, $names))));
         // Keep a reasonable number for the API call
-        if (count($names) > 15) $names = array_slice($names, 0, 15);
+        if (count($names) > $limit) $names = array_slice($names, 0, $limit);
         return $names;
     }
 

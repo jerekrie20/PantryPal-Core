@@ -23,6 +23,11 @@ $csrf = $_SESSION['csrf_token'] ?? '';
                 <a href="/recipes" class="btn btn-subtle btn-md hidden sm:inline-flex">Recipes</a>
                 <a href="/recipes?ugc=1" class="btn btn-subtle btn-md hidden sm:inline-flex">My Recipes</a>
                 <a href="/items" class="btn btn-subtle btn-md hidden sm:inline-flex">Items</a>
+                <a href="/shopping-list" class="btn btn-subtle btn-md hidden sm:inline-flex" title="Shopping List">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.5 7h13L17 13M9 21a1 1 0 100-2 1 1 0 000 2zm10 0a1 1 0 100-2 1 1 0 000 2z"/>
+                    </svg>
+                </a>
                 <?php if (!empty($_SESSION['is_admin'])): ?>
                 <a href="/admin" class="btn btn-subtle btn-md hidden sm:inline-flex">Admin</a>
                 <?php endif; ?>
@@ -58,6 +63,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
             <a href="/recipes" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Recipes</a>
             <a href="/recipes?ugc=1" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">My Recipes</a>
             <a href="/items" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Items</a>
+            <a href="/shopping-list" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Shopping List</a>
             <?php if (!empty($_SESSION['is_admin'])): ?>
             <a href="/admin" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Admin</a>
             <?php endif; ?>

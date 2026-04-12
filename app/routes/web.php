@@ -8,6 +8,7 @@ use Controllers\IngredientsController;
 use Controllers\ProductsController;
 use Controllers\UserController;
 use Controllers\RecipesController;
+use Controllers\ShoppingListController;
 use Controllers\AdminController;
 use Controllers\AIController;
 use Middleware\AuthMiddleware;
@@ -86,6 +87,14 @@ $router->group(['middleware' => [AuthMiddleware::class, CsrfMiddleware::class]],
     // Save/Unsave
     $router->post('/recipes/save', [RecipesController::class, 'save']);
     $router->post('/recipes/unsave', [RecipesController::class, 'unsave']);
+
+    // Shopping List
+    $router->get('/shopping-list', [ShoppingListController::class, 'index']);
+    $router->post('/shopping-list/add-from-recipe', [ShoppingListController::class, 'addFromRecipe']);
+    $router->post('/shopping-list/item/add', [ShoppingListController::class, 'addItem']);
+    $router->post('/shopping-list/item/{id:int}/update', [ShoppingListController::class, 'update']);
+    $router->post('/shopping-list/item/{id:int}/delete', [ShoppingListController::class, 'delete']);
+    $router->post('/shopping-list/item/{id:int}/move-to-pantry', [ShoppingListController::class, 'moveToPantry']);
 
     // AI Cooking Assistant
     $router->post('/api/ai/chat', [AIController::class, 'chat']);

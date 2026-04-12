@@ -80,11 +80,66 @@ $img = (!empty($recipe['image']) && (preg_match('#^https?://#i', $recipe['image'
       <div class="card p-6">
           <h3 class="text-lg font-semibold mb-3">Ingredients</h3>
           <?php if (!empty($recipe['ingredients']) && is_array($recipe['ingredients'])): ?>
-              <ul class="list-disc list-inside space-y-1 text-sm">
-                  <?php foreach ($recipe['ingredients'] as $ing): ?>
-                      <li><?php echo e($ing); ?></li>
+              <?php
+              $pantrySet    = $pantryIngredients ?? [];
+              $hasPantry    = !empty($pantrySet);
+              $missingIngs  = []; // ingredients not found in pantry
+
+              if ($hasPantry): ?>
+                  <p class="text-xs text-text-muted mb-3">
+                      <span class="inline-flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                          You have this in your pantry
+                      </span>
+                  </p>
+              <?php endif; ?>
+              <ul class="space-y-1.5 text-sm">
+                  <?php foreach ($recipe['ingredients'] as $ing):
+                      $inPantry = false;
+                      if ($hasPantry) {
+                          $ingLower = strtolower((string)$ing);
+                          foreach ($pantrySet as $pName) {
+                              if ($pName !== '' && stripos($ingLower, $pName) !== false) {
+                                  $inPantry = true;
+                                  break;
+                              }
+                          }
+                      }
+                      if (!$inPantry) {
+                          $missingIngs[] = (string)$ing;
+                      }
+                  ?>
+                      <li class="flex items-start gap-2">
+                          <?php if ($inPantry): ?>
+                              <svg class="w-4 h-4 mt-0.5 shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                          <?php else: ?>
+                              <span class="w-4 h-4 mt-0.5 shrink-0 flex items-center justify-center">
+                                  <span class="w-1.5 h-1.5 rounded-full bg-text-muted opacity-40"></span>
+                              </span>
+                          <?php endif; ?>
+                          <span class="<?php echo $inPantry ? 'font-medium' : ''; ?>"><?php echo e($ing); ?></span>
+                      </li>
                   <?php endforeach; ?>
               </ul>
+
+              <?php if (!empty($missingIngs)): ?>
+                  <form action="/shopping-list/add-from-recipe" method="POST" class="mt-4">
+                      <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                      <input type="hidden" name="recipe_id"    value="<?php echo (int)($recipe['db_id'] ?? 0); ?>">
+                      <input type="hidden" name="recipe_title" value="<?php echo e($recipe['title'] ?? ''); ?>">
+                      <?php foreach ($missingIngs as $mi): ?>
+                          <input type="hidden" name="ingredients[]" value="<?php echo e($mi); ?>">
+                      <?php endforeach; ?>
+                      <button type="submit" class="btn btn-cta btn-sm w-full mt-1">
+                          <svg class="w-4 h-4 mr-1.5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.5 7h13L17 13M9 21a1 1 0 100-2 1 1 0 000 2zm10 0a1 1 0 100-2 1 1 0 000 2z"/>
+                          </svg>
+                          Add <?php echo count($missingIngs); ?> missing to shopping list
+                      </button>
+                  </form>
+              <?php elseif ($hasPantry && empty($missingIngs)): ?>
+                  <p class="mt-4 text-xs text-green-600 font-medium">You have all the ingredients!</p>
+              <?php endif; ?>
           <?php else: ?>
               <p class="text-text-muted text-sm">Ingredients not listed.</p>
           <?php endif; ?>
