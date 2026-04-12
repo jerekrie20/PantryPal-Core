@@ -28,4 +28,9 @@ if ($env === 'production') {
 } else {
     ini_set('display_errors', '1');
     error_reporting(E_ALL);
+    // Dev-only: route all error_log() calls to a local file (Herd doesn't expose PHP's default log)
+    $__logDir = $__root . '/storage/logs';
+    if (!is_dir($__logDir)) { @mkdir($__logDir, 0755, true); }
+    ini_set('log_errors', '1');
+    ini_set('error_log', $__logDir . '/app.log');
 }
