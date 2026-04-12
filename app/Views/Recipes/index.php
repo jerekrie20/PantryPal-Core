@@ -10,7 +10,9 @@ if (!function_exists('e')) {
     function e($v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); }
 }
 
-$hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) || (getenv('SPOONACULAR_API_KEY') || (!empty($_ENV['SPOONACULAR_API_KEY'])));
+$hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY'])))
+       || (getenv('SPOONACULAR_API_KEY') || (!empty($_ENV['SPOONACULAR_API_KEY'])))
+       || (getenv('FATSECRET_CLIENT_ID') || (!empty($_ENV['FATSECRET_CLIENT_ID'])));
 ?>
 
 <?php
