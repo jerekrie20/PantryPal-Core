@@ -294,6 +294,14 @@ class Items
         return $stmt->execute();
     }
 
+    public function delete(int $id, int $userId): bool
+    {
+        $stmt = $this->db->prepare("DELETE FROM items WHERE id = :id AND user_id = :user_id");
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        return $stmt->execute();
+    }
+
     public function getExpirationStatus(?string $expirationDate): array
     {
         $status = 'In Stock';
