@@ -11,7 +11,12 @@ if ($env === 'production') {
     header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
     header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://production.suggestic.com; font-src 'self' data:; frame-ancestors 'none'");
 } else {
-    $vite = getenv('VITE_DEV_SERVER') ?: 'https://localhost:5173';
+    $vite = getenv('VITE_DEV_SERVER');
+    if (!$vite) {
+        $sslDir = APP_ROOT . '/ssl';
+        $protocol = (file_exists($sslDir . '/localhost+3-key.pem') && file_exists($sslDir . '/localhost+3.pem')) ? 'https' : 'http';
+        $vite = "{$protocol}://localhost:5173";
+    }
 
     // Derive the proper WS/WSS URL for HMR
     $p = parse_url($vite);

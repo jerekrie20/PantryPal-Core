@@ -1,5 +1,9 @@
 -- PantryPal Core: Initial schema (MySQL 8.0+)
 -- NOTE: This file is kept for reference only. Your canonical schema is app/Database/migrations/database.sql.
+
+CREATE DATABASE IF NOT EXISTS `pantrypal`;
+USE `pantrypal`;
+
 -- Prefer applying database.sql for fresh installs. Then, optionally run 20250923_prod_indexes.sql to add extra indexes.
 -- Safe to run multiple times (uses CREATE TABLE IF NOT EXISTS). Additional indexes are defined in separate migration files.
 

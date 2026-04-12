@@ -42,14 +42,24 @@ export default defineConfig(({ command, mode }) => {
             ]),
         ],
 
-        // Only configure the HTTPS dev server locally. This avoids reading SSL files in production.
+        // Only configure the HTTPS dev server locally if SSL files are available.
         server: isDev
             ? {
-                  https: {
-                      key: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost+3-key.pem')),
-                      cert: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost+3.pem')),
-                      ca: fs.readFileSync(path.resolve(__dirname, 'ssl/rootCA.crt')),
-                  },
+                  https: (function() {
+                      const keyPath = path.resolve(__dirname, 'ssl/localhost+3-key.pem');
+                      const certPath = path.resolve(__dirname, 'ssl/localhost+3.pem');
+                      const caPath = path.resolve(__dirname, 'ssl/rootCA.crt');
+
+                      if (fs.existsSync(keyPath) && fs.existsSync(certPath) && fs.existsSync(caPath)) {
+                          return {
+                              key: fs.readFileSync(keyPath),
+                              cert: fs.readFileSync(certPath),
+                              ca: fs.readFileSync(caPath),
+                          };
+                      }
+                      // Fallback to non-HTTPS if files are missing, or let Herd handle it
+                      return false;
+                  })(),
                   host: true,
                   port: Number(env.VITE_DEV_PORT || 5173),
                   hmr: {

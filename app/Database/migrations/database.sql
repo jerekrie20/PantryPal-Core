@@ -1,6 +1,9 @@
 -- 000_full_schema_with_sources.sql
 -- MySQL 8.0+ recommended
 
+CREATE DATABASE IF NOT EXISTS `pantrypal`;
+USE `pantrypal`;
+
 -- USERS (unchanged sample; keep yours if you already have it)
 CREATE TABLE IF NOT EXISTS `users`
 (

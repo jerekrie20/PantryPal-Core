@@ -3,7 +3,12 @@ namespace Helpers;
 
 class Vite {
     public static function tags(): string {
-        $devServer = getenv('VITE_DEV_SERVER') ?: 'https://localhost:5173';
+        $devServer = getenv('VITE_DEV_SERVER');
+        if (!$devServer) {
+            $sslDir = APP_ROOT . '/ssl';
+            $protocol = (file_exists($sslDir . '/localhost+3-key.pem') && file_exists($sslDir . '/localhost+3.pem')) ? 'https' : 'http';
+            $devServer = "{$protocol}://localhost:5173";
+        }
         $entry     = 'src/js/main.js';
         
         // Prefer public/dist for production assets, but be resilient if someone uploaded to /dist or Vite wrote manifest under .vite

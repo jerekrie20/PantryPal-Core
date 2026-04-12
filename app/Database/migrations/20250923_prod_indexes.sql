@@ -1,5 +1,8 @@
 -- PantryPal Core: Production index and constraint recommendations
 -- Use AFTER applying app/Database/migrations/database.sql (canonical schema).
+
+USE `pantrypal`;
+
 -- MySQL 8.0 (no IF NOT EXISTS for CREATE INDEX). Rerunning may error if indexes already exist; ignore such errors.
 
 -- Items: common list and counts
