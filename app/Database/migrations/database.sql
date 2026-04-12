@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `ingredients`
     `name`            VARCHAR(255) NOT NULL,
     `normalized_name` VARCHAR(255) NOT NULL,
     `brand`           VARCHAR(120)                           DEFAULT NULL,
-    `api_source`      ENUM('spoonacular','fdc','off')        DEFAULT NULL,
+    `api_source`      ENUM('fdc','off')                      DEFAULT NULL,
     `api_id`          BIGINT                                 DEFAULT NULL,
     `api_kind`        ENUM('ingredient','product','manual')  DEFAULT NULL,
     `image_url`       VARCHAR(255)                           DEFAULT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `products`
 (
     `id`             INT(11)      NOT NULL AUTO_INCREMENT,
     `ingredient_id`  INT(11)      NULL,
-    `api_source`     ENUM('spoonacular','fdc','off') DEFAULT NULL,
+    `api_source`     ENUM('fdc','off') DEFAULT NULL,
     `api_id`         BIGINT       NULL,
     `title`          VARCHAR(255) NOT NULL,
     `brand`          VARCHAR(120) NULL,
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS `recipes`
 (
     `id`          INT(11)      NOT NULL AUTO_INCREMENT,
     `user_id`     INT(11)               DEFAULT NULL, -- owner (when user-created), NULL for global cache
-    `api_source`  ENUM('spoonacular','fdc','off','manual','api_ninjas','suggestic') DEFAULT NULL,
+    `api_source`  ENUM('fdc','off','manual','fatsecret') DEFAULT NULL,
     `api_id`      VARCHAR(191)         DEFAULT NULL,
     `title`       VARCHAR(255) NOT NULL,
     `description` TEXT                  NULL,
@@ -135,6 +135,19 @@ CREATE TABLE IF NOT EXISTS `recipe_nutrition` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uniq_recipe` (`recipe_id`),
     CONSTRAINT `rn_fk_recipe` FOREIGN KEY (`recipe_id`) REFERENCES `recipes`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- FatSecret 24-hour response cache (ToS-compliant — no permanent nutritional storage).
+-- The reserved key __oauth_token__ is also stored here to cache Bearer tokens.
+CREATE TABLE IF NOT EXISTS `fatsecret_cache` (
+    `id`            INT(11)       NOT NULL AUTO_INCREMENT,
+    `cache_key`     VARCHAR(64)   NOT NULL COMMENT 'SHA-256 of endpoint+sorted-params',
+    `endpoint`      VARCHAR(120)  NOT NULL COMMENT 'API method, e.g. foods.search or __oauth_token__',
+    `response_json` MEDIUMTEXT    NOT NULL,
+    `created_at`    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uniq_cache_key` (`cache_key`),
+    KEY `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `recipe_ingredients`

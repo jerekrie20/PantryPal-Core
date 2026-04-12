@@ -369,7 +369,7 @@ class IngredientsController
                             if (count($list) < 6) {
                                 $needed = 6 - count($list);
                                 try {
-                                    $prov = new \Services\Recipes\SuggesticProvider();
+                                    $prov = new \Services\Recipes\FatSecretRecipesProvider();
                                     if ($prov->isConfigured()) {
                                         $apiResults = $prov->findByIngredients([$t], $needed);
                                         $seen = [];
@@ -380,7 +380,7 @@ class IngredientsController
                                         foreach ($apiResults as $r) {
                                             $k = strtolower(trim(($r['title'] ?? '').'|'.($r['image'] ?? '')));
                                             if ($k === '' || isset($seen[$k])) continue;
-                                            try { $id = $model->upsertFromProvider($r, null, ($r['provider'] ?? 'suggestic')); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                                            try { $id = $model->upsertFromProvider($r, null, 'fatsecret'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
                                             $list[] = $r; $seen[$k] = true;
                                             if (count($list) >= 6) break;
                                         }

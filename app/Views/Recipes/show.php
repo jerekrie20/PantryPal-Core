@@ -40,11 +40,9 @@ $img = (!empty($recipe['image']) && preg_match('#^https?://#i', $recipe['image']
         <input type="hidden" name="sourceUrl" value="<?php echo e($recipe['sourceUrl'] ?? ''); ?>" />
         <input type="hidden" name="payload" value='<?php echo e(json_encode($recipe)); ?>' />
         <?php 
-          $prov = 'spoonacular';
+          $prov = 'fatsecret';
           if (!empty($recipe['api_source'])) { $prov = (string)$recipe['api_source']; }
           elseif (!empty($recipe['provider'])) { $prov = (string)$recipe['provider']; }
-          elseif (!isset($recipe['id']) || !is_numeric($recipe['id'])) { $prov = 'suggestic'; }
-          elseif (empty($recipe['id'])) { $prov = 'api_ninjas'; }
         ?>
         <input type="hidden" name="provider" value="<?php echo e($prov); ?>" />
         <button type="submit" class="btn btn-cta btn-md">Save</button>

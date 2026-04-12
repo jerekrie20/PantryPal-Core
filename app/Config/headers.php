@@ -9,7 +9,7 @@ header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 if ($env === 'production') {
     // Enforce HTTPS long-term (enable only when HTTPS is fully configured site-wide)
     header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
-    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://production.suggestic.com; font-src 'self' data:; frame-ancestors 'none'");
+    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://platform.fatsecret.com https://oauth.fatsecret.com; font-src 'self' data:; frame-ancestors 'none'");
 } else {
     $vite = getenv('VITE_DEV_SERVER');
     if (!$vite) {
@@ -31,7 +31,7 @@ if ($env === 'production') {
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' {$vite}; " .
         "style-src 'self' 'unsafe-inline'; " .
         "img-src 'self' https: data:; " .
-        "connect-src 'self' {$vite} {$ws} https://production.suggestic.com; " .
+        "connect-src 'self' {$vite} {$ws} https://platform.fatsecret.com https://oauth.fatsecret.com; " .
         "font-src 'self' data:; " .
         "frame-ancestors 'none'"
     );

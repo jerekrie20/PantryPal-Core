@@ -19,9 +19,8 @@ class Recipes
     }
 
     /** Upsert a recipe based on provider identity. Returns recipe ID. */
-    public function upsertFromProvider(array $r, ?int $userId = null, string $source = 'spoonacular'): int
+    public function upsertFromProvider(array $r, ?int $userId = null, string $source = 'fatsecret'): int
     {
-        // Accept string IDs (e.g., Suggestic databaseId) or numeric IDs
         $apiId = null;
         if (isset($r['id'])) {
             $apiId = is_scalar($r['id']) ? (string)$r['id'] : null;
@@ -35,7 +34,7 @@ class Recipes
         $raw = json_encode($r, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
 
         // Normalize/allow source strings; permit null if unknown
-        $allowedSources = ['spoonacular','fdc','off','manual','api_ninjas','suggestic'];
+        $allowedSources = ['fdc','off','manual','fatsecret'];
         $src = in_array($source, $allowedSources, true) ? $source : null;
 
         // Try update existing by (api_source, api_id) when api_id is available and source is usable
@@ -389,16 +388,14 @@ class Recipes
         return array_map([$this, 'normalize'], $rows);
     }
 
-    /** Update an existing recipe row with detailed provider payload (e.g., Spoonacular information). */
-    public function updateFromProviderDetails(int $dbId, array $details, string $source = 'spoonacular'): bool
+    /** Update an existing recipe row with detailed provider payload. */
+    public function updateFromProviderDetails(int $dbId, array $details, string $source = 'fatsecret'): bool
     {
         if ($dbId <= 0) return false;
         // Extract a few common meta fields
         $title = isset($details['title']) ? (string)$details['title'] : (isset($details['name']) ? (string)$details['name'] : null);
         $image = isset($details['image']) && is_string($details['image']) ? $details['image'] : null;
-        $srcUrl = isset($details['sourceUrl']) && is_string($details['sourceUrl'])
-            ? $details['sourceUrl']
-            : (isset($details['spoonacularSourceUrl']) && is_string($details['spoonacularSourceUrl']) ? $details['spoonacularSourceUrl'] : null);
+        $srcUrl = isset($details['sourceUrl']) && is_string($details['sourceUrl']) ? $details['sourceUrl'] : null;
         $raw = json_encode($details, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
 
         $sql = "UPDATE recipes
@@ -465,8 +462,8 @@ class Recipes
             if (is_array($decoded)) $raw = $decoded;
         }
         $id = $raw['id'] ?? null;
-        if ($id === null && isset($row['api_source'], $row['api_id']) && $row['api_source'] === 'spoonacular' && is_numeric($row['api_id'])) {
-            $id = (int)$row['api_id'];
+        if ($id === null && !empty($row['api_id'])) {
+            $id = $row['api_id'];
         }
         $out = [
             'id' => $id,

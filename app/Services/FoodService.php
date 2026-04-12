@@ -5,6 +5,7 @@ use Models\Ingredients;
 use Models\Products;
 use Services\Providers\FdcProvider;
 use Services\Providers\OffProvider;
+use Services\Providers\FatSecretProvider;
 
 class FoodService
 {
@@ -13,11 +14,13 @@ class FoodService
         protected ?FoodProvider $off = null,
         protected ?Ingredients $ingredients = null,
         protected ?Products $products = null,
+        protected ?FatSecretProvider $fatSecret = null,
     ) {
-        $this->fdc = $fdc ?? new FdcProvider();
-        $this->off = $off ?? new OffProvider();
+        $this->fdc       = $fdc       ?? new FdcProvider();
+        $this->off       = $off       ?? new OffProvider();
         $this->ingredients = $ingredients ?? new Ingredients();
-        $this->products    = $products ?? new Products();
+        $this->products    = $products    ?? new Products();
+        $this->fatSecret   = $fatSecret   ?? new FatSecretProvider();
     }
 
     /** Same signature/shape you used before. */
@@ -30,7 +33,34 @@ class FoodService
         if ($apiKind === 'ingredient') {
             return $this->fdc->searchIngredients($query, $limit);
         }
+        if ($apiKind === 'fatsecret') {
+            return $this->searchWithFatSecret($query, $limit);
+        }
         return [];
+    }
+
+    /**
+     * Search FatSecret foods (cache-first, never permanently stored).
+     * Returns the same shape as FDC/OFF search results.
+     */
+    public function searchWithFatSecret(string $query, int $limit = 5): array
+    {
+        if (!$this->fatSecret->isConfigured()) {
+            return [];
+        }
+        return $this->fatSecret->searchFoods($query, $limit);
+    }
+
+    /**
+     * Fetch full FatSecret food detail by food_id (cache-first, never permanently stored).
+     * Returns the raw decoded API response; callers must not write this to permanent tables.
+     */
+    public function getFatSecretFood(int|string $foodId): ?array
+    {
+        if (!$this->fatSecret->isConfigured()) {
+            return null;
+        }
+        return $this->fatSecret->getFood($foodId);
     }
 
     /** Save ingredient from provider detail (FDC). */

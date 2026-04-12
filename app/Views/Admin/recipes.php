@@ -19,7 +19,7 @@ require VIEW_PATH . '/Admin/partials/nav.php';
     </div>
     <div>
       <label class="block text-xs text-text-muted mb-1">Source</label>
-      <?php $src = (string)($filters['source'] ?? ''); $opts = ['', 'manual','spoonacular','fdc','off','api_ninjas','suggestic']; ?>
+      <?php $src = (string)($filters['source'] ?? ''); $opts = ['', 'manual','fdc','off','fatsecret']; ?>
       <select class="input" name="source">
         <?php foreach ($opts as $opt): $label = $opt === '' ? '— any —' : ucwords(str_replace('_',' ', $opt)); ?>
           <option value="<?php echo htmlspecialchars($opt); ?>" <?php echo $src === $opt ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>

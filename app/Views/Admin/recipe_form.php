@@ -32,7 +32,7 @@ require VIEW_PATH . '/Admin/partials/nav.php';
             <?php $src = $input['api_source'] ?? ''; ?>
             <select class="input w-full" name="api_source">
                 <option value="" <?php echo $src === '' ? 'selected' : ''; ?>>— none —</option>
-                <?php foreach (['manual','spoonacular','fdc','off','api_ninjas','suggestic'] as $opt): ?>
+                <?php foreach (['manual','fdc','off','fatsecret'] as $opt): ?>
                     <option value="<?php echo htmlspecialchars($opt); ?>" <?php echo $src === $opt ? 'selected' : ''; ?>><?php echo htmlspecialchars(ucwords(str_replace('_',' ', $opt))); ?></option>
                 <?php endforeach; ?>
             </select>

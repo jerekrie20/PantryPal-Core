@@ -7,14 +7,11 @@ use Models\Items;
 use Models\Ingredients;
 use Models\Products;
 use Models\Recipes;
-use Services\Recipes\SpoonacularProvider;
-use Services\Recipes\SuggesticProvider;
-use Services\Recipes\RecipesProvider;
+use Services\Recipes\FatSecretRecipesProvider;
 
 class RecipesController
 {
-    private RecipesProvider $provider; // default provider (now API Ninjas)
-    private ?SpoonacularProvider $spoon = null; // optional fallback
+    private ?FatSecretRecipesProvider $provider = null;
     private Items $items;
     private Ingredients $ingredients;
     private Products $products;
@@ -22,11 +19,8 @@ class RecipesController
 
     public function __construct()
     {
-        // Use Suggestic as the default provider
-        $this->provider = new SuggesticProvider();
-        // Temporarily disable Spoonacular completely to avoid quota/limit errors.
-        // Leave the property in place but set to null so guarded calls are no-ops.
-        $this->spoon = null;
+        $fs = new FatSecretRecipesProvider();
+        $this->provider = $fs->isConfigured() ? $fs : null;
         $this->items = new Items();
         $this->ingredients = new Ingredients();
         $this->products = new Products();
@@ -79,57 +73,11 @@ class RecipesController
             if ($pantryMode !== 'any' && $pantryMode !== 'all') { $pantryMode = 'all'; }
             $requireAll = ($pantryMode === 'all');
 
-            // Determine source label for the active provider
-            $srcName = ($this->provider instanceof SuggesticProvider) ? 'suggestic' : 'spoonacular';
-
             if ($browse) {
+                // Browse mode not supported by FatSecret free tier
                 $mode = 'browse_api';
-                $total = 0;
-                $results = [];
-                $didApi = false;
-                if (method_exists($this->provider, 'browseAll') && $this->provider->isConfigured()) {
-                    $resp = $this->provider->browseAll($filters, $page, $perPage);
-                    $results = $resp['results'] ?? [];
-                    $total = (int)($resp['total'] ?? 0);
-                    $didApi = true;
-                }
-                // Fallback to Spoonacular browse if available
-                if (!$didApi && $this->spoon && method_exists($this->spoon, 'browseAll') && $this->spoon->isConfigured()) {
-                    $resp = $this->spoon->browseAll($filters, $page, $perPage);
-                    $results = $resp['results'] ?? [];
-                    $total = (int)($resp['total'] ?? 0);
-                    $didApi = true;
-                }
-                if (!$didApi) {
-                    $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
-                }
-                $recipes = [];
-                foreach ($results as $r) {
-                    try {
-                        $src = isset($r['id']) && $r['id'] ? 'spoonacular' : 'suggestic';
-                        $id = $this->recipes->upsertFromProvider($r, null, $src);
-                        $r['db_id'] = $id;
-                    } catch (\Throwable $e) { /* ignore */ }
-                    $recipes[] = $r;
-                }
-                // Build pagination if total provided (>0)
-                if ($total > 0) {
-                    $totalPages = (int)max(1, ceil($total / $perPage));
-                    $pagination = [
-                        'currentPage' => $page,
-                        'perPage' => $perPage,
-                        'total' => $total,
-                        'totalPages' => $totalPages,
-                    ];
-                } else {
-                    // Unknown total: still provide basic page/perPage
-                    $pagination = [
-                        'currentPage' => $page,
-                        'perPage' => $perPage,
-                        'total' => null,
-                        'totalPages' => null,
-                    ];
-                }
+                $error = 'Browse mode is not available. Use the search box to find recipes.';
+                $pagination = ['currentPage' => $page, 'perPage' => $perPage, 'total' => null, 'totalPages' => null];
             } elseif (!empty($selectedPantry)) {
                 // Use selected pantry items (subset) to search DB and top up with API
                 $mode = 'search';
@@ -153,7 +101,7 @@ class RecipesController
                 }
                 // When UGC-only, do not top up from API — show only user-created recipes
                 if (!$ugcOnly) {
-                    if (count($recipes) < $perPage && $this->provider->isConfigured()) {
+                    if (count($recipes) < $perPage && $this->provider) {
                         $needed = $perPage - count($recipes);
                         $apiResults = $this->provider->findByIngredients($selectedPantry, $needed);
                         // Post-filter for AND mode so that all selected terms appear in title or ingredients list
@@ -171,36 +119,13 @@ class RecipesController
                             }));
                         }
                         foreach ($apiResults as $r) {
-                            try { $id = $this->recipes->upsertFromProvider($r, null, $srcName); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                            try { $id = $this->recipes->upsertFromProvider($r, null, 'fatsecret'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
                             $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
                             if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
                         }
                     }
-                    // Spoonacular fallback if enabled later
-                    if (count($recipes) < $perPage && $this->spoon && $this->spoon->isConfigured()) {
-                        $needed = $perPage - count($recipes);
-                        $apiResults = $this->spoon->findByIngredients($selectedPantry, $needed);
-                        if ($requireAll) {
-                            $apiResults = array_values(array_filter($apiResults, function($r) use ($selectedPantry){
-                                $hay = strtolower((string)($r['title'] ?? ''));
-                                if (!empty($r['ingredients_list']) && is_array($r['ingredients_list'])) {
-                                    $hay .= ' ' . strtolower(implode(' ', $r['ingredients_list']));
-                                }
-                                foreach ($selectedPantry as $t) {
-                                    if ($t === '') continue;
-                                    if (strpos($hay, strtolower($t)) === false) return false;
-                                }
-                                return true;
-                            }));
-                        }
-                        foreach ($apiResults as $r) {
-                            try { $id = $this->recipes->upsertFromProvider($r, null, 'spoonacular'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                            $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
-                            if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
-                        }
-                    }
-                    if ($total === 0 && !$this->provider->isConfigured() && !($this->spoon && $this->spoon->isConfigured())) {
-                        $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
+                    if ($total === 0 && !$this->provider) {
+                        $error = 'No live recipe API configured. Set FATSECRET_CLIENT_ID and FATSECRET_CLIENT_SECRET in .env to enable live results.';
                     }
                 }
             } elseif ($q === '') {
@@ -208,61 +133,23 @@ class RecipesController
                 $recipes = $this->recipes->getSavedForUser((int)$userId, 24);
             } else {
                 if ($forceApi) {
-                    $didApi = false;
-                    if ($this->provider->isConfigured()) {
-                        // Use provider-paged search to get exactly the requested page and know if there is a next page
-                        if (method_exists($this->provider, 'searchPaged')) {
-                            $resp = $this->provider->searchPaged($q, $page, $perPage);
-                            $apiResults = $resp['results'] ?? [];
-                            $hasNext = (bool)($resp['hasNext'] ?? false);
-                        } else {
-                            // Fallback to single page (no cursor) — behaves like page 1 only
-                            $apiResults = $this->provider->searchByQuery($q, $perPage);
-                            $hasNext = false;
-                        }
+                    if ($this->provider) {
+                        $apiResults = $this->provider->searchByQuery($q, $perPage);
                         $recipes = [];
                         foreach ($apiResults as $r) {
-                            try { $id = $this->recipes->upsertFromProvider($r, null, $srcName); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                            try { $id = $this->recipes->upsertFromProvider($r, null, 'fatsecret'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
                             $recipes[] = $r;
                         }
                         $mode = 'search_api';
-                        $didApi = true;
-                        // Provide pagination with unknown total but with hasNext hint
-                        $pagination = [
-                            'currentPage' => $page,
-                            'perPage' => $perPage,
-                            'total' => null,
-                            'totalPages' => $hasNext ? null : $page, // if no next page, cap at current
-                            'hasNext' => $hasNext,
-                        ];
-                    }
-                    // Fallback to Spoonacular forced search
-                    if (!$didApi && $this->spoon && $this->spoon->isConfigured()) {
-                        $apiResults = $this->spoon->searchByQuery($q, $perPage);
-                        $recipes = [];
-                        foreach ($apiResults as $r) {
-                            try { $id = $this->recipes->upsertFromProvider($r, null, 'spoonacular'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                            $recipes[] = $r;
-                        }
-                        $mode = 'search_api';
-                        $didApi = true;
-                        $pagination = [
-                            'currentPage' => $page,
-                            'perPage' => $perPage,
-                            'total' => null,
-                            'totalPages' => null,
-                        ];
-                    }
-                    if (!$didApi) {
-                        $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
-                        // fall back to local
+                        $pagination = ['currentPage' => $page, 'perPage' => $perPage, 'total' => null, 'totalPages' => null];
+                    } else {
+                        $error = 'No live recipe API configured. Set FATSECRET_CLIENT_ID and FATSECRET_CLIENT_SECRET in .env to enable live results.';
                         $recipes = $this->recipes->searchLocalByQuery($q, $perPage);
                         $mode = 'search';
                     }
                 } else {
                     // Local-first search
                     if ($ugcOnly) {
-                        // Only user-generated recipes
                         $recipes = $this->recipes->searchLocalUserByQuery($q, $perPage);
                         $mode = 'search';
                     } else {
@@ -272,29 +159,17 @@ class RecipesController
                             $dbid = $r['db_id'] ?? null; $k = $dbid ? ('db:' . $dbid) : ('title:' . ($r['title'] ?? ''));
                             $seen[$k] = true;
                         }
-                        if (count($recipes) < $perPage) {
+                        if (count($recipes) < $perPage && $this->provider) {
                             $needed = $perPage - count($recipes);
-                            if ($this->provider->isConfigured()) {
-                                $apiResults = $this->provider->searchByQuery($q, $needed);
-                                foreach ($apiResults as $r) {
-                                    try { $id = $this->recipes->upsertFromProvider($r, null, $srcName); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                                    $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
-                                    if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
-                                }
-                            }
-                            // Fallback to Spoonacular if still underfilled
-                            if (count($recipes) < $perPage && $this->spoon && $this->spoon->isConfigured()) {
-                                $needed = $perPage - count($recipes);
-                                $apiResults = $this->spoon->searchByQuery($q, $needed);
-                                foreach ($apiResults as $r) {
-                                    try { $id = $this->recipes->upsertFromProvider($r, null, 'spoonacular'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                                    $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
-                                    if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
-                                }
+                            $apiResults = $this->provider->searchByQuery($q, $needed);
+                            foreach ($apiResults as $r) {
+                                try { $id = $this->recipes->upsertFromProvider($r, null, 'fatsecret'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                                $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
+                                if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
                             }
                         }
-                        if (empty($recipes) && !$this->provider->isConfigured() && !($this->spoon && $this->spoon->isConfigured())) {
-                            $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
+                        if (empty($recipes) && !$this->provider) {
+                            $error = 'No live recipe API configured. Set FATSECRET_CLIENT_ID and FATSECRET_CLIENT_SECRET in .env to enable live results.';
                         }
                         $mode = 'search';
                     }
@@ -333,13 +208,11 @@ class RecipesController
             $names = $this->collectPantryNames($userId);
             $recipes = [];
             $pagination = null;
-            // Determine source label for the active provider
-            $srcName = ($this->provider instanceof SuggesticProvider) ? 'suggestic' : 'spoonacular';
             $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
             $perPage = isset($_GET['perPage']) ? max(1, min(30, (int)$_GET['perPage'])) : 12;
             if (!$names) {
                 $error = 'Your pantry looks empty. Add some items to get recipe suggestions.';
-            } elseif (!$this->provider->isConfigured() && !($this->spoon && $this->spoon->isConfigured())) {
+            } elseif (!$this->provider) {
                 // No live API: paginate local only
                 $local = $this->recipes->findByIngredientsLocalPaged($names, $page, $perPage);
                 $recipes = $local['results'];
@@ -351,7 +224,7 @@ class RecipesController
                     'totalPages' => (int)max(1, ($total ? ceil($total / $perPage) : 1)),
                 ];
                 if ($total === 0) {
-                    $error = 'No live recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.';
+                    $error = 'No live recipe API configured. Set FATSECRET_CLIENT_ID and FATSECRET_CLIENT_SECRET in .env to enable live results.';
                 }
             } else {
                 // Local-first with pagination
@@ -369,21 +242,11 @@ class RecipesController
                     $dbid = $r['db_id'] ?? null; $k = $dbid ? ('db:' . $dbid) : ('title:' . ($r['title'] ?? ''));
                     $seen[$k] = true;
                 }
-                if (count($recipes) < $perPage && $this->provider->isConfigured()) {
+                if (count($recipes) < $perPage && $this->provider) {
                     $needed = $perPage - count($recipes);
                     $apiResults = $this->provider->findByIngredients($names, $needed);
                     foreach ($apiResults as $r) {
-                        try { $id = $this->recipes->upsertFromProvider($r, null, $srcName); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                        $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
-                        if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
-                    }
-                }
-                // Spoonacular fallback disabled globally, keep guard in case enabled later
-                if (count($recipes) < $perPage && $this->spoon && $this->spoon->isConfigured()) {
-                    $needed = $perPage - count($recipes);
-                    $apiResults = $this->spoon->findByIngredients($names, $needed);
-                    foreach ($apiResults as $r) {
-                        try { $id = $this->recipes->upsertFromProvider($r, null, 'spoonacular'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                        try { $id = $this->recipes->upsertFromProvider($r, null, 'fatsecret'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
                         $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
                         if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
                     }
@@ -432,13 +295,13 @@ class RecipesController
                 http_response_code(422);
                 return View::render('Pages/500', ['title' => 'Invalid recipe data']);
             }
-            // Infer provider
-            $src = 'spoonacular';
+            // Infer provider from hint; default to fatsecret for API-sourced recipes
+            $src = 'fatsecret';
             if ($provider) {
                 $p = strtolower((string)$provider);
-                if (str_contains($p, 'suggestic')) $src = 'suggestic';
-            } else {
-                if (!isset($data['id'])) $src = 'suggestic';
+                if (str_contains($p, 'manual')) $src = 'manual';
+                elseif (str_contains($p, 'fdc')) $src = 'fdc';
+                elseif (str_contains($p, 'off')) $src = 'off';
             }
 
             $recipeId = $this->recipes->upsertFromProvider($data, null, $src);
@@ -506,45 +369,31 @@ class RecipesController
             $isSaved = $this->recipes->isSaved((int)$row['id'], (int)$userId);
             $normalized = $this->normalizeForShow($row);
 
-            // If ingredients or steps are missing, and it's a Spoonacular-backed recipe with an API id,
-            // try fetching detailed information now and update the cache, then re-normalize.
-            $needsDetails = (empty($normalized['ingredients']) || empty($normalized['steps']));
-            if ($needsDetails && ($row['api_source'] ?? null) === 'spoonacular' && !empty($row['api_id'])) {
-                if ($this->spoon && $this->spoon->isConfigured()) {
-                    try {
-                        $details = $this->spoon->getRecipeInformation((int)$row['api_id']);
-                        if (!empty($details)) {
-                            $this->recipes->updateFromProviderDetails((int)$row['id'], $details, 'spoonacular');
-                            // Re-fetch and re-normalize to reflect new data
+            // FatSecret: fetch detail from cache (never store raw_payload permanently — ToS compliance)
+            $needsAny = (empty($normalized['ingredients']) || empty($normalized['steps']));
+            if ($needsAny && (($row['api_source'] ?? null) === 'fatsecret') && isset($row['api_id']) && $this->provider) {
+                try {
+                    $details = $this->provider->getRecipeById((string)$row['api_id']);
+                    if (!empty($details)) {
+                        // Update only title/image/sourceUrl — intentionally omit raw_payload
+                        $safeUpdate = array_intersect_key($details, array_flip(['title', 'image', 'sourceUrl', 'ingredients_list', 'instructions_list']));
+                        if (!empty($safeUpdate)) {
+                            $this->recipes->updateFromProviderDetails((int)$row['id'], $safeUpdate, 'fatsecret');
                             $row = $this->recipes->findById($id);
                             if ($row) {
                                 $normalized = $this->normalizeForShow($row);
                             }
                         }
-                    } catch (\Throwable $e) {
-                        error_log('RecipesController::show detail fetch error: ' . $e->getMessage());
-                    }
-                }
-            }
-
-            // If any core fields are missing and this is a Suggestic recipe, try to fetch details now
-            $needsAny = (empty($normalized['ingredients']) || empty($normalized['steps']) || empty($normalized['nutrition_per_serving']));
-
-            if ($needsAny && (($row['api_source'] ?? null) === 'suggestic') && isset($row['api_id'])) {
-                if (method_exists($this->provider, 'getRecipeById') && $this->provider->isConfigured()) {
-                    try {
-                        $details = $this->provider->getRecipeById((string)$row['api_id']);
-                        if (!empty($details)) {
-                            // persist raw for future loads (also persists nutrition if present)
-                            $this->recipes->updateFromProviderDetails((int)$row['id'], $details, 'suggestic');
-                            $row = $this->recipes->findById($id);
-                            if ($row) {
-                                $normalized = $this->normalizeForShow($row);
-                            }
+                        // Surface detail fields directly for the view even if not re-persisted
+                        if (empty($normalized['ingredients']) && !empty($details['ingredients_list'])) {
+                            $normalized['ingredients'] = $details['ingredients_list'];
                         }
-                    } catch (\Throwable $e) {
-                        error_log('RecipesController::show suggestic fetch error: ' . $e->getMessage());
+                        if (empty($normalized['steps']) && !empty($details['instructions_list'])) {
+                            $normalized['steps'] = $details['instructions_list'];
+                        }
                     }
+                } catch (\Throwable $e) {
+                    error_log('RecipesController::show fatsecret fetch error: ' . $e->getMessage());
                 }
             }
 

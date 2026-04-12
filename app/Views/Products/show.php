@@ -407,10 +407,9 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                                                 <input type="hidden" name="sourceUrl" value="<?php echo e($r['sourceUrl'] ?? ''); ?>" />
                                                 <input type="hidden" name="payload" value='<?php echo e(json_encode($r)); ?>' />
                                                 <?php 
-                                                    $prov = 'spoonacular';
+                                                    $prov = 'fatsecret';
                                                     if (!empty($r['provider'])) { $prov = (string)$r['provider']; }
                                                     elseif (!empty($r['api_source'])) { $prov = (string)$r['api_source']; }
-                                                    elseif (!isset($r['id']) || !is_numeric($r['id'])) { $prov = 'suggestic'; }
                                                 ?>
                                                 <input type="hidden" name="provider" value="<?php echo e($prov); ?>" />
                                                 <button type="submit" class="btn btn-secondary btn-xs">Save</button>
