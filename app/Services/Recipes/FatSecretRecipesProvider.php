@@ -4,16 +4,16 @@ namespace Services\Recipes;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
-use Models\FatSecretCache;
+use Helpers\Cache;
 
 /**
  * FatSecret recipe search and retrieval.
  * Implements RecipesProvider so it plugs directly into RecipesController.
  *
  * ToS compliance:
- *   Full JSON is stored only in fatsecret_cache (24-hour TTL).
+ *   Full JSON is cached in Redis (24-hour TTL only).
  *   Only recipe_id (api_id) is written permanently to the recipes table.
- *   raw_payload is intentionally left NULL for FatSecret rows.
+ *   raw_payload is intentionally NULL for FatSecret rows.
  *
  * Auth: OAuth 2.0 client_credentials (shared with FatSecretProvider).
  *   Env vars: FATSECRET_CLIENT_ID, FATSECRET_CLIENT_SECRET
@@ -22,24 +22,21 @@ class FatSecretRecipesProvider implements RecipesProvider
 {
     private const TOKEN_URL       = 'https://oauth.fatsecret.com/connect/token';
     private const API_BASE        = 'https://platform.fatsecret.com/rest/';
-    private const TOKEN_CACHE_KEY = '__fatsecret_oauth_token__';
-    private const TOKEN_ENDPOINT  = '__oauth_token__';
+    private const TOKEN_CACHE_KEY = 'fatsecret:__oauth_token__';
+    private const CACHE_TTL       = 86400; // 24 hours
 
     private string $clientId;
     private string $clientSecret;
     private Client $http;
-    private FatSecretCache $cache;
 
     public function __construct(
         ?string $clientId     = null,
         ?string $clientSecret = null,
-        ?Client $http         = null,
-        ?FatSecretCache $cache = null
+        ?Client $http         = null
     ) {
         $this->clientId     = $clientId     ?? ($_ENV['FATSECRET_CLIENT_ID']     ?? '');
         $this->clientSecret = $clientSecret ?? ($_ENV['FATSECRET_CLIENT_SECRET'] ?? '');
-        $this->http  = $http  ?? new Client(['timeout' => 8.0]);
-        $this->cache = $cache ?? new FatSecretCache();
+        $this->http = $http ?? new Client(['timeout' => 8.0]);
     }
 
     public function isConfigured(): bool
@@ -52,7 +49,7 @@ class FatSecretRecipesProvider implements RecipesProvider
     // -------------------------------------------------------------------------
 
     /**
-     * Search recipes by text query via recipes.search v3.
+     * Search recipes by text query via recipes/search/v3.
      */
     public function searchByQuery(string $query, int $number = 12): array
     {
@@ -60,12 +57,11 @@ class FatSecretRecipesProvider implements RecipesProvider
             return [];
         }
         $params = [
-            'method'       => 'recipes.search.v3',
             'search_expression' => $query,
-            'max_results'  => max(1, min(50, $number)),
-            'format'       => 'json',
+            'max_results'       => max(1, min(50, $number)),
+            'format'            => 'json',
         ];
-        $data = $this->cachedCall('recipes.search.v3', $params);
+        $data = $this->cachedCall('recipes.search.v3', self::API_BASE . 'recipes/search/v3', $params);
         return $this->normalizeSearchResults($data);
     }
 
@@ -85,12 +81,13 @@ class FatSecretRecipesProvider implements RecipesProvider
     }
 
     // -------------------------------------------------------------------------
-    // Extended method (mirrors SuggesticProvider pattern used in RecipesController)
+    // Extended method
     // -------------------------------------------------------------------------
 
     /**
-     * Fetch full recipe detail via recipe.get v2.
-     * Returns the raw (normalized) recipe array from cache; caller must not store raw_payload.
+     * Fetch full recipe detail via recipe/v2.
+     * Returns normalized recipe array including nutrition_per_serving (from Redis cache).
+     * Caller must not store raw_payload.
      */
     public function getRecipeById(string $id): ?array
     {
@@ -98,11 +95,10 @@ class FatSecretRecipesProvider implements RecipesProvider
             return null;
         }
         $params = [
-            'method'    => 'recipe.get.v2',
             'recipe_id' => $id,
             'format'    => 'json',
         ];
-        $data = $this->cachedCall('recipe.get.v2', $params);
+        $data = $this->cachedCall('recipe.get.v2', self::API_BASE . 'recipe/v2', $params);
         if (!$data) {
             return null;
         }
@@ -117,43 +113,61 @@ class FatSecretRecipesProvider implements RecipesProvider
     // Internal helpers
     // -------------------------------------------------------------------------
 
-    private function cachedCall(string $endpoint, array $params): ?array
+    private function cacheKey(string $endpoint, array $params): string
     {
-        $key = $this->cache->makeKey($endpoint, $params);
-        $hit = $this->cache->get($key);
-        if ($hit !== null) {
+        ksort($params);
+        return 'fatsecret:' . hash('sha256', $endpoint . json_encode($params));
+    }
+
+    /**
+     * Check Redis → on miss call the API → cache result → return decoded data.
+     */
+    private function cachedCall(string $endpoint, string $url, array $params): ?array
+    {
+        $key = $this->cacheKey($endpoint, $params);
+        $hit = Cache::get($key);
+        if (is_array($hit)) {
             return $hit;
         }
-        $data = $this->callApi($params);
+        $data = $this->callApi($url, $params);
         if ($data !== null) {
-            $this->cache->set($key, $endpoint, $data);
+            Cache::set($key, $data, self::CACHE_TTL);
         }
         return $data;
     }
 
-    private function callApi(array $params): ?array
+    private function callApi(string $url, array $params): ?array
     {
         $token = $this->getBearerToken();
         if ($token === null) {
             return null;
         }
         try {
-            $resp = $this->http->post(self::API_BASE . 'server.api', [
-                'headers'     => ['Authorization' => 'Bearer ' . $token],
-                'form_params' => $params,
+            $resp = $this->http->get($url, [
+                'headers' => ['Authorization' => 'Bearer ' . $token],
+                'query'   => $params,
             ]);
-            $decoded = json_decode((string)$resp->getBody(), true);
-            return is_array($decoded) ? $decoded : null;
+            $body    = (string)$resp->getBody();
+            $decoded = json_decode($body, true);
+            if (!is_array($decoded)) {
+                error_log('FatSecretRecipesProvider: non-JSON response url=' . $url . ' body=' . substr($body, 0, 500));
+                return null;
+            }
+            if (isset($decoded['error'])) {
+                error_log('FatSecretRecipesProvider API error: ' . json_encode($decoded['error']));
+                return null;
+            }
+            return $decoded;
         } catch (GuzzleException $e) {
-            error_log('FatSecretRecipesProvider API error: ' . $e->getMessage());
+            error_log('FatSecretRecipesProvider HTTP error: ' . $e->getMessage());
             return null;
         }
     }
 
     private function getBearerToken(): ?string
     {
-        $cached = $this->cache->get(self::TOKEN_CACHE_KEY);
-        if ($cached !== null && isset($cached['access_token'], $cached['expires_at'])) {
+        $cached = Cache::get(self::TOKEN_CACHE_KEY);
+        if (is_array($cached) && isset($cached['access_token'], $cached['expires_at'])) {
             if ($cached['expires_at'] > time() + 60) {
                 return (string)$cached['access_token'];
             }
@@ -177,7 +191,7 @@ class FatSecretRecipesProvider implements RecipesProvider
                 'access_token' => $data['access_token'],
                 'expires_at'   => time() + $expiresIn,
             ];
-            $this->cache->set(self::TOKEN_CACHE_KEY, self::TOKEN_ENDPOINT, $payload);
+            Cache::set(self::TOKEN_CACHE_KEY, $payload, max(60, $expiresIn - 60));
             return (string)$data['access_token'];
         } catch (GuzzleException $e) {
             error_log('FatSecretRecipesProvider token fetch error: ' . $e->getMessage());
@@ -202,13 +216,13 @@ class FatSecretRecipesProvider implements RecipesProvider
         $out = [];
         foreach ($recipes as $r) {
             $out[] = [
-                'id'               => (string)($r['recipe_id'] ?? ''),
-                'title'            => (string)($r['recipe_name'] ?? ''),
-                'image'            => isset($r['recipe_image']) && $r['recipe_image'] !== '' ? (string)$r['recipe_image'] : null,
-                'sourceUrl'        => isset($r['recipe_url']) && $r['recipe_url'] !== '' ? (string)$r['recipe_url'] : null,
-                'usedIngredients'  => [],
-                'missedIngredients'=> [],
-                'source'           => 'fatsecret',
+                'id'                => (string)($r['recipe_id'] ?? ''),
+                'title'             => (string)($r['recipe_name'] ?? ''),
+                'image'             => isset($r['recipe_image']) && $r['recipe_image'] !== '' ? (string)$r['recipe_image'] : null,
+                'sourceUrl'         => isset($r['recipe_url']) && $r['recipe_url'] !== '' ? (string)$r['recipe_url'] : null,
+                'usedIngredients'   => [],
+                'missedIngredients' => [],
+                'source'            => 'fatsecret',
             ];
         }
         return $out;
@@ -243,16 +257,63 @@ class FatSecretRecipesProvider implements RecipesProvider
             }
         }
 
+        // Nutrition per serving from serving_sizes.serving
+        $nutrition = $this->normalizeNutrition($r['serving_sizes']['serving'] ?? null);
+
         return [
-            'id'               => (string)($r['recipe_id'] ?? ''),
-            'title'            => (string)($r['recipe_name'] ?? ''),
-            'image'            => isset($r['recipe_image']) && $r['recipe_image'] !== '' ? (string)$r['recipe_image'] : null,
-            'sourceUrl'        => isset($r['recipe_url']) && $r['recipe_url'] !== '' ? (string)$r['recipe_url'] : null,
-            'usedIngredients'  => [],
-            'missedIngredients'=> [],
-            'ingredients_list' => $ingredientLines,
-            'instructions_list'=> $steps,
-            'source'           => 'fatsecret',
+            'id'                  => (string)($r['recipe_id'] ?? ''),
+            'title'               => (string)($r['recipe_name'] ?? ''),
+            'image'               => isset($r['recipe_image']) && $r['recipe_image'] !== '' ? (string)$r['recipe_image'] : null,
+            'sourceUrl'           => isset($r['recipe_url']) && $r['recipe_url'] !== '' ? (string)$r['recipe_url'] : null,
+            'usedIngredients'     => [],
+            'missedIngredients'   => [],
+            'ingredients_list'    => $ingredientLines,
+            'instructions_list'   => $steps,
+            'nutrition_per_serving' => $nutrition,
+            'source'              => 'fatsecret',
         ];
+    }
+
+    /**
+     * Convert a FatSecret serving_sizes.serving object into the nutrition_per_serving
+     * format expected by the Recipes/show.php view:
+     *   [ 'Calories' => ['amount' => 350.0, 'unit' => 'kcal'], ... ]
+     */
+    private function normalizeNutrition(?array $s): array
+    {
+        if (empty($s)) {
+            return [];
+        }
+
+        $map = [
+            'calories'            => ['Calories',        'kcal'],
+            'protein'             => ['Protein',          'g'],
+            'carbohydrate'        => ['Carbohydrates',    'g'],
+            'fat'                 => ['Fat',              'g'],
+            'saturated_fat'       => ['Saturated Fat',    'g'],
+            'polyunsaturated_fat' => ['Polyunsaturated Fat', 'g'],
+            'monounsaturated_fat' => ['Monounsaturated Fat', 'g'],
+            'trans_fat'           => ['Trans Fat',        'g'],
+            'fiber'               => ['Fiber',            'g'],
+            'sugar'               => ['Sugar',            'g'],
+            'sodium'              => ['Sodium',           'mg'],
+            'potassium'           => ['Potassium',        'mg'],
+            'cholesterol'         => ['Cholesterol',      'mg'],
+            'calcium'             => ['Calcium',          'mg'],
+            'iron'                => ['Iron',             'mg'],
+            'vitamin_a'           => ['Vitamin A',        'IU'],
+            'vitamin_c'           => ['Vitamin C',        'mg'],
+        ];
+
+        $out = [];
+        foreach ($map as $key => [$label, $unit]) {
+            if (isset($s[$key]) && $s[$key] !== '' && $s[$key] !== null) {
+                $amount = (float)$s[$key];
+                if ($amount > 0 || $key === 'calories') {
+                    $out[$label] = ['amount' => $amount, 'unit' => $unit];
+                }
+            }
+        }
+        return $out;
     }
 }

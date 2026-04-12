@@ -7,6 +7,8 @@ use Models\Items;
 use Models\Ingredients;
 use Models\Products;
 use Models\Recipes;
+use Policies\RecipePolicy;
+use Services\ImageService;
 use Services\Recipes\FatSecretRecipesProvider;
 
 class RecipesController
@@ -129,8 +131,22 @@ class RecipesController
                     }
                 }
             } elseif ($q === '') {
-                // Default: show user's saved recipes from DB
-                $recipes = $this->recipes->getSavedForUser((int)$userId, 24);
+                if ($ugcOnly) {
+                    // My Recipes: show ONLY this user's manually-created recipes
+                    $local = $this->recipes->findByCurrentUser((int)$userId, $page, $perPage);
+                    $recipes = $local['results'] ?? [];
+                    $total   = (int)($local['total'] ?? 0);
+                    $pagination = [
+                        'currentPage' => $page,
+                        'perPage'     => $perPage,
+                        'total'       => $total,
+                        'totalPages'  => (int)max(1, $total ? ceil($total / $perPage) : 1),
+                    ];
+                    $mode = 'ugc';
+                } else {
+                    // Default: show user's saved/bookmarked recipes
+                    $recipes = $this->recipes->getSavedForUser((int)$userId, 24);
+                }
             } else {
                 if ($forceApi) {
                     if ($this->provider) {
@@ -151,7 +167,7 @@ class RecipesController
                     // Local-first search
                     if ($ugcOnly) {
                         $recipes = $this->recipes->searchLocalUserByQuery($q, $perPage);
-                        $mode = 'search';
+                        $mode = 'ugc';
                     } else {
                         $recipes = $this->recipes->searchLocalByQuery($q, $perPage);
                         $seen = [];
@@ -369,13 +385,13 @@ class RecipesController
             $isSaved = $this->recipes->isSaved((int)$row['id'], (int)$userId);
             $normalized = $this->normalizeForShow($row);
 
-            // FatSecret: fetch detail from cache (never store raw_payload permanently — ToS compliance)
-            $needsAny = (empty($normalized['ingredients']) || empty($normalized['steps']));
-            if ($needsAny && (($row['api_source'] ?? null) === 'fatsecret') && isset($row['api_id']) && $this->provider) {
+            // FatSecret: fetch detail from Redis cache (never store raw_payload permanently — ToS compliance)
+            $needsDetail = (($row['api_source'] ?? null) === 'fatsecret') && isset($row['api_id']) && $this->provider;
+            if ($needsDetail) {
                 try {
                     $details = $this->provider->getRecipeById((string)$row['api_id']);
                     if (!empty($details)) {
-                        // Update only title/image/sourceUrl — intentionally omit raw_payload
+                        // Persist only safe fields (no raw_payload)
                         $safeUpdate = array_intersect_key($details, array_flip(['title', 'image', 'sourceUrl', 'ingredients_list', 'instructions_list']));
                         if (!empty($safeUpdate)) {
                             $this->recipes->updateFromProviderDetails((int)$row['id'], $safeUpdate, 'fatsecret');
@@ -384,12 +400,16 @@ class RecipesController
                                 $normalized = $this->normalizeForShow($row);
                             }
                         }
-                        // Surface detail fields directly for the view even if not re-persisted
+                        // Surface detail fields directly for the view
                         if (empty($normalized['ingredients']) && !empty($details['ingredients_list'])) {
                             $normalized['ingredients'] = $details['ingredients_list'];
                         }
                         if (empty($normalized['steps']) && !empty($details['instructions_list'])) {
                             $normalized['steps'] = $details['instructions_list'];
+                        }
+                        // Nutrition lives only in the Redis-cached detail — never persisted
+                        if (!empty($details['nutrition_per_serving'])) {
+                            $normalized['nutrition_per_serving'] = $details['nutrition_per_serving'];
                         }
                     }
                 } catch (\Throwable $e) {
@@ -419,8 +439,9 @@ class RecipesController
             $raw = is_array($row['raw_payload']) ? $row['raw_payload'] : json_decode((string)$row['raw_payload'], true);
             if (!is_array($raw)) $raw = [];
         }
-        $norm['db_id'] = (int)$row['id'];
+        $norm['db_id']     = (int)$row['id'];
         $norm['api_source'] = $row['api_source'] ?? null;
+        $norm['user_id']   = isset($row['user_id']) ? (int)$row['user_id'] : null;
         // Ingredients
         $ingredients = $norm['ingredients_list'] ?? [];
         // Spoonacular raw: extendedIngredients
@@ -694,18 +715,33 @@ class RecipesController
                     'input' => $_POST,
                 ]);
             }
+            // Handle image: uploaded file takes priority over URL field
+            $imageUrl = trim((string)($_POST['image_url'] ?? ''));
+            $uploadedFile = $_FILES['image_file'] ?? null;
+            if (!empty($uploadedFile['name'])) {
+                try {
+                    $imageUrl = (new ImageService())->storeRecipeImage($uploadedFile);
+                } catch (\RuntimeException $imgErr) {
+                    return View::render('Recipes/recipe_form', [
+                        'title' => 'Add Recipe',
+                        'error' => $imgErr->getMessage(),
+                        'input' => $_POST,
+                    ]);
+                }
+            }
+
             $ingInput = trim((string)($_POST['ingredients_list'] ?? ''));
             $instrInput = trim((string)($_POST['instructions_list'] ?? ''));
             $ingredients = $ingInput !== '' ? $this->parseArrayInput($ingInput) : null;
             $instructions = $instrInput !== '' ? $this->parseArrayInput($instrInput) : null;
 
             $data = [
-                'title' => $title,
-                'description' => $_POST['description'] ?? null,
-                'image' => $_POST['image_url'] ?? null,
-                'sourceUrl' => $_POST['source_url'] ?? null,
-                'id' => null,
-                'ingredients_list' => $ingredients,
+                'title'             => $title,
+                'description'       => $_POST['description'] ?? null,
+                'image'             => $imageUrl !== '' ? $imageUrl : null,
+                'sourceUrl'         => trim((string)($_POST['source_url'] ?? '')) ?: null,
+                'id'                => null,
+                'ingredients_list'  => $ingredients,
                 'instructions_list' => $instructions,
             ];
             $rid = $this->recipes->upsertFromProvider($data, (int)$userId, 'manual');
@@ -726,6 +762,192 @@ class RecipesController
             return View::render('Pages/500', ['title' => 'Server Error']);
         }
     }
+
+    // -------------------------------------------------------------------------
+    // User recipe edit / delete
+    // -------------------------------------------------------------------------
+
+    /** GET /recipes/{id}/edit — show edit form for a user-owned recipe */
+    public function edit(int $id): string
+    {
+        try {
+            if (session_status() !== \PHP_SESSION_ACTIVE) { @session_start(); }
+            if (empty($_SESSION['user_id'])) {
+                http_response_code(401);
+                return View::render('Pages/401', ['title' => 'Unauthorized']);
+            }
+            $row = $this->recipes->findById($id);
+            if (!$row) {
+                http_response_code(404);
+                return View::render('Pages/404', ['title' => 'Recipe Not Found']);
+            }
+            if (!RecipePolicy::canEdit($row)) {
+                http_response_code(403);
+                return View::render('Pages/403', ['title' => 'Forbidden']);
+            }
+            $normalized = $this->normalizeForShow($row);
+            $nutrition  = $this->recipes->getNutrition($id);
+
+            // Convert arrays back to textarea-friendly text
+            $ingText   = implode("\n", $normalized['ingredients'] ?? []);
+            $instrText = implode("\n", $normalized['steps'] ?? []);
+            $nutriText = '';
+            if (is_array($nutrition)) {
+                $lines = [];
+                foreach ($nutrition as $label => $n) {
+                    $lines[] = $label . ': ' . $n['amount'] . ' ' . $n['unit'];
+                }
+                $nutriText = implode("\n", $lines);
+            }
+
+            return View::render('Recipes/recipe_form', [
+                'title'    => 'Edit Recipe',
+                'isEdit'   => true,
+                'recipeId' => $id,
+                'recipe'   => $normalized,
+                'input'    => [
+                    'title'               => $normalized['title'] ?? '',
+                    'description'         => $row['description'] ?? '',
+                    'image_url'           => $normalized['image'] ?? '',
+                    'source_url'          => $normalized['sourceUrl'] ?? '',
+                    'ingredients_list'    => $ingText,
+                    'instructions_list'   => $instrText,
+                    'nutrition_per_serving' => $nutriText,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            error_log('RecipesController::edit error: ' . $e->getMessage());
+            http_response_code(500);
+            return View::render('Pages/500', ['title' => 'Server Error']);
+        }
+    }
+
+    /** POST /recipes/{id}/edit — persist edits to a user-owned recipe */
+    public function update(int $id)
+    {
+        try {
+            if (session_status() !== \PHP_SESSION_ACTIVE) { @session_start(); }
+            if (empty($_SESSION['user_id'])) {
+                http_response_code(401);
+                return View::render('Pages/401', ['title' => 'Unauthorized']);
+            }
+            $row = $this->recipes->findById($id);
+            if (!$row) {
+                http_response_code(404);
+                return View::render('Pages/404', ['title' => 'Recipe Not Found']);
+            }
+            if (!RecipePolicy::canEdit($row)) {
+                http_response_code(403);
+                return View::render('Pages/403', ['title' => 'Forbidden']);
+            }
+
+            $title = trim((string)($_POST['title'] ?? ''));
+            if ($title === '') {
+                $normalized = $this->normalizeForShow($row);
+                return View::render('Recipes/recipe_form', [
+                    'title'    => 'Edit Recipe',
+                    'isEdit'   => true,
+                    'recipeId' => $id,
+                    'recipe'   => $normalized,
+                    'error'    => 'Title is required.',
+                    'input'    => $_POST,
+                ]);
+            }
+
+            // Handle image upload (new file takes priority over URL field)
+            $imageUrl = trim((string)($_POST['image_url'] ?? ''));
+            $uploadedFile = $_FILES['image_file'] ?? null;
+            if (!empty($uploadedFile['name'])) {
+                try {
+                    $svc = new ImageService();
+                    // Delete old local image if present
+                    if (!empty($row['image_url'])) {
+                        $svc->deleteIfLocal($row['image_url']);
+                    }
+                    $imageUrl = $svc->storeRecipeImage($uploadedFile);
+                } catch (\RuntimeException $e) {
+                    $normalized = $this->normalizeForShow($row);
+                    return View::render('Recipes/recipe_form', [
+                        'title'    => 'Edit Recipe',
+                        'isEdit'   => true,
+                        'recipeId' => $id,
+                        'recipe'   => $normalized,
+                        'error'    => $e->getMessage(),
+                        'input'    => $_POST,
+                    ]);
+                }
+            }
+
+            $ingInput   = trim((string)($_POST['ingredients_list'] ?? ''));
+            $instrInput = trim((string)($_POST['instructions_list'] ?? ''));
+
+            $data = [
+                'title'             => $title,
+                'description'       => $_POST['description'] ?? null,
+                'image_url'         => $imageUrl !== '' ? $imageUrl : null,
+                'image'             => $imageUrl !== '' ? $imageUrl : null,
+                'source_url'        => trim((string)($_POST['source_url'] ?? '')) ?: null,
+                'sourceUrl'         => trim((string)($_POST['source_url'] ?? '')) ?: null,
+                'ingredients_list'  => $ingInput !== '' ? $this->parseArrayInput($ingInput) : [],
+                'instructions_list' => $instrInput !== '' ? $this->parseArrayInput($instrInput) : [],
+            ];
+            $this->recipes->updateUserRecipe($id, $data);
+
+            $nutritionInput = trim((string)($_POST['nutrition_per_serving'] ?? ''));
+            if ($nutritionInput !== '') {
+                $per = $this->parseNutritionInput($nutritionInput);
+                if (!empty($per)) {
+                    $this->recipes->upsertNutrition($id, $per);
+                }
+            }
+
+            header('Location: /recipes/view/' . $id);
+            exit;
+        } catch (\Throwable $e) {
+            error_log('RecipesController::update error: ' . $e->getMessage());
+            http_response_code(500);
+            return View::render('Pages/500', ['title' => 'Server Error']);
+        }
+    }
+
+    /** POST /recipes/{id}/delete — delete a user-owned recipe */
+    public function destroy(int $id)
+    {
+        try {
+            if (session_status() !== \PHP_SESSION_ACTIVE) { @session_start(); }
+            if (empty($_SESSION['user_id'])) {
+                http_response_code(401);
+                exit;
+            }
+            $row = $this->recipes->findById($id);
+            if (!$row) {
+                header('Location: /recipes');
+                exit;
+            }
+            if (!RecipePolicy::canDelete($row)) {
+                http_response_code(403);
+                return View::render('Pages/403', ['title' => 'Forbidden']);
+            }
+
+            // Clean up local image if present
+            if (!empty($row['image_url'])) {
+                (new ImageService())->deleteIfLocal($row['image_url']);
+            }
+
+            $this->recipes->deleteById($id);
+
+            header('Location: /recipes?ugc=1');
+            exit;
+        } catch (\Throwable $e) {
+            error_log('RecipesController::destroy error: ' . $e->getMessage());
+            http_response_code(500);
+            return View::render('Pages/500', ['title' => 'Server Error']);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // store() also needs to handle image upload — update here
+    // -------------------------------------------------------------------------
 
     // --- Helpers copied from AdminController parsers (user-friendly inputs) ---
     private function parseArrayInput(string $input): array

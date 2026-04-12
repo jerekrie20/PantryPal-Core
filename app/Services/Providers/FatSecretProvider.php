@@ -4,13 +4,13 @@ namespace Services\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
-use Models\FatSecretCache;
+use Helpers\Cache;
 
 /**
  * FatSecret Platform API client — food search and retrieval.
  *
  * ToS compliance:
- *   Full JSON responses are stored in fatsecret_cache (24-hour TTL only).
+ *   Full JSON responses are cached in Redis (24-hour TTL only).
  *   Nutritional data is NEVER written to the permanent ingredients/products tables.
  *
  * Auth: OAuth 2.0 client_credentials flow.
@@ -20,27 +20,23 @@ use Models\FatSecretCache;
  */
 class FatSecretProvider
 {
-    private const TOKEN_URL = 'https://oauth.fatsecret.com/connect/token';
-    private const API_BASE  = 'https://platform.fatsecret.com/rest/';
-    // Reserved cache key for the Bearer token
-    private const TOKEN_CACHE_KEY = '__fatsecret_oauth_token__';
-    private const TOKEN_ENDPOINT  = '__oauth_token__';
+    private const TOKEN_URL       = 'https://oauth.fatsecret.com/connect/token';
+    private const API_BASE        = 'https://platform.fatsecret.com/rest/';
+    private const TOKEN_CACHE_KEY = 'fatsecret:__oauth_token__';
+    private const CACHE_TTL       = 86400; // 24 hours
 
     private string $clientId;
     private string $clientSecret;
     private Client $http;
-    private FatSecretCache $cache;
 
     public function __construct(
         ?string $clientId     = null,
         ?string $clientSecret = null,
-        ?Client $http         = null,
-        ?FatSecretCache $cache = null
+        ?Client $http         = null
     ) {
         $this->clientId     = $clientId     ?? ($_ENV['FATSECRET_CLIENT_ID']     ?? '');
         $this->clientSecret = $clientSecret ?? ($_ENV['FATSECRET_CLIENT_SECRET'] ?? '');
-        $this->http  = $http  ?? new Client(['timeout' => 8.0]);
-        $this->cache = $cache ?? new FatSecretCache();
+        $this->http = $http ?? new Client(['timeout' => 8.0]);
     }
 
     public function isConfigured(): bool
@@ -53,8 +49,8 @@ class FatSecretProvider
     // -------------------------------------------------------------------------
 
     /**
-     * Search foods via foods.search v1.
-     * Returns normalized results; full response cached for 24 hours.
+     * Search foods via foods/search/v1.
+     * Returns normalized results; full response cached in Redis for 24 hours.
      *
      * @return array<int, array{api_id:string,name:string,brand:string|null,type:string,url:string|null,source:string}>
      */
@@ -64,12 +60,11 @@ class FatSecretProvider
             return [];
         }
         $params = [
-            'method'       => 'foods.search',
             'search_expression' => $query,
-            'max_results'  => max(1, min(50, $maxResults)),
-            'format'       => 'json',
+            'max_results'       => max(1, min(50, $maxResults)),
+            'format'            => 'json',
         ];
-        $data = $this->cachedCall('foods.search', $params);
+        $data = $this->cachedCall('foods.search.v1', self::API_BASE . 'foods/search/v1', $params);
         if (!$data) {
             return [];
         }
@@ -93,8 +88,8 @@ class FatSecretProvider
     }
 
     /**
-     * Fetch full food details via food.get v5.
-     * Returns the raw decoded response array (cached); caller must not store permanently.
+     * Fetch full food details via food/v5.
+     * Returns the raw decoded response array (cached in Redis); caller must not store permanently.
      */
     public function getFood(int|string $foodId): ?array
     {
@@ -102,73 +97,82 @@ class FatSecretProvider
             return null;
         }
         $params = [
-            'method'  => 'food.get.v5',
             'food_id' => (string)$foodId,
             'format'  => 'json',
         ];
-        return $this->cachedCall('food.get.v5', $params);
+        return $this->cachedCall('food.get.v5', self::API_BASE . 'food/v5', $params);
     }
 
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
 
-    /**
-     * Check cache → on miss call the API → store result → return decoded data.
-     */
-    private function cachedCall(string $endpoint, array $params): ?array
+    private function cacheKey(string $endpoint, array $params): string
     {
-        $key = $this->cache->makeKey($endpoint, $params);
-        $hit = $this->cache->get($key);
-        if ($hit !== null) {
+        ksort($params);
+        return 'fatsecret:' . hash('sha256', $endpoint . json_encode($params));
+    }
+
+    /**
+     * Check Redis → on miss call the API → cache result → return decoded data.
+     */
+    private function cachedCall(string $endpoint, string $url, array $params): ?array
+    {
+        $key = $this->cacheKey($endpoint, $params);
+        $hit = Cache::get($key);
+        if (is_array($hit)) {
             return $hit;
         }
-        $data = $this->callApi($params);
+        $data = $this->callApi($url, $params);
         if ($data !== null) {
-            $this->cache->set($key, $endpoint, $data);
+            Cache::set($key, $data, self::CACHE_TTL);
         }
         return $data;
     }
 
     /**
-     * Execute a signed API call to platform.fatsecret.com/rest/server.api.
+     * Execute a GET request to a versioned FatSecret REST endpoint.
      */
-    private function callApi(array $params): ?array
+    private function callApi(string $url, array $params): ?array
     {
         $token = $this->getBearerToken();
         if ($token === null) {
             return null;
         }
         try {
-            $resp = $this->http->post(self::API_BASE . 'server.api', [
-                'headers'     => ['Authorization' => 'Bearer ' . $token],
-                'form_params' => $params,
+            $resp = $this->http->get($url, [
+                'headers' => ['Authorization' => 'Bearer ' . $token],
+                'query'   => $params,
             ]);
-            $decoded = json_decode((string)$resp->getBody(), true);
-            return is_array($decoded) ? $decoded : null;
+            $body    = (string)$resp->getBody();
+            $decoded = json_decode($body, true);
+            if (!is_array($decoded)) {
+                error_log('FatSecretProvider: non-JSON response url=' . $url . ' body=' . substr($body, 0, 500));
+                return null;
+            }
+            if (isset($decoded['error'])) {
+                error_log('FatSecretProvider API error: ' . json_encode($decoded['error']));
+                return null;
+            }
+            return $decoded;
         } catch (GuzzleException $e) {
-            error_log('FatSecretProvider API error: ' . $e->getMessage());
+            error_log('FatSecretProvider HTTP error: ' . $e->getMessage());
             return null;
         }
     }
 
     /**
      * Return a valid Bearer token, fetching a new one via client_credentials if needed.
-     * The token is cached in fatsecret_cache under a reserved key.
-     * We embed an explicit expires_at in the stored JSON so we can detect near-expiry
-     * without relying solely on the row's created_at timestamp.
+     * Stored in Redis with a TTL matching expires_in.
      */
     private function getBearerToken(): ?string
     {
-        // Check cached token
-        $cached = $this->cache->get(self::TOKEN_CACHE_KEY);
-        if ($cached !== null && isset($cached['access_token'], $cached['expires_at'])) {
-            // Treat as valid if it expires more than 60 seconds from now
+        $cached = Cache::get(self::TOKEN_CACHE_KEY);
+        if (is_array($cached) && isset($cached['access_token'], $cached['expires_at'])) {
             if ($cached['expires_at'] > time() + 60) {
                 return (string)$cached['access_token'];
             }
         }
-        // Fetch a new token
         try {
             $resp = $this->http->post(self::TOKEN_URL, [
                 'form_params' => [
@@ -188,7 +192,7 @@ class FatSecretProvider
                 'access_token' => $data['access_token'],
                 'expires_at'   => time() + $expiresIn,
             ];
-            $this->cache->set(self::TOKEN_CACHE_KEY, self::TOKEN_ENDPOINT, $payload);
+            Cache::set(self::TOKEN_CACHE_KEY, $payload, max(60, $expiresIn - 60));
             return (string)$data['access_token'];
         } catch (GuzzleException $e) {
             error_log('FatSecretProvider token fetch error: ' . $e->getMessage());

@@ -9,7 +9,7 @@
 ob_start();
 if (!function_exists('e')) { function e($v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); } }
 
-$img = (!empty($recipe['image']) && preg_match('#^https?://#i', $recipe['image']))
+$img = (!empty($recipe['image']) && (preg_match('#^https?://#i', $recipe['image']) || str_starts_with($recipe['image'], '/')))
     ? $recipe['image']
     : ('https://placehold.co/640x360/E8F5E9/36454F?text=' . urlencode($recipe['title'] ?? 'Recipe'));
 ?>
@@ -24,7 +24,27 @@ $img = (!empty($recipe['image']) && preg_match('#^https?://#i', $recipe['image']
       <p class="text-xs text-text-muted mt-1">Source: <?php echo e($recipe['api_source']); ?></p>
     <?php endif; ?>
   </div>
-  <div class="flex gap-2">
+  <div class="flex gap-2 flex-wrap">
+    <?php
+    // Show Edit/Delete if user owns this recipe (manual source) or is admin
+    $sessionUserId = (int)($_SESSION['user_id'] ?? 0);
+    $isAdmin       = !empty($_SESSION['is_admin']);
+    $recipeOwner   = (int)($recipe['user_id'] ?? 0);
+    $isManual      = ($recipe['api_source'] ?? null) === 'manual';
+    $canEdit       = $isManual && ($isAdmin || ($sessionUserId > 0 && $recipeOwner === $sessionUserId));
+    $canDelete     = $isAdmin || ($sessionUserId > 0 && $recipeOwner === $sessionUserId);
+    $dbId          = (int)($recipe['db_id'] ?? 0);
+    ?>
+    <?php if ($canEdit && $dbId > 0): ?>
+      <a href="/recipes/<?php echo $dbId; ?>/edit" class="btn btn-subtle btn-md">Edit</a>
+    <?php endif; ?>
+    <?php if ($canDelete && $dbId > 0): ?>
+      <form action="/recipes/<?php echo $dbId; ?>/delete" method="POST"
+            onsubmit="return confirm('Permanently delete this recipe?');">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+        <button type="submit" class="btn btn-danger btn-md">Delete</button>
+      </form>
+    <?php endif; ?>
     <?php if (!empty($isSaved)): ?>
       <form action="/recipes/unsave" method="POST">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />

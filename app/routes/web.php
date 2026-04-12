@@ -78,6 +78,11 @@ $router->group(['middleware' => [AuthMiddleware::class, CsrfMiddleware::class]],
     $router->get('/recipes/create', [RecipesController::class, 'create']);
     $router->post('/recipes', [RecipesController::class, 'store']);
 
+    // Edit / delete user-owned recipes
+    $router->get('/recipes/{id:int}/edit', [RecipesController::class, 'edit']);
+    $router->post('/recipes/{id:int}/edit', [RecipesController::class, 'update']);
+    $router->post('/recipes/{id:int}/delete', [RecipesController::class, 'destroy']);
+
     // Save/Unsave
     $router->post('/recipes/save', [RecipesController::class, 'save']);
     $router->post('/recipes/unsave', [RecipesController::class, 'unsave']);

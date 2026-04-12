@@ -154,13 +154,49 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                                             <dt class="text-text-muted">Serving Size</dt>
                                             <dd class="font-medium"><?php echo !empty($offServing) ? e($offServing) : '—'; ?></dd>
                                         </div>
-                                        <div class="flex justify-between">
+                                        <div class="flex justify-between items-center">
                                             <dt class="text-text-muted">Nutri-Score</dt>
-                                            <dd class="font-medium uppercase"><?php echo !empty($nutriScore) ? e($nutriScore) : '—'; ?></dd>
+                                            <dd>
+                                                <?php if (!empty($nutriScore)): ?>
+                                                <?php
+                                                $ns = strtolower((string)$nutriScore);
+                                                $nsGrades = ['a','b','c','d','e'];
+                                                $nsColors = ['a'=>'#038141','b'=>'#85BB2F','c'=>'#FECB02','d'=>'#EE8100','e'=>'#E63312'];
+                                                $nsValid = in_array($ns, $nsGrades, true);
+                                                ?>
+                                                <?php if ($nsValid): ?>
+                                                <span class="inline-flex items-end gap-px" aria-label="Nutri-Score <?php echo strtoupper($ns); ?>">
+                                                    <?php foreach ($nsGrades as $g): $active = $ns === $g; ?>
+                                                    <span style="background:<?php echo $nsColors[$g]; ?>;color:<?php echo $g === 'c' ? '#000' : '#fff'; ?>;width:<?php echo $active ? '1.5rem' : '1.1rem'; ?>;height:<?php echo $active ? '2rem' : '1.5rem'; ?>;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:<?php echo $active ? '0.85rem' : '0.65rem'; ?>;border-radius:3px;"><?php echo strtoupper($g); ?></span>
+                                                    <?php endforeach; ?>
+                                                </span>
+                                                <?php else: ?>
+                                                <span class="font-medium uppercase"><?php echo e($nutriScore); ?></span>
+                                                <?php endif; ?>
+                                                <?php else: ?>&mdash;<?php endif; ?>
+                                            </dd>
                                         </div>
-                                        <div class="flex justify-between">
+                                        <div class="flex justify-between items-center">
                                             <dt class="text-text-muted">Eco-Score</dt>
-                                            <dd class="font-medium uppercase"><?php echo !empty($ecoScore) ? e($ecoScore) : '—'; ?></dd>
+                                            <dd>
+                                                <?php if (!empty($ecoScore)): ?>
+                                                <?php
+                                                $es = strtolower((string)$ecoScore);
+                                                $esGrades = ['a','b','c','d','e'];
+                                                $esColors = ['a'=>'#1E8F4E','b'=>'#56AE36','c'=>'#CCCE00','d'=>'#FF9900','e'=>'#FF2D00'];
+                                                $esValid = in_array($es, $esGrades, true);
+                                                ?>
+                                                <?php if ($esValid): ?>
+                                                <span class="inline-flex items-end gap-px" aria-label="Eco-Score <?php echo strtoupper($es); ?>">
+                                                    <?php foreach ($esGrades as $g): $active = $es === $g; ?>
+                                                    <span style="background:<?php echo $esColors[$g]; ?>;color:<?php echo $g === 'c' ? '#000' : '#fff'; ?>;width:<?php echo $active ? '1.5rem' : '1.1rem'; ?>;height:<?php echo $active ? '2rem' : '1.5rem'; ?>;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:<?php echo $active ? '0.85rem' : '0.65rem'; ?>;border-radius:3px;"><?php echo strtoupper($g); ?></span>
+                                                    <?php endforeach; ?>
+                                                </span>
+                                                <?php else: ?>
+                                                <span class="font-medium uppercase"><?php echo e($ecoScore); ?></span>
+                                                <?php endif; ?>
+                                                <?php else: ?>&mdash;<?php endif; ?>
+                                            </dd>
                                         </div>
                                         <div class="flex justify-between">
                                             <dt class="text-text-muted">NOVA Group</dt>

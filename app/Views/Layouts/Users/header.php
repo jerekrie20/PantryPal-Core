@@ -21,6 +21,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
                 <!-- Desktop nav -->
                 <a href="/dashboard" class="btn btn-subtle btn-md hidden sm:inline-flex">Dashboard</a>
                 <a href="/recipes" class="btn btn-subtle btn-md hidden sm:inline-flex">Recipes</a>
+                <a href="/recipes?ugc=1" class="btn btn-subtle btn-md hidden sm:inline-flex">My Recipes</a>
                 <a href="/items" class="btn btn-subtle btn-md hidden sm:inline-flex">Items</a>
                 <?php if (!empty($_SESSION['is_admin'])): ?>
                 <a href="/admin" class="btn btn-subtle btn-md hidden sm:inline-flex">Admin</a>
@@ -55,6 +56,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
         <nav class="container mx-auto px-4 py-3 space-y-1">
             <a href="/dashboard" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Dashboard</a>
             <a href="/recipes" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Recipes</a>
+            <a href="/recipes?ugc=1" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">My Recipes</a>
             <a href="/items" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Items</a>
             <?php if (!empty($_SESSION['is_admin'])): ?>
             <a href="/admin" class="block px-3 py-2 rounded text-sm font-medium hover:bg-surface-default">Admin</a>

@@ -31,7 +31,8 @@ class Recipes
         $image = isset($r['image']) && is_string($r['image']) ? $r['image'] : null;
         $desc  = isset($r['summary']) && is_string($r['summary']) ? $r['summary'] : ($r['description'] ?? null);
         $srcUrl = isset($r['sourceUrl']) && is_string($r['sourceUrl']) ? $r['sourceUrl'] : ($r['url'] ?? null);
-        $raw = json_encode($r, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+        // FatSecret ToS: do not permanently store raw recipe content
+        $raw = ($source === 'fatsecret') ? null : json_encode($r, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
 
         // Normalize/allow source strings; permit null if unknown
         $allowedSources = ['fdc','off','manual','fatsecret'];
@@ -52,7 +53,7 @@ class Recipes
                 $upd->bindValue(':description', $desc, $desc === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
                 $upd->bindValue(':image', $image, $image === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
                 $upd->bindValue(':source_url', $srcUrl, $srcUrl === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-                $upd->bindValue(':raw', $raw, PDO::PARAM_STR);
+                $upd->bindValue(':raw', $raw, $raw === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
                 $upd->bindValue(':id', $id, PDO::PARAM_INT);
                 $upd->execute();
                 return $id;
@@ -69,7 +70,7 @@ class Recipes
         $ins->bindValue(':description', $desc, $desc === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
         $ins->bindValue(':image', $image, $image === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
         $ins->bindValue(':source_url', $srcUrl, $srcUrl === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-        $ins->bindValue(':raw', $raw, PDO::PARAM_STR);
+        $ins->bindValue(':raw', $raw, $raw === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
         try {
             $ins->execute();
         } catch (\Throwable $e) {
@@ -83,7 +84,7 @@ class Recipes
                 $ins2->bindValue(':description', $desc, $desc === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
                 $ins2->bindValue(':image', $image, $image === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
                 $ins2->bindValue(':source_url', $srcUrl, $srcUrl === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-                $ins2->bindValue(':raw', $raw, PDO::PARAM_STR);
+                $ins2->bindValue(':raw', $raw, $raw === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
                 $ins2->execute();
             } catch (\Throwable $e2) {
                 throw $e2; // bubble up the original failure if fallback also fails
@@ -226,6 +227,36 @@ class Recipes
         $st->execute();
         $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
         return array_map([$this, 'normalize'], $rows);
+    }
+
+    /**
+     * Fetch all manually-created recipes belonging to a specific user, paginated.
+     * Returns ['results' => [...normalized...], 'total' => int]
+     */
+    public function findByCurrentUser(int $userId, int $page = 1, int $perPage = 12): array
+    {
+        $offset = ($page - 1) * $perPage;
+        try {
+            $cntSt = $this->db->prepare(
+                "SELECT COUNT(*) FROM recipes WHERE user_id = :uid AND api_source = 'manual'"
+            );
+            $cntSt->bindValue(':uid', $userId, PDO::PARAM_INT);
+            $cntSt->execute();
+            $total = (int)$cntSt->fetchColumn();
+
+            $st = $this->db->prepare(
+                "SELECT * FROM recipes WHERE user_id = :uid AND api_source = 'manual'
+                 ORDER BY created_at DESC LIMIT :lim OFFSET :off"
+            );
+            $st->bindValue(':uid', $userId, PDO::PARAM_INT);
+            $st->bindValue(':lim', $perPage, PDO::PARAM_INT);
+            $st->bindValue(':off', $offset, PDO::PARAM_INT);
+            $st->execute();
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            return ['results' => array_map([$this, 'normalize'], $rows), 'total' => $total];
+        } catch (\Throwable $e) {
+            return ['results' => [], 'total' => 0];
+        }
     }
 
     /** Like searchLocalByQuery but restricted to user-generated recipes (user_id IS NOT NULL). */
@@ -493,6 +524,48 @@ class Recipes
         $st->execute();
         $row = $st->fetch(PDO::FETCH_ASSOC);
         return $row ?: false;
+    }
+
+    /**
+     * Update a user-created (manual) recipe, including raw_payload so that
+     * ingredients_list / instructions_list remain readable by normalize().
+     */
+    public function updateUserRecipe(int $id, array $data): bool
+    {
+        if ($id <= 0) return false;
+
+        // Merge editable fields into the existing raw_payload
+        $row = $this->findById($id);
+        if (!$row || ($row['api_source'] ?? null) !== 'manual') return false;
+
+        $existing = [];
+        if (!empty($row['raw_payload'])) {
+            $existing = json_decode((string)$row['raw_payload'], true) ?: [];
+        }
+        foreach (['title', 'image', 'sourceUrl', 'description', 'ingredients_list', 'instructions_list'] as $k) {
+            if (array_key_exists($k, $data)) {
+                $existing[$k] = $data[$k];
+            }
+        }
+        $raw = json_encode($existing, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        $title     = isset($data['title']) && $data['title'] !== '' ? (string)$data['title'] : (string)$row['title'];
+        $imageUrl  = $data['image_url'] ?? null;
+        $sourceUrl = $data['source_url'] ?? null;
+        $desc      = $data['description'] ?? null;
+
+        $st = $this->db->prepare("UPDATE recipes
+            SET title = :title, description = :description, image_url = :image_url,
+                source_url = :source_url, raw_payload = :raw
+            WHERE id = :id AND api_source = 'manual'");
+        $st->bindValue(':title',     $title,     PDO::PARAM_STR);
+        $st->bindValue(':description', $desc,    $desc      === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $st->bindValue(':image_url', $imageUrl,  $imageUrl  === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $st->bindValue(':source_url', $sourceUrl,$sourceUrl === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $st->bindValue(':raw',       $raw,       PDO::PARAM_STR);
+        $st->bindValue(':id',        $id,        PDO::PARAM_INT);
+        $st->execute();
+        return $st->rowCount() > 0;
     }
 
     /** Admin: update basic recipe fields (title, description, image_url, source_url). */

@@ -13,15 +13,36 @@ if (!function_exists('e')) {
 $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) || (getenv('SPOONACULAR_API_KEY') || (!empty($_ENV['SPOONACULAR_API_KEY'])));
 ?>
 
-<section class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between">
+<?php
+// Determine active tab
+$_ugcMode    = (isset($_GET['ugc']) && (string)$_GET['ugc'] === '1') || (($mode ?? '') === 'ugc');
+$_apiMode    = isset($_GET['api']) || isset($_GET['browse']);
+$_savedMode  = !$_ugcMode && !$_apiMode;
+?>
+<section class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between">
     <div>
         <h1 class="text-3xl font-bold text-text-heading"><?php echo e($title ?? 'Recipes'); ?></h1>
-        <p class="text-text-muted mt-1">Find recipes by searching the web or using your pantry.</p>
     </div>
     <div class="mt-3 sm:mt-0">
-        <a href="/recipes/create" class="btn btn-subtle">Add Recipe</a>
+        <a href="/recipes/create" class="btn btn-cta btn-sm">+ Add Recipe</a>
     </div>
 </section>
+
+<!-- Recipe mode tabs -->
+<div class="mb-5 flex gap-1 border-b border-border-default">
+    <a href="/recipes"
+       class="px-4 py-2 text-sm font-medium rounded-t <?php echo $_savedMode ? 'border border-b-bg-default border-border-default bg-bg-default text-text-heading -mb-px' : 'text-text-muted hover:text-text-heading'; ?>">
+       Saved
+    </a>
+    <a href="/recipes?ugc=1"
+       class="px-4 py-2 text-sm font-medium rounded-t <?php echo $_ugcMode ? 'border border-b-bg-default border-border-default bg-bg-default text-text-heading -mb-px' : 'text-text-muted hover:text-text-heading'; ?>">
+       My Recipes
+    </a>
+    <a href="/recipes/suggested"
+       class="px-4 py-2 text-sm font-medium rounded-t text-text-muted hover:text-text-heading">
+       Suggested
+    </a>
+</div>
 
 <div class="card p-4 md:p-6 mb-6">
     <form action="/recipes" method="GET" class="flex flex-col gap-3">
@@ -158,13 +179,15 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
 <?php if (!empty($recipes) && is_array($recipes)): ?>
     <?php if (!empty($mode) && $mode === 'saved'): ?>
         <h2 class="text-xl font-semibold mb-3">Your Saved Recipes</h2>
+    <?php elseif (!empty($mode) && $mode === 'ugc'): ?>
+        <h2 class="text-xl font-semibold mb-3">My Recipes</h2>
     <?php elseif (!empty($mode) && $mode === 'browse_api'): ?>
         <h2 class="text-xl font-semibold mb-3">Browsing Live Results</h2>
     <?php endif; ?>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <?php foreach ($recipes as $r): ?>
             <?php
-            $img = (!empty($r['image']) && preg_match('#^https?://#i', $r['image']))
+            $img = (!empty($r['image']) && (preg_match('#^https?://#i', $r['image']) || str_starts_with($r['image'], '/')))
                 ? $r['image']
                 : ('https://placehold.co/400x240/E8F5E9/36454F?text=' . urlencode($r['title'] ?? 'Recipe'));
             ?>
@@ -181,6 +204,16 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
                     <div class="flex flex-wrap gap-2 mt-2">
                         <?php if (!empty($r['db_id'])): ?>
                             <a href="/recipes/view/<?php echo (int)$r['db_id']; ?>" class="btn btn-cta btn-sm">Details</a>
+                        <?php endif; ?>
+                        <?php
+                        $sessionUid = (int)($_SESSION['user_id'] ?? 0);
+                        $isAdmin    = !empty($_SESSION['is_admin']);
+                        $rOwner     = (int)($r['user_id'] ?? 0);
+                        $rManual    = ($r['api_source'] ?? null) === 'manual';
+                        $canEditCard = $rManual && ($isAdmin || ($sessionUid > 0 && $rOwner === $sessionUid));
+                        ?>
+                        <?php if ($canEditCard && !empty($r['db_id'])): ?>
+                            <a href="/recipes/<?php echo (int)$r['db_id']; ?>/edit" class="btn btn-subtle btn-sm">Edit</a>
                         <?php endif; ?>
                         <?php if (!empty($r['sourceUrl'])): ?>
                             <a href="<?php echo e($r['sourceUrl']); ?>" target="_blank" rel="noopener" class="btn btn-subtle btn-sm">Source</a>
@@ -236,12 +269,16 @@ $hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY']))) 
     <?php endif; ?>
 <?php else: ?>
     <div class="text-center text-text-muted mt-8">
-        <?php if (!empty($mode) && $mode === 'search' && !empty($query)): ?>
+        <?php if ($_ugcMode || ($mode ?? '') === 'ugc'): ?>
+            <p class="mb-3">You haven't created any recipes yet.</p>
+            <a href="/recipes/create" class="btn btn-cta">Create Your First Recipe</a>
+        <?php elseif (!empty($mode) && $mode === 'search' && !empty($query)): ?>
             No recipes found for "<?php echo e($query); ?>".
         <?php elseif (!empty($mode) && $mode === 'suggested'): ?>
             No suggestions yet. Try adding more items or using the search above.
         <?php elseif (!empty($mode) && $mode === 'saved'): ?>
-            You haven't saved any recipes yet. Try a search, use your pantry, or click "Web Search".
+            <p class="mb-3">You haven't saved any recipes yet.</p>
+            <a href="/recipes?api=1&q=popular" class="btn btn-subtle">Discover Recipes</a>
         <?php elseif (!empty($mode) && $mode === 'browse_api'): ?>
             No recipes returned by API for these filters.
         <?php else: ?>

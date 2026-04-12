@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(composer require:*)",
+      "Bash(php composer.phar require intervention/image)"
+    ]
+  }
+}
