@@ -22,7 +22,7 @@
                 <?php if (!empty($_SESSION['user_id'])) { ?>
                     <a href="/dashboard" class="font-medium text-gray-600 hover:text-primary">Dashboard</a>
                     <form action="/logout" method="POST" class="inline">
-                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
+                        <?php echo csrf_field(); ?>
                         <button type="submit" class="font-medium text-gray-600 hover:text-primary">Logout</button>
                     </form>
                 <?php } else { ?>

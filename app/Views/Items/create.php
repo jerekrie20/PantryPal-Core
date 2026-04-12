@@ -20,7 +20,7 @@ require_once VIEW_PATH . '/Components/form_elements.php';
     <!-- Add Item Form -->
     <div class="card p-6 md:p-8">
         <form action="/items" method="POST" class="space-y-6">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
+            <?php echo csrf_field(); ?>
 
             <?php form_input('name', 'Item Name', 'text', [
                     'placeholder' => 'e.g., Organic Milk',

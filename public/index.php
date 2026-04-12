@@ -22,6 +22,9 @@ require_once APP_PATH . '/Config/sessions.php';
 
 require_once APP_PATH . '/Helpers/support.php';
 
+// Register Error Handler
+\Helpers\ErrorHandler::register();
+
 
 spl_autoload_register(function ($class) {
     $relative = str_replace('\\', '/', ltrim($class, '\\')) . '.php';

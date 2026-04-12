@@ -33,7 +33,7 @@ $input = $input ?? [];
             <?php endif; ?>
 
             <form action="/register" method="POST" class="space-y-6">
-                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
+                <?php echo csrf_field(); ?>
                 <?php
                 form_input('username', 'Username', 'text', [
                         'placeholder' => 'e.g., pantrypal123',

@@ -17,7 +17,7 @@ class CsrfMiddleware
         if ($method !== 'POST') {
             return; // only enforce on POST (router supports GET/POST)
         }
-        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $sessionToken = csrf_token();
         $token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
         if (!is_string($token) || $token === '' || !hash_equals((string)$sessionToken, (string)$token)) {
             http_response_code(419);

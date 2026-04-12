@@ -114,62 +114,22 @@ class ItemsController
                 return View::render('Pages/401', ['title' => 'Unauthorized']);
             }
 
-            $itemRow = $this->items->find($id);
-            if (!$itemRow || (int)$itemRow['user_id'] !== (int)$userId) {
+            $row = $this->items->find($id, (int)$userId);
+            if (!$row) {
                 http_response_code(404);
                 return View::render('Pages/404', ['title' => 'Item Not Found']);
             }
 
             // If this is an ingredient-backed item, delegate to the IngredientsController show route
-            if (!empty($itemRow['ingredient_id'])) {
+            if (!empty($row['ingredient_id'])) {
                 header('Location: /ingredients/view/' . (int)$id);
                 exit;
             }
 
-            // Build a unified $row structure without Items doing cross-table joins
-            $ing = null; $prod = null;
-            if (!empty($itemRow['ingredient_id'])) {
-                $ingModel = new Ingredients();
-                $ing = $ingModel->find((int)$itemRow['ingredient_id']);
-            }
-            if (!empty($itemRow['product_id'])) {
-                $prodModel = new Products();
-                $prod = $prodModel->find((int)$itemRow['product_id']);
-            }
-
-            $row = $itemRow; // start with items columns (quantity, dates, etc.)
-            if ($ing) {
-                $row['ingredient_name'] = $ing['name'] ?? null;
-                $row['ingredient_category'] = $ing['category'] ?? null;
-                $row['ingredient_image_url'] = $ing['image_url'] ?? null;
-                $row['ingredient_nutrition_info'] = $ing['nutrition_info'] ?? null;
-                // legacy plain key sometimes used
-                $row['nutrition_info'] = $ing['nutrition_info'] ?? null;
-            }
-            if ($prod) {
-                $row['product_title'] = $prod['title'] ?? null;
-                $row['product_brand'] = $prod['brand'] ?? null;
-                $row['product_category'] = $prod['category'] ?? null;
-                $row['product_image_url'] = $prod['image_url'] ?? null;
-                $row['product_upc'] = $prod['upc'] ?? null;
-                $row['product_nutrition_info'] = $prod['nutrition_info'] ?? null;
-                $row['product_raw_payload'] = $prod['raw_payload'] ?? null;
-            }
-
             // ----- status / badge
-            $status = 'In Stock';
-            $badge  = 'badge-success';
-            if (!empty($row['expiration_date'])) {
-                try {
-                    $today    = new \DateTimeImmutable('today');
-                    $exp      = new \DateTimeImmutable($row['expiration_date']);
-                    $diffDays = (int)$today->diff($exp)->format('%r%a');
-                    if     ($diffDays < 0) { $status = 'Expired ' . (abs($diffDays) === 1 ? '1 day ago' : abs($diffDays) . ' days ago'); $badge = 'badge-danger'; }
-                    elseif ($diffDays === 0){ $status = 'Expires today'; $badge = 'badge-warning'; }
-                    elseif ($diffDays <= 3){ $status = 'Expires in ' . ($diffDays === 1 ? '1 day' : $diffDays . ' days'); $badge = 'badge-warning'; }
-                    else                    { $status = 'Expires in ' . $diffDays . ' days'; $badge = 'badge-neutral'; }
-                } catch (\Exception $e) {}
-            }
+            $statusData = $this->items->getExpirationStatus($row['expiration_date'] ?? null);
+            $status = $statusData['status'];
+            $badge = $statusData['badge'];
 
             // ----- nutrition (ingredient first)
             $nutrition = null;
@@ -206,7 +166,7 @@ class ItemsController
                 }
                 if (is_array($decoded)) {
                     $rawNutri = $decoded;
-                    $nutrition = $this->normalizeNutrition($decoded);
+                    $nutrition = $this->items->normalizeNutrition($decoded);
                 }
             }
 
@@ -232,7 +192,7 @@ class ItemsController
                         $productRaw['image'] = $productRaw['image_url'];
                     }
                     // OFF nutriments → nutrition
-                    $nutrition = $this->normalizeNutrition($productRaw);
+                    $nutrition = $this->items->normalizeNutrition($productRaw);
                 }
             }
 
@@ -241,7 +201,7 @@ class ItemsController
                     ? $row['product_nutrition_info']
                     : json_decode((string)$row['product_nutrition_info'], true);
                 if (is_array($pn)) {
-                    $nutrition = $this->normalizeNutrition($pn);
+                    $nutrition = $this->items->normalizeNutrition($pn);
                 }
             }
 
@@ -249,8 +209,7 @@ class ItemsController
             $displayName = $row['ingredient_name'] ?? ($row['product_title'] ?? 'Item');
 
             // Category may be a JSON array / path → stringify safely
-            $catRaw = $row['ingredient_category'] ?? ($row['product_category'] ?? null);
-            $displayCategory = $this->stringifyCategory($catRaw);
+            $displayCategory = $this->items->stringifyCategory($row['ingredient_category'] ?? ($row['product_category'] ?? null));
 
             $displayImage = $row['ingredient_image_url']
                 ?? ($row['product_image_url'] ?? ($productRaw['image'] ?? null));
@@ -270,12 +229,12 @@ class ItemsController
                 'nutrition_raw'   => $rawNutri,
 
                 // Brand: prefer product brand, else ingredient brand, else entered brand
-                'brand'           => $row['product_brand'] ?? ($ing['brand'] ?? ($row['entered_brand'] ?? null)),
+                'brand'           => $row['product_brand'] ?? ($row['ingredient_brand'] ?? ($row['entered_brand'] ?? null)),
                 'product_title'   => $row['product_title'] ?? null,
                 'product_raw'     => $productRaw,
             ];
 
-            $isIngredient = !empty($itemRow['ingredient_id']);
+            $isIngredient = !empty($row['ingredient_id']);
             $view = $isIngredient ? 'Ingredients/show' : 'Products/show';
             $title = $isIngredient ? 'Ingredient Details' : 'Product Details';
             return View::render($view, [
@@ -650,7 +609,7 @@ class ItemsController
                 http_response_code(401);
                 return View::render('Pages/401', ['title' => 'Unauthorized']);
             }
-            $row = $this->items->findWithGlobalById($id, (int)$userId);
+            $row = $this->items->find($id, (int)$userId);
             if (!$row) {
                 http_response_code(404);
                 return View::render('Pages/404', ['title' => 'Item Not Found']);
@@ -667,7 +626,7 @@ class ItemsController
             ];
             // Display name/category/image for context
             $name = $row['ingredient_name'] ?? ($row['product_title'] ?? ($row['entered_name'] ?? 'Item'));
-            $category = $this->stringifyCategory($row['ingredient_category'] ?? ($row['product_category'] ?? null));
+            $category = $this->items->stringifyCategory($row['ingredient_category'] ?? ($row['product_category'] ?? null));
             $image = $row['ingredient_image_url'] ?? ($row['product_image_url'] ?? null);
             return View::render('Items/edit', [
                 'title' => 'Edit Item',
@@ -811,7 +770,7 @@ class ItemsController
                 return View::render('Pages/401', ['title' => 'Unauthorized']);
             }
             // Ensure item exists and belongs to the user
-            $item = $this->items->findWithGlobalById($id, (int)$userId);
+            $item = $this->items->find($id, (int)$userId);
             if (!$item) {
                 http_response_code(404);
                 return View::render('Pages/404', ['title' => 'Item Not Found']);

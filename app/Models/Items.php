@@ -18,10 +18,35 @@ class Items
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     }
 
-    public function find(int $id): array|false
+    public function find(int $id, ?int $userId = null): array|false
     {
-        $stmt = $this->db->prepare("SELECT * FROM items WHERE id = :id LIMIT 1");
+        $sql = "SELECT i.*, 
+                       ing.name            AS ingredient_name,
+                       ing.category        AS ingredient_category,
+                       ing.image_url       AS ingredient_image_url,
+                       ing.nutrition_info  AS ingredient_nutrition_info,
+                       p.title             AS product_title,
+                       p.brand             AS product_brand,
+                       p.category          AS product_category,
+                       p.image_url         AS product_image_url,
+                       p.upc               AS product_upc,
+                       p.nutrition_info    AS product_nutrition_info,
+                       p.raw_payload       AS product_raw_payload
+                FROM items i
+                LEFT JOIN ingredients ing ON ing.id = i.ingredient_id
+                LEFT JOIN products p      ON p.id = i.product_id
+                WHERE i.id = :id";
+
+        if ($userId !== null) {
+            $sql .= " AND i.user_id = :user_id";
+        }
+        $sql .= " LIMIT 1";
+
+        $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        if ($userId !== null) {
+            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        }
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -226,14 +251,7 @@ class Items
 
     public function findWithGlobalById(int $id, int $userId): array|false
     {
-        // Backward-compat: now returns items-only row with user check
-        $sql = "SELECT * FROM items WHERE id = :id AND user_id = :user_id LIMIT 1";
-        $stmt = $this->db->prepare($sql);
-        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
-        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
-        $stmt->execute();
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row ?: false;
+        return $this->find($id, $userId);
     }
 
 
@@ -274,12 +292,261 @@ class Items
         return $stmt->execute();
     }
 
-    public function delete(int $id, ?int $userId = null): bool
+    public function getExpirationStatus(?string $expirationDate): array
     {
-        $sql = "DELETE FROM items WHERE id = :id";
-        $stmt = $this->db->prepare($sql . ($userId !== null ? " AND user_id = :user_id" : ""));
-        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
-        if ($userId !== null) $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
-        return $stmt->execute();
+        $status = 'In Stock';
+        $badge = 'badge-success';
+
+        if (!empty($expirationDate)) {
+            try {
+                $today = new \DateTimeImmutable('today');
+                $exp = new \DateTimeImmutable($expirationDate);
+                $diffDays = (int)$today->diff($exp)->format('%r%a');
+                if ($diffDays < 0) {
+                    $status = 'Expired ' . (abs($diffDays) === 1 ? '1 day ago' : abs($diffDays) . ' days ago');
+                    $badge = 'badge-danger';
+                } elseif ($diffDays === 0) {
+                    $status = 'Expires today';
+                    $badge = 'badge-warning';
+                } elseif ($diffDays <= 3) {
+                    $status = 'Expires in ' . ($diffDays === 1 ? '1 day' : $diffDays . ' days');
+                    $badge = 'badge-warning';
+                } else {
+                    $status = 'Expires in ' . $diffDays . ' days';
+                    $badge = 'badge-neutral';
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        return ['status' => $status, 'badge' => $badge];
+    }
+
+    public function stringifyCategory($cat): ?string
+    {
+        if ($cat === null || $cat === '') return null;
+
+        if (is_string($cat)) {
+            $trim = ltrim($cat);
+            if ($trim !== '' && ($trim[0] === '{' || $trim[0] === '[')) {
+                $decoded = json_decode($cat, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    return $this->stringifyCategory($decoded);
+                }
+            }
+            return $cat; // already a plain string
+        }
+
+        if (is_array($cat)) {
+            // OFF sometimes gives category paths / arrays
+            if (isset($cat['categoryPath']) && is_array($cat['categoryPath'])) {
+                return implode(' › ', array_filter($cat['categoryPath'], 'is_string'));
+            }
+            // generic: collapse any stringy array
+            $vals = [];
+            foreach ($cat as $v) {
+                if (is_string($v)) $vals[] = $v;
+            }
+            return $vals ? implode(' › ', $vals) : null;
+        }
+
+        return null;
+    }
+
+    public function normalizeNutrition($src): ?array
+    {
+        if (!is_array($src) || !$src) return null;
+
+        // If we received a bare FDC-style list of FoodNutrient entries, wrap it.
+        if (isset($src[0]) && is_array($src[0]) && (isset($src[0]['nutrient']) || isset($src[0]['nutrientName']) || (isset($src[0]['type']) && $src[0]['type'] === 'FoodNutrient'))) {
+            $src = ['foodNutrients' => $src];
+        }
+
+        // Already in target form?
+        if (isset($src['nutrients']) && is_array($src['nutrients'])) {
+            return $src;
+        }
+
+        // ---------- FDC: labelNutrients ----------
+        if (isset($src['labelNutrients']) && is_array($src['labelNutrients'])) {
+            $ln = $src['labelNutrients'];
+            $get = fn($k) => isset($ln[$k]['value']) ? (float)$ln[$k]['value'] : null;
+            $nutrients = [
+                ['name' => 'Calories', 'amount' => $get('calories'), 'unit' => 'kcal'],
+                ['name' => 'Protein', 'amount' => $get('protein'), 'unit' => 'g'],
+                ['name' => 'Fat', 'amount' => $get('fat'), 'unit' => 'g'],
+                ['name' => 'Saturated Fat', 'amount' => $get('saturatedFat'), 'unit' => 'g'],
+                ['name' => 'Carbohydrates', 'amount' => $get('carbohydrates'), 'unit' => 'g'],
+                ['name' => 'Fiber', 'amount' => $get('fiber'), 'unit' => 'g'],
+                ['name' => 'Sugar', 'amount' => $get('sugars'), 'unit' => 'g'],
+                ['name' => 'Sodium', 'amount' => $get('sodium'), 'unit' => 'mg'],
+                ['name' => 'Calcium', 'amount' => $get('calcium'), 'unit' => 'mg'],
+                ['name' => 'Iron', 'amount' => $get('iron'), 'unit' => 'mg'],
+                ['name' => 'Potassium', 'amount' => $get('potassium'), 'unit' => 'mg'],
+                ['name' => 'Cholesterol', 'amount' => $get('cholesterol'), 'unit' => 'mg'],
+            ];
+            $nutrients = array_values(array_filter($nutrients, fn($n) => $n['amount'] !== null));
+
+            $servingText = null;
+            if (isset($src['servingSize'], $src['servingSizeUnit'])) {
+                $servingText = $src['servingSize'] . ' ' . $src['servingSizeUnit'];
+            } elseif (isset($src['householdServingFullText'])) {
+                $servingText = $src['householdServingFullText'];
+            }
+
+            return $nutrients ? ['nutrients' => $nutrients, 'servings' => ['original' => $servingText ?? 'per serving']] : null;
+        }
+
+        // ---------- FDC: foodNutrients ----------
+        if (isset($src['foodNutrients']) && is_array($src['foodNutrients'])) {
+            $core = [
+                'Energy' => ['Calories', 'kcal'],
+                'Energy (Atwater General Factors)' => ['Calories', 'kcal'],
+                'Protein' => ['Protein', 'g'],
+                'Total lipid (fat)' => ['Fat', 'g'],
+                'Carbohydrate, by difference' => ['Carbohydrates', 'g'],
+                'Fiber, total dietary' => ['Fiber', 'g'],
+                'Sugars, total including NLEA' => ['Sugar', 'g'],
+                'Sugars, total' => ['Sugar', 'g'],
+                'Sodium, Na' => ['Sodium', 'mg'],
+                'Calcium, Ca' => ['Calcium', 'mg'],
+                'Iron, Fe' => ['Iron', 'mg'],
+                'Potassium, K' => ['Potassium', 'mg'],
+                'Cholesterol' => ['Cholesterol', 'mg'],
+            ];
+            $bucket = [];
+            $extras = [];
+            foreach ($src['foodNutrients'] as $fn) {
+                $name = $fn['nutrient']['name'] ?? $fn['nutrientName'] ?? null;
+                $amount = $fn['amount'] ?? $fn['value'] ?? null;
+                $unit = $fn['nutrient']['unitName'] ?? $fn['unitName'] ?? null;
+                if (!$name || $amount === null) continue;
+                $out = [
+                    'name' => $core[$name][0] ?? $name,
+                    'amount' => (float)$amount,
+                    'unit' => $unit ?: ($core[$name][1] ?? ''),
+                ];
+                if (isset($core[$name])) {
+                    $bucket[$out['name']] = $out;
+                } else {
+                    $extras[] = $out;
+                }
+            }
+            $list = array_values($bucket);
+            foreach ($extras as $ex) {
+                if (!isset($bucket[$ex['name']])) $list[] = $ex;
+            }
+            if ($list) {
+                $servingText = null;
+                if (isset($src['servingSize'], $src['servingSizeUnit'])) {
+                    $servingText = $src['servingSize'] . ' ' . $src['servingSizeUnit'];
+                } elseif (isset($src['householdServingFullText'])) {
+                    $servingText = $src['householdServingFullText'];
+                }
+                if (count($list) > 200) $list = array_slice($list, 0, 200);
+                return ['nutrients' => $list, 'servings' => ['original' => $servingText ?? 'per 100 g']];
+            }
+        }
+
+        // ---------- OFF: nutriments ----------
+        $nutriments = $src['nutriments'] ?? null;
+        if (!$nutriments && $this->looksLikeOffNutriments($src)) {
+            $nutriments = $src;
+        }
+        if (is_array($nutriments)) {
+            $pick = function (string $base) use ($nutriments) {
+                if (isset($nutriments[$base . '_serving'])) return ['v' => (float)$nutriments[$base . '_serving'], 'scope' => 'per serving'];
+                if (isset($nutriments[$base . '_100g'])) return ['v' => (float)$nutriments[$base . '_100g'], 'scope' => 'per 100 g'];
+                return null;
+            };
+            $unit = function (string $base, string $default) use ($nutriments) {
+                $k = $base . '_unit';
+                return isset($nutriments[$k]) && is_string($nutriments[$k]) ? $nutriments[$k] : $default;
+            };
+
+            $map = [
+                ['Calories', 'energy-kcal', 'kcal'],
+                ['Protein', 'proteins', 'g'],
+                ['Fat', 'fat', 'g'],
+                ['Saturated Fat', 'saturated-fat', 'g'],
+                ['Carbohydrates', 'carbohydrates', 'g'],
+                ['Fiber', 'fiber', 'g'],
+                ['Sugar', 'sugars', 'g'],
+                ['Sodium', 'sodium', 'mg'],
+                ['Calcium', 'calcium', 'mg'],
+                ['Iron', 'iron', 'mg'],
+                ['Potassium', 'potassium', 'mg'],
+            ];
+
+            $scope = null;
+            $out = [];
+            $taken = [];
+            foreach ($map as [$name, $base, $defUnit]) {
+                $picked = $pick($base);
+                if ($picked) {
+                    $out[] = ['name' => $name, 'amount' => $picked['v'], 'unit' => $unit($base, $defUnit)];
+                    $scope = $scope ?? $picked['scope'];
+                    $taken[$base] = true;
+                }
+            }
+            foreach ($nutriments as $key => $val) {
+                if (!is_scalar($val)) continue;
+                if (preg_match('/^(.+?)_(serving|100g)$/', (string)$key, $m)) {
+                    $base = $m[1];
+                    if (isset($taken[$base])) continue;
+                    $v = (float)$val;
+                    if (!is_finite($v)) continue;
+                    $nm = ucwords(str_replace(['-', '_'], [' ', ' '], $base));
+                    $out[] = ['name' => $nm, 'amount' => $v, 'unit' => $unit($base, '')];
+                }
+            }
+            if ($out) {
+                if (count($out) > 200) $out = array_slice($out, 0, 200);
+                return ['nutrients' => $out, 'servings' => ['original' => $scope ?? 'per 100 g']];
+            }
+        }
+
+        // Flat label-like structure
+        $flatKeys = ['calories', 'protein', 'fat', 'saturatedFat', 'transFat', 'carbohydrates', 'fiber', 'sugars', 'sodium', 'calcium', 'iron', 'potassium', 'cholesterol', 'addedSugars'];
+        $hasFlat = false;
+        foreach ($flatKeys as $k) {
+            if (isset($src[$k]) && is_array($src[$k]) && array_key_exists('value', $src[$k])) {
+                $hasFlat = true;
+                break;
+            }
+        }
+        if ($hasFlat) {
+            $get = function (string $k) use ($src) {
+                return isset($src[$k]['value']) ? (float)$src[$k]['value'] : null;
+            };
+            $nutrients = [
+                ['name' => 'Calories', 'amount' => $get('calories'), 'unit' => 'kcal'],
+                ['name' => 'Protein', 'amount' => $get('protein'), 'unit' => 'g'],
+                ['name' => 'Fat', 'amount' => $get('fat'), 'unit' => 'g'],
+                ['name' => 'Saturated Fat', 'amount' => $get('saturatedFat'), 'unit' => 'g'],
+                ['name' => 'Trans Fat', 'amount' => $get('transFat'), 'unit' => 'g'],
+                ['name' => 'Carbohydrates', 'amount' => $get('carbohydrates'), 'unit' => 'g'],
+                ['name' => 'Fiber', 'amount' => $get('fiber'), 'unit' => 'g'],
+                ['name' => 'Sugar', 'amount' => $get('sugars'), 'unit' => 'g'],
+                ['name' => 'Added Sugars', 'amount' => $get('addedSugars'), 'unit' => 'g'],
+                ['name' => 'Sodium', 'amount' => $get('sodium'), 'unit' => 'mg'],
+                ['name' => 'Calcium', 'amount' => $get('calcium'), 'unit' => 'mg'],
+                ['name' => 'Iron', 'amount' => $get('iron'), 'unit' => 'mg'],
+                ['name' => 'Potassium', 'amount' => $get('potassium'), 'unit' => 'mg'],
+                ['name' => 'Cholesterol', 'amount' => $get('cholesterol'), 'unit' => 'mg'],
+            ];
+            $nutrients = array_values(array_filter($nutrients, fn($n) => $n['amount'] !== null));
+            return $nutrients ? ['nutrients' => $nutrients, 'servings' => ['original' => 'per serving']] : null;
+        }
+
+        return null;
+    }
+
+    private function looksLikeOffNutriments(array $a): bool
+    {
+        foreach (['energy-kcal_100g', 'fat_100g', 'proteins_100g', 'carbohydrates_100g'] as $k) {
+            if (array_key_exists($k, $a)) return true;
+        }
+        return false;
     }
 }
