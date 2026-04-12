@@ -27,14 +27,18 @@ class Vite {
         $isDev     = ($env !== 'production') && is_dir(APP_ROOT . '/node_modules');
 
         if ($isDev) {
-            $ts = time();
-            $client   = $devServer . '/@vite/client?' . $ts;
-            $entryUrl = $devServer . '/' . $entry . '?' . $ts;
-            $clientEsc = htmlspecialchars($client, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $client    = $devServer . '/@vite/client';
+            $entryUrl  = $devServer . '/' . $entry;
+            $clientEsc = htmlspecialchars($client,   ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $entryEsc  = htmlspecialchars($entryUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            // Hide the page until Vite has injected its CSS to prevent FOUC.
+            // The inline module script runs after main.js; two rAFs ensure the
+            // injected <style> tag has been painted before we reveal content.
             return <<<HTML
+<style id="_vfouc">html{visibility:hidden}</style>
 <script type="module" src="{$clientEsc}"></script>
 <script type="module" src="{$entryEsc}"></script>
+<script type="module">requestAnimationFrame(()=>requestAnimationFrame(()=>{var e=document.getElementById('_vfouc');if(e)e.remove();}));</script>
 HTML;
         }
 
