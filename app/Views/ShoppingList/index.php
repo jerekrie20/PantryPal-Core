@@ -172,7 +172,7 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
 <?php endif; ?>
 
 <!-- Barcode Scanner modal -->
-<div id="scanner-modal" class="fixed inset-0 z-[70] hidden flex flex-col bg-black" role="dialog" aria-modal="true" aria-label="Barcode Scanner">
+<div id="scanner-modal" class="fixed inset-0 z-[90] hidden flex flex-col bg-black" role="dialog" aria-modal="true" aria-label="Barcode Scanner">
     <!-- Top bar -->
     <div class="flex items-center justify-between p-4 text-white shrink-0">
         <h2 class="text-lg font-semibold">Scan a Barcode</h2>
@@ -207,7 +207,7 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
 </div>
 
 <!-- Scanned item → Pantry form modal (for items NOT on the shopping list) -->
-<div id="scanned-pantry-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4" role="dialog" aria-modal="true">
+<div id="scanned-pantry-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="absolute inset-0 bg-black/50" onclick="closeScannedPantryModal()"></div>
     <div class="relative bg-bg-component rounded-xl shadow-xl w-full max-w-sm p-6 z-10">
         <h2 class="text-lg font-semibold text-text-heading mb-1">Add to Pantry</h2>
