@@ -215,6 +215,7 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
 
         <form id="scanned-pantry-form">
             <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+            <input type="hidden" id="scanned-barcode" name="barcode" value="">
             <input type="hidden" id="scanned-food-name" name="food_name" value="">
             <input type="hidden" id="scanned-brand-name" name="brand_name" value="">
 
@@ -462,7 +463,7 @@ function handleScannedBarcode(barcode) {
             resultEl.innerHTML = '<div class="p-3 bg-blue-50 border border-blue-200 rounded-lg z-[101]">'
                 + '<p class="text-sm font-semibold text-blue-800">' + displayName + '</p>'
                 + '<p class="text-xs text-blue-600 mb-2">Not on your list — add directly to pantry?</p>'
-                + '<button onclick="openScannedPantryForm(' + escHtml(JSON.stringify(data.food_name)) + ', ' + escHtml(JSON.stringify(data.brand_name || '')) + ')" class="btn btn-secondary btn-sm w-full">Add to Pantry</button>'
+                + '<button onclick="openScannedPantryForm(' + escHtml(JSON.stringify(data.food_name)) + ', ' + escHtml(JSON.stringify(data.brand_name || '')) + ', \'' + barcode + '\')" class="btn btn-secondary btn-sm w-full">Add to Pantry</button>'
                 + '</div>';
         }
     })
@@ -476,9 +477,10 @@ function openPantryModalFromScan(itemId, itemName) {
     openPantryModal(itemId, itemName);
 }
 
-function openScannedPantryForm(foodName, brandName) {
+function openScannedPantryForm(foodName, brandName, barcode) {
     document.getElementById('scanned-food-name').value  = foodName;
     document.getElementById('scanned-brand-name').value = brandName;
+    document.getElementById('scanned-barcode').value    = barcode || '';
     document.getElementById('sp-quantity').value = '';
     document.getElementById('sp-unit').value     = '';
 

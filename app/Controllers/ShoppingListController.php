@@ -366,6 +366,7 @@ class ShoppingListController
             exit;
         }
 
+        $barcode   = trim((string)($_POST['barcode'] ?? ''));
         $foodName  = trim((string)($_POST['food_name'] ?? ''));
         $brandName = trim((string)($_POST['brand_name'] ?? '')) ?: null;
         $quantity  = trim((string)($_POST['quantity'] ?? '')) ?: null;
@@ -378,29 +379,38 @@ class ShoppingListController
         }
 
         try {
-            $ingredientId = null;
+            $productId = null;
             try {
-                $results = $this->svc->searchWithKind($foodName, 'ingredient', $brandName, 1);
-                if (!empty($results[0]['api_id'])) {
-                    $ing = $this->svc->ensureIngredientFromApi($results[0]['api_id'], $foodName, $brandName);
-                    if ($ing && !empty($ing['id'])) {
-                        $ingredientId = (int)$ing['id'];
+                if ($barcode !== '') {
+                    $prod = $this->svc->ensureProductFromApi($barcode, $foodName, $brandName);
+                    if ($prod && !empty($prod['id'])) {
+                        $productId = (int)$prod['id'];
+                    }
+                }
+                
+                if (!$productId) {
+                    $results = $this->svc->searchWithKind($foodName, 'product', $brandName, 1);
+                    if (!empty($results[0]['api_id'])) {
+                        $prod = $this->svc->ensureProductFromApi($results[0]['api_id'], $foodName, $brandName);
+                        if ($prod && !empty($prod['id'])) {
+                            $productId = (int)$prod['id'];
+                        }
                     }
                 }
             } catch (\Throwable $e) {
-                error_log('ShoppingListController::addScannedToPantry FDC lookup failed: ' . $e->getMessage());
+                error_log('ShoppingListController::addScannedToPantry OFF lookup failed: ' . $e->getMessage());
                 // Non-fatal — fall through to entered_name path
             }
 
             $this->items->create([
                 'user_id'         => $userId,
-                'ingredient_id'   => $ingredientId,
-                'product_id'      => null,
+                'ingredient_id'   => null,
+                'product_id'      => $productId,
                 'quantity'        => $quantity,
                 'unit'            => $unit,
                 'purchase_date'   => date('Y-m-d'),
                 'expiration_date' => null,
-                'entered_name'    => $ingredientId ? null : $foodName,
+                'entered_name'    => $productId ? null : $foodName,
                 'entered_brand'   => $brandName,
             ]);
 

@@ -145,7 +145,12 @@ class OffProvider implements FoodProvider
                     'size_text' => $p['quantity'] ?? null,
                     'image_url' => $p['image_url'] ?? null,
                     'category' => $p['categories'] ?? null,
-                    'nutrition_info' => $p['nutriments'] ?? null,
+                    'nutrition_info' => [
+                        'nutriments' => $p['nutriments'] ?? null,
+                        'serving_size' => $p['serving_size'] ?? null,
+                        'serving_quantity' => $p['serving_quantity'] ?? null,
+                        'serving_quantity_unit' => $p['serving_quantity_unit'] ?? null,
+                    ],
                     'raw' => $p,
                 ];
             } catch (GuzzleException $e) {
