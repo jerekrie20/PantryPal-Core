@@ -386,37 +386,33 @@ function startShopping() {
         return;
     }
 
-    var constraints = [
-        { video: { facingMode: { exact: 'environment' } } },
-        { video: { facingMode: 'environment' } },
-        { video: true }
-    ];
-
-    function tryNext(index) {
-        if (index >= constraints.length) {
-            showScannerError('Could not access camera. Please check Chrome Settings → Site Settings → Camera and try again.');
-            return;
-        }
-        navigator.mediaDevices.getUserMedia(constraints[index])
-            .then(function (stream) {
-                scannerStream = stream;
-                var video = document.getElementById('scanner-video');
-                video.srcObject = stream;
-                video.play();
-                video.addEventListener('loadedmetadata', function () {
-                    requestAnimationFrame(function () { scanLoop(video); });
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+        .catch(function (err) {
+            console.log('Rear camera request failed, trying any camera...', err);
+            return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        })
+        .then(function (stream) {
+            scannerStream = stream;
+            var video = document.getElementById('scanner-video');
+            video.classList.remove('hidden');
+            video.srcObject = stream;
+            var playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(function (error) {
+                    console.error('Video play was prevented:', error);
                 });
-            })
-            .catch(function (err) {
-                if (err.name === 'OverconstrainedError' || err.name === 'NotFoundError') {
-                    tryNext(index + 1);
-                } else {
-                    showScannerError('Camera error [' + err.name + ']: ' + err.message);
-                }
-            });
-    }
-
-    tryNext(0);
+            }
+            video.onloadedmetadata = function () {
+                requestAnimationFrame(function () { scanLoop(video); });
+            };
+        })
+        .catch(function (err) {
+            if (err.name === 'NotAllowedError') {
+                showScannerError('Permission denied. Check Chrome Settings → Site Settings → Camera and try again.');
+            } else {
+                showScannerError('Camera error (' + err.name + '): ' + err.message);
+            }
+        });
 }
 
 function scanLoop(video) {
