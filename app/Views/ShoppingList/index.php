@@ -172,7 +172,7 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
 <?php endif; ?>
 
 <!-- Barcode Scanner modal -->
-<div id="scanner-modal" class="fixed inset-0 z-50 hidden flex flex-col bg-black" role="dialog" aria-modal="true" aria-label="Barcode Scanner">
+<div id="scanner-modal" class="fixed inset-0 z-[70] hidden flex flex-col bg-black" role="dialog" aria-modal="true" aria-label="Barcode Scanner">
     <!-- Top bar -->
     <div class="flex items-center justify-between p-4 text-white shrink-0">
         <h2 class="text-lg font-semibold">Scan a Barcode</h2>
@@ -456,13 +456,13 @@ function handleScannedBarcode(barcode) {
             resultEl.innerHTML = '<div class="p-3 bg-green-50 border border-green-200 rounded-lg">'
                 + '<p class="text-sm font-semibold text-green-800">' + displayName + '</p>'
                 + '<p class="text-xs text-green-600 mb-2">On your shopping list — move to pantry?</p>'
-                + '<button onclick="openPantryModalFromScan(' + data.list_item_id + ', ' + JSON.stringify(data.list_item_name) + ')" class="btn btn-cta btn-sm w-full">Add to Pantry</button>'
+                + '<button onclick="openPantryModalFromScan(' + data.list_item_id + ', ' + escHtml(JSON.stringify(data.list_item_name)) + ')" class="btn btn-cta btn-sm w-full">Add to Pantry</button>'
                 + '</div>';
         } else {
             resultEl.innerHTML = '<div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">'
                 + '<p class="text-sm font-semibold text-blue-800">' + displayName + '</p>'
                 + '<p class="text-xs text-blue-600 mb-2">Not on your list — add directly to pantry?</p>'
-                + '<button onclick="openScannedPantryForm(' + JSON.stringify(data.food_name) + ', ' + JSON.stringify(data.brand_name || '') + ')" class="btn btn-secondary btn-sm w-full">Add to Pantry</button>'
+                + '<button onclick="openScannedPantryForm(' + escHtml(JSON.stringify(data.food_name)) + ', ' + escHtml(JSON.stringify(data.brand_name || '')) + ')" class="btn btn-secondary btn-sm w-full">Add to Pantry</button>'
                 + '</div>';
         }
     })
