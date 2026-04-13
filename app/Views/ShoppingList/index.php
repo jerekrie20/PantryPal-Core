@@ -397,11 +397,7 @@ function startShopping() {
             });
         })
         .catch(function (err) {
-            if (err.name === 'NotAllowedError') {
-                showScannerError('Camera permission denied. Please allow camera access in your browser settings and try again.');
-            } else {
-                showScannerError('Could not start camera: ' + err.message);
-            }
+            showScannerError('Camera error [' + err.name + ']: ' + err.message + '. If permission was denied, check Chrome Settings → Site Settings → Camera.');
         });
 }
 
