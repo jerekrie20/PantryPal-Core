@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `ingredients`
     `name`            VARCHAR(255) NOT NULL,
     `normalized_name` VARCHAR(255) NOT NULL,
     `brand`           VARCHAR(120)                           DEFAULT NULL,
-    `api_source`      ENUM('fdc','off')                      DEFAULT NULL,
+    `api_source`      ENUM('fdc','off','fatsecret')                      DEFAULT NULL,
     `api_id`          BIGINT                                 DEFAULT NULL,
     `api_kind`        ENUM('ingredient','product','manual')  DEFAULT NULL,
     `image_url`       VARCHAR(255)                           DEFAULT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `products`
 (
     `id`             INT(11)      NOT NULL AUTO_INCREMENT,
     `ingredient_id`  INT(11)      NULL,
-    `api_source`     ENUM('fdc','off') DEFAULT NULL,
+    `api_source`     ENUM('fdc','off','fatsecret') DEFAULT NULL,
     `api_id`         BIGINT       NULL,
     `title`          VARCHAR(255) NOT NULL,
     `brand`          VARCHAR(120) NULL,

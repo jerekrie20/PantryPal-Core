@@ -170,8 +170,17 @@ class ItemsController
                 }
             }
 
-            // Products (if no nutrition yet): try OFF raw payload, then product_nutrition_info
             $productRaw = null;
+            if ($nutrition === null && ($row['product_api_source'] ?? '') === 'fatsecret' && !empty($row['product_api_id'])) {
+                $fsSvc = new \Services\FoodService();
+                $fsData = $fsSvc->getFatSecretFood($row['product_api_id']);
+                if ($fsData && isset($fsData['food'])) {
+                    $productRaw = $fsData['food'];
+                    $nutrition = $this->items->normalizeNutrition($productRaw);
+                }
+            }
+
+            // Products (if no nutrition yet): try OFF raw payload, then product_nutrition_info
             if ($nutrition === null && !empty($row['product_raw_payload'])) {
                 $productRaw = is_array($row['product_raw_payload'])
                     ? $row['product_raw_payload']

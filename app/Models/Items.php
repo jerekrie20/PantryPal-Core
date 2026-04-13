@@ -25,13 +25,17 @@ class Items
                        ing.category        AS ingredient_category,
                        ing.image_url       AS ingredient_image_url,
                        ing.nutrition_info  AS ingredient_nutrition_info,
+                       ing.api_source      AS ingredient_api_source,
+                       ing.api_id          AS ingredient_api_id,
                        p.title             AS product_title,
                        p.brand             AS product_brand,
                        p.category          AS product_category,
                        p.image_url         AS product_image_url,
                        p.upc               AS product_upc,
                        p.nutrition_info    AS product_nutrition_info,
-                       p.raw_payload       AS product_raw_payload
+                       p.raw_payload       AS product_raw_payload,
+                       p.api_source        AS product_api_source,
+                       p.api_id            AS product_api_id
                 FROM items i
                 LEFT JOIN ingredients ing ON ing.id = i.ingredient_id
                 LEFT JOIN products p      ON p.id = i.product_id
@@ -375,6 +379,57 @@ class Items
         // Already in target form?
         if (isset($src['nutrients']) && is_array($src['nutrients'])) {
             return $src;
+        }
+
+        // ---------- FatSecret: food.servings ----------
+        if (isset($src['servings']['serving']) && is_array($src['servings']['serving'])) {
+            $servings = $src['servings']['serving'];
+            // API can return a single object instead of an array if there's only one serving
+            if (isset($servings['serving_id'])) {
+                $servings = [$servings];
+            }
+            $serving = $servings[0] ?? null;
+            foreach ($servings as $s) {
+                if (!empty($s['is_default'])) {
+                    $serving = $s;
+                    break;
+                }
+            }
+            
+            if ($serving) {
+                $map = [
+                    'calories'            => ['Calories',        'kcal'],
+                    'protein'             => ['Protein',          'g'],
+                    'carbohydrate'        => ['Carbohydrates',    'g'],
+                    'fat'                 => ['Fat',              'g'],
+                    'saturated_fat'       => ['Saturated Fat',    'g'],
+                    'polyunsaturated_fat' => ['Polyunsaturated Fat', 'g'],
+                    'monounsaturated_fat' => ['Monounsaturated Fat', 'g'],
+                    'trans_fat'           => ['Trans Fat',        'g'],
+                    'fiber'               => ['Fiber',            'g'],
+                    'sugar'               => ['Sugar',            'g'],
+                    'sodium'              => ['Sodium',           'mg'],
+                    'potassium'           => ['Potassium',        'mg'],
+                    'cholesterol'         => ['Cholesterol',      'mg'],
+                    'calcium'             => ['Calcium',          'mg'],
+                    'iron'                => ['Iron',             'mg'],
+                    'vitamin_a'           => ['Vitamin A',        'IU'],
+                    'vitamin_c'           => ['Vitamin C',        'mg'],
+                ];
+
+                $nutrients = [];
+                foreach ($map as $key => [$label, $unit]) {
+                    if (isset($serving[$key]) && $serving[$key] !== '' && $serving[$key] !== null) {
+                        $amount = (float)$serving[$key];
+                        if ($amount > 0 || $key === 'calories' || $amount !== 0.0) {
+                            $nutrients[] = ['name' => $label, 'amount' => $amount, 'unit' => $unit];
+                        }
+                    }
+                }
+                
+                $servingText = $serving['serving_description'] ?? 'per serving';
+                return $nutrients ? ['nutrients' => $nutrients, 'servings' => ['original' => $servingText]] : null;
+            }
         }
 
         // ---------- FDC: labelNutrients ----------

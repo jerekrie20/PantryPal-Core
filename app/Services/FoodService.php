@@ -116,6 +116,35 @@ class FoodService
         return $id ? $this->products->findBySourceAndApiId('off', $apiId) : null;
     }
 
+    /** Save FatSecret product (only storing ID, name, brand to comply with ToS). */
+    public function ensureFatSecretProductFromApi(int|string $apiId, string $originalQuery, ?string $brand = null): ?array
+    {
+        try {
+            if (!\Helpers\Cache::get('fs_enum_patch_prod')) {
+                global $conn;
+                $conn->exec("ALTER TABLE `products` MODIFY COLUMN `api_source` ENUM('fdc','off','fatsecret') DEFAULT NULL");
+                \Helpers\Cache::set('fs_enum_patch_prod', 1, 86400 * 365);
+            }
+        } catch (\Throwable $e) {}
+
+        if ($hit = $this->products->findBySourceAndApiId('fatsecret', $apiId)) {
+            return $hit;
+        }
+        $id = $this->products->create([
+            'api_source'     => 'fatsecret',
+            'api_id'         => (string)$apiId,
+            'title'          => $originalQuery,
+            'brand'          => $brand,
+            'upc'            => null,
+            'size_text'      => null,
+            'image_url'      => null,
+            'category'       => null,
+            'nutrition_info' => null,
+            'raw_payload'    => null,
+        ]);
+        return $id ? $this->products->findBySourceAndApiId('fatsecret', $apiId) : null;
+    }
+
     /**
      * Reduce bulky nutrition payloads to the essentials we can render.
      * Accepts array|string JSON; returns array simplified.

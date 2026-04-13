@@ -260,8 +260,18 @@ class IngredientsController
             // Nutrition: robustly decode and normalize the ingredient's nutrition_info
             $nutrition = null;
             $rawNutri = null;
+
+            if (($ing['api_source'] ?? '') === 'fatsecret' && !empty($ing['api_id'])) {
+                $fsSvc = new \Services\FoodService();
+                $fsData = $fsSvc->getFatSecretFood($ing['api_id']);
+                if ($fsData && isset($fsData['food'])) {
+                    $rawNutri = $fsData['food'];
+                    $nutrition = $this->normalizeNutrition($rawNutri);
+                }
+            }
+
             $ingNutri = $ing['nutrition_info'] ?? null;
-            if ($ingNutri) {
+            if ($nutrition === null && $ingNutri) {
                 $decoded = is_array($ingNutri) ? $ingNutri : json_decode((string)$ingNutri, true);
                 if (!is_array($decoded)) {
                     $s = (string)$ingNutri;
@@ -432,9 +442,60 @@ class IngredientsController
     {
         if (!is_array($src) || !$src) return null;
 
-        // Already normalized
+        // Already in target form?
         if (isset($src['nutrients']) && is_array($src['nutrients'])) {
             return $src;
+        }
+
+        // ---------- FatSecret: food.servings ----------
+        if (isset($src['servings']['serving']) && is_array($src['servings']['serving'])) {
+            $servings = $src['servings']['serving'];
+            // API can return a single object instead of an array if there's only one serving
+            if (isset($servings['serving_id'])) {
+                $servings = [$servings];
+            }
+            $serving = $servings[0] ?? null;
+            foreach ($servings as $s) {
+                if (!empty($s['is_default'])) {
+                    $serving = $s;
+                    break;
+                }
+            }
+            
+            if ($serving) {
+                $map = [
+                    'calories'            => ['Calories',        'kcal'],
+                    'protein'             => ['Protein',          'g'],
+                    'carbohydrate'        => ['Carbohydrates',    'g'],
+                    'fat'                 => ['Fat',              'g'],
+                    'saturated_fat'       => ['Saturated Fat',    'g'],
+                    'polyunsaturated_fat' => ['Polyunsaturated Fat', 'g'],
+                    'monounsaturated_fat' => ['Monounsaturated Fat', 'g'],
+                    'trans_fat'           => ['Trans Fat',        'g'],
+                    'fiber'               => ['Fiber',            'g'],
+                    'sugar'               => ['Sugar',            'g'],
+                    'sodium'              => ['Sodium',           'mg'],
+                    'potassium'           => ['Potassium',        'mg'],
+                    'cholesterol'         => ['Cholesterol',      'mg'],
+                    'calcium'             => ['Calcium',          'mg'],
+                    'iron'                => ['Iron',             'mg'],
+                    'vitamin_a'           => ['Vitamin A',        'IU'],
+                    'vitamin_c'           => ['Vitamin C',        'mg'],
+                ];
+
+                $nutrients = [];
+                foreach ($map as $key => [$label, $unit]) {
+                    if (isset($serving[$key]) && $serving[$key] !== '' && $serving[$key] !== null) {
+                        $amount = (float)$serving[$key];
+                        if ($amount > 0 || $key === 'calories' || $amount !== 0.0) {
+                            $nutrients[] = ['name' => $label, 'amount' => $amount, 'unit' => $unit];
+                        }
+                    }
+                }
+                
+                $servingText = $serving['serving_description'] ?? 'per serving';
+                return $nutrients ? ['nutrients' => $nutrients, 'servings' => ['original' => $servingText]] : null;
+            }
         }
 
         // FDC labelNutrients

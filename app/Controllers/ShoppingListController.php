@@ -380,7 +380,10 @@ class ShoppingListController
 
         try {
             $productId = null;
+            $ingredientId = null;
+
             try {
+                // 1. Try OFF (Product)
                 if ($barcode !== '') {
                     $prod = $this->svc->ensureProductFromApi($barcode, $foodName, $brandName);
                     if ($prod && !empty($prod['id'])) {
@@ -388,7 +391,21 @@ class ShoppingListController
                     }
                 }
                 
+                if (!$productId && $barcode !== '') {
+                    // 2. Try FatSecret (Barcode)
+                    $fs = new \Services\Providers\FatSecretProvider();
+                    $fsData = $fs->findFoodByBarcode($barcode);
+                    if ($fsData && isset($fsData['food']['food_id'])) {
+                        $fsFoodId = $fsData['food']['food_id'];
+                        $prod = $this->svc->ensureFatSecretProductFromApi($fsFoodId, $foodName, $brandName);
+                        if ($prod && !empty($prod['id'])) {
+                            $productId = (int)$prod['id'];
+                        }
+                    }
+                }
+
                 if (!$productId) {
+                    // 3. Fallback to OFF by name search
                     $results = $this->svc->searchWithKind($foodName, 'product', $brandName, 1);
                     if (!empty($results[0]['api_id'])) {
                         $prod = $this->svc->ensureProductFromApi($results[0]['api_id'], $foodName, $brandName);
@@ -397,20 +414,31 @@ class ShoppingListController
                         }
                     }
                 }
+                
+                if (!$productId && !$ingredientId) {
+                    // 4. Fallback to FDC (Ingredient) by name search
+                    $results = $this->svc->searchWithKind($foodName, 'ingredient', $brandName, 1);
+                    if (!empty($results[0]['api_id'])) {
+                        $ing = $this->svc->ensureIngredientFromApi($results[0]['api_id'], $foodName, $brandName);
+                        if ($ing && !empty($ing['id'])) {
+                            $ingredientId = (int)$ing['id'];
+                        }
+                    }
+                }
             } catch (\Throwable $e) {
-                error_log('ShoppingListController::addScannedToPantry OFF lookup failed: ' . $e->getMessage());
+                error_log('ShoppingListController::addScannedToPantry lookup failed: ' . $e->getMessage());
                 // Non-fatal — fall through to entered_name path
             }
 
             $this->items->create([
                 'user_id'         => $userId,
-                'ingredient_id'   => null,
+                'ingredient_id'   => $ingredientId,
                 'product_id'      => $productId,
                 'quantity'        => $quantity,
                 'unit'            => $unit,
                 'purchase_date'   => date('Y-m-d'),
                 'expiration_date' => null,
-                'entered_name'    => $productId ? null : $foodName,
+                'entered_name'    => ($productId || $ingredientId) ? null : $foodName,
                 'entered_brand'   => $brandName,
             ]);
 
