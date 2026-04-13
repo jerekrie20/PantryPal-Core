@@ -9,9 +9,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($title) ? htmlspecialchars($title) . ' · ' : '' ?>PantryPal</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <!-- Begin fatsecret Platform API HTML Attribution Snippet -->
-    <a href="https://platform.fatsecret.com">Powered by fatsecret Platform API</a>
-    <!-- End fatsecret Platform API HTML Attribution Snippet -->
     <?php
     if (!function_exists('vite_tags')) {
         function vite_tags() { /* Placeholder */ }
