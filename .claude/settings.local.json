@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(composer require:*)",
-      "Bash(php composer.phar require intervention/image)"
+      "Bash(php composer.phar require intervention/image)",
+      "Bash(git checkout:*)",
+      "Bash(php -l app/Services/Providers/FatSecretProvider.php)",
+      "Bash(php -l app/Controllers/ShoppingListController.php)",
+      "Bash(php -l app/routes/web.php)",
+      "Bash(php -l app/Views/ShoppingList/index.php)",
+      "Bash(php.exe -l app/Services/Providers/FatSecretProvider.php)",
+      "Bash(php.exe -l app/Controllers/ShoppingListController.php)",
+      "Bash(php.exe -l app/routes/web.php)",
+      "Bash(/c/Users/Jeremiah/AppData/Roaming/Herd/bin/php.bat -l app/Services/Providers/FatSecretProvider.php)"
     ]
   }
 }

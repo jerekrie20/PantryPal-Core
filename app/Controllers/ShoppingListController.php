@@ -6,6 +6,7 @@ use Helpers\View;
 use Models\Items;
 use Models\ShoppingList;
 use Services\FoodService;
+use Services\Providers\FatSecretProvider;
 
 class ShoppingListController
 {
@@ -270,6 +271,148 @@ class ShoppingListController
         }
 
         header('Location: /shopping-list');
+        exit;
+    }
+
+    /**
+     * POST /api/shopping/scan-barcode
+     * Looks up a barcode via the FatSecret Premier barcode API and checks whether
+     * the resolved food already exists on the user's shopping list.
+     * Returns JSON.
+     */
+    public function scanBarcode(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = (int)($_SESSION['user_id'] ?? 0);
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            exit;
+        }
+
+        $barcode = trim((string)($_POST['barcode'] ?? ''));
+        if ($barcode === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Barcode is required']);
+            exit;
+        }
+
+        try {
+            $fs   = new FatSecretProvider();
+            $data = $fs->findFoodByBarcode($barcode);
+
+            if (!$data || isset($data['error'])) {
+                echo json_encode(['found' => false, 'message' => 'Product not found for this barcode.']);
+                exit;
+            }
+
+            $food = $data['food'] ?? null;
+            if (!$food) {
+                echo json_encode(['found' => false, 'message' => 'Product not found for this barcode.']);
+                exit;
+            }
+
+            $foodName  = (string)($food['food_name'] ?? '');
+            $brandName = (string)($food['brand_name'] ?? '');
+
+            // Check if any shopping list item fuzzy-matches the scanned food name
+            $listItems    = $this->list->findAllForUser($userId);
+            $inList       = false;
+            $listItemId   = null;
+            $listItemName = '';
+
+            $needle = strtolower($foodName);
+            foreach ($listItems as $listItem) {
+                $haystack = strtolower($listItem['name']);
+                if (str_contains($haystack, $needle) || str_contains($needle, $haystack)) {
+                    $inList       = true;
+                    $listItemId   = (int)$listItem['id'];
+                    $listItemName = $listItem['name'];
+                    break;
+                }
+            }
+
+            echo json_encode([
+                'found'          => true,
+                'food_name'      => $foodName,
+                'brand_name'     => $brandName,
+                'in_list'        => $inList,
+                'list_item_id'   => $listItemId,
+                'list_item_name' => $listItemName,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('ShoppingListController::scanBarcode error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['error' => 'Something went wrong. Please try again.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /api/shopping/scanned-to-pantry
+     * Adds a barcode-scanned item directly to the pantry when it was not on the shopping list.
+     * Attempts an FDC ingredient lookup; falls back to entered_name just like moveToPantry.
+     * Returns JSON.
+     */
+    public function addScannedToPantry(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = (int)($_SESSION['user_id'] ?? 0);
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            exit;
+        }
+
+        $foodName  = trim((string)($_POST['food_name'] ?? ''));
+        $brandName = trim((string)($_POST['brand_name'] ?? '')) ?: null;
+        $quantity  = trim((string)($_POST['quantity'] ?? '')) ?: null;
+        $unit      = trim((string)($_POST['unit'] ?? '')) ?: null;
+
+        if ($foodName === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Food name is required']);
+            exit;
+        }
+
+        try {
+            $ingredientId = null;
+            try {
+                $results = $this->svc->searchWithKind($foodName, 'ingredient', $brandName, 1);
+                if (!empty($results[0]['api_id'])) {
+                    $ing = $this->svc->ensureIngredientFromApi($results[0]['api_id'], $foodName, $brandName);
+                    if ($ing && !empty($ing['id'])) {
+                        $ingredientId = (int)$ing['id'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('ShoppingListController::addScannedToPantry FDC lookup failed: ' . $e->getMessage());
+                // Non-fatal — fall through to entered_name path
+            }
+
+            $this->items->create([
+                'user_id'         => $userId,
+                'ingredient_id'   => $ingredientId,
+                'product_id'      => null,
+                'quantity'        => $quantity,
+                'unit'            => $unit,
+                'purchase_date'   => date('Y-m-d'),
+                'expiration_date' => null,
+                'entered_name'    => $ingredientId ? null : $foodName,
+                'entered_brand'   => $brandName,
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'message' => "'{$foodName}' added to your pantry.",
+            ]);
+        } catch (\Throwable $e) {
+            error_log('ShoppingListController::addScannedToPantry error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['error' => 'Something went wrong. Please try again.']);
+        }
         exit;
     }
 }

@@ -96,6 +96,10 @@ $router->group(['middleware' => [AuthMiddleware::class, CsrfMiddleware::class]],
     $router->post('/shopping-list/item/{id:int}/delete', [ShoppingListController::class, 'delete']);
     $router->post('/shopping-list/item/{id:int}/move-to-pantry', [ShoppingListController::class, 'moveToPantry']);
 
+    // Barcode scanning (Premier FatSecret)
+    $router->post('/api/shopping/scan-barcode', [ShoppingListController::class, 'scanBarcode']);
+    $router->post('/api/shopping/scanned-to-pantry', [ShoppingListController::class, 'addScannedToPantry']);
+
     // AI Cooking Assistant
     $router->post('/api/ai/chat', [AIController::class, 'chat']);
     $router->get('/api/ai/usage', [AIController::class, 'usage']);

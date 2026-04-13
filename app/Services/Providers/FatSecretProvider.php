@@ -88,6 +88,32 @@ class FatSecretProvider
     }
 
     /**
+     * Look up food by barcode (GTIN-13) via the Premier barcode endpoint v2.
+     * UPC-A (12-digit) and EAN-8 barcodes are automatically left-padded to 13 digits.
+     * Returns the raw decoded food response (same shape as food/v5); caller must not store permanently.
+     *
+     * Requires 'barcode' OAuth scope (Premier plan).
+     */
+    public function findFoodByBarcode(string $barcode): ?array
+    {
+        if (!$this->isConfigured() || trim($barcode) === '') {
+            return null;
+        }
+        // Normalise to GTIN-13: strip non-digits then left-pad with zeros
+        $normalised = str_pad(preg_replace('/\D/', '', $barcode), 13, '0', STR_PAD_LEFT);
+        if (strlen($normalised) > 13) {
+            error_log('FatSecretProvider::findFoodByBarcode: barcode too long after normalisation: ' . $barcode);
+            return null;
+        }
+        $params = [
+            'barcode'              => $normalised,
+            'flag_default_serving' => 'true',
+            'format'               => 'json',
+        ];
+        return $this->cachedCall('food.find_id_for_barcode.v2', self::API_BASE . 'food/barcode/find-by-id/v2', $params);
+    }
+
+    /**
      * Fetch full food details via food/v5.
      * Returns the raw decoded response array (cached in Redis); caller must not store permanently.
      */
@@ -179,7 +205,7 @@ class FatSecretProvider
                     'grant_type'    => 'client_credentials',
                     'client_id'     => $this->clientId,
                     'client_secret' => $this->clientSecret,
-                    'scope'         => 'basic',
+                    'scope'         => 'basic barcode',
                 ],
             ]);
             $data = json_decode((string)$resp->getBody(), true);

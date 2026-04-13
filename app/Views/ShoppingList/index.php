@@ -32,9 +32,18 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
         <h1 class="text-3xl font-bold text-text-heading">Shopping List</h1>
         <p class="text-text-muted mt-1"><?php echo $total; ?> item<?php echo $total !== 1 ? 's' : ''; ?> to pick up</p>
     </div>
-    <?php if ($total > 0): ?>
-        <a href="/items" class="btn btn-subtle btn-md">View Pantry</a>
-    <?php endif; ?>
+    <div class="flex items-center gap-2">
+        <button type="button" onclick="startShopping()" class="btn btn-cta btn-md flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            Start Shopping
+        </button>
+        <?php if ($total > 0): ?>
+            <a href="/items" class="btn btn-subtle btn-md">View Pantry</a>
+        <?php endif; ?>
+    </div>
 </section>
 
 <!-- Add item manually -->
@@ -162,6 +171,89 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
     <?php endforeach; ?>
 <?php endif; ?>
 
+<!-- Barcode Scanner modal -->
+<div id="scanner-modal" class="fixed inset-0 z-50 hidden flex flex-col bg-black" role="dialog" aria-modal="true" aria-label="Barcode Scanner">
+    <!-- Top bar -->
+    <div class="flex items-center justify-between p-4 text-white shrink-0">
+        <h2 class="text-lg font-semibold">Scan a Barcode</h2>
+        <button type="button" onclick="stopScanner()" class="p-2 rounded-full hover:bg-white/10 transition" aria-label="Close scanner">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Camera feed area -->
+    <div class="relative flex-1 overflow-hidden flex items-center justify-center bg-black">
+        <video id="scanner-video" class="w-full h-full object-cover" playsinline autoplay muted></video>
+
+        <!-- Viewfinder overlay -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="relative w-64 h-40">
+                <!-- Corner marks -->
+                <span class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-sm"></span>
+                <span class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-sm"></span>
+                <span class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-sm"></span>
+                <span class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-sm"></span>
+                <!-- Scan line animation -->
+                <span id="scanner-line" class="absolute left-2 right-2 h-0.5 bg-brand/80 animate-bounce" style="top:50%"></span>
+            </div>
+        </div>
+
+        <!-- Error / unsupported message -->
+        <div id="scanner-error" class="absolute inset-0 hidden flex items-center justify-center p-6">
+            <div class="bg-bg-component rounded-xl p-6 text-center max-w-sm shadow-xl">
+                <svg class="w-10 h-10 mx-auto mb-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+                <p id="scanner-error-msg" class="text-sm text-text-base"></p>
+                <button type="button" onclick="stopScanner()" class="btn btn-subtle btn-md mt-4">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom result panel -->
+    <div class="shrink-0 p-4 bg-bg-component border-t border-border-default">
+        <p class="text-xs text-text-muted text-center mb-3">Point your camera at a barcode on any food item</p>
+        <div id="scanner-result" class="hidden"></div>
+    </div>
+</div>
+
+<!-- Scanned item → Pantry form modal (for items NOT on the shopping list) -->
+<div id="scanned-pantry-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="absolute inset-0 bg-black/50" onclick="closeScannedPantryModal()"></div>
+    <div class="relative bg-bg-component rounded-xl shadow-xl w-full max-w-sm p-6 z-10">
+        <h2 class="text-lg font-semibold text-text-heading mb-1">Add to Pantry</h2>
+        <p id="scanned-display-name" class="text-sm text-text-muted mb-4 truncate"></p>
+
+        <form id="scanned-pantry-form">
+            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+            <input type="hidden" id="scanned-food-name" name="food_name" value="">
+            <input type="hidden" id="scanned-brand-name" name="brand_name" value="">
+
+            <div class="space-y-3">
+                <div class="flex gap-3">
+                    <div class="flex-1">
+                        <label for="sp-quantity" class="block text-xs font-medium text-text-muted mb-1">Quantity</label>
+                        <input type="number" id="sp-quantity" name="quantity" min="0" step="any" placeholder="e.g. 1"
+                            class="w-full border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-page text-text-base focus:outline-none focus:ring-2 focus:ring-brand">
+                    </div>
+                    <div class="flex-1">
+                        <label for="sp-unit" class="block text-xs font-medium text-text-muted mb-1">Unit</label>
+                        <input type="text" id="sp-unit" name="unit" placeholder="e.g. box"
+                            class="w-full border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-page text-text-base focus:outline-none focus:ring-2 focus:ring-brand">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-2 mt-5">
+                <button type="button" onclick="submitScannedPantry()" class="btn btn-cta btn-md flex-1">Add to Pantry</button>
+                <button type="button" onclick="closeScannedPantryModal()" class="btn btn-subtle btn-md">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Move to Pantry modal -->
 <div id="pantry-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="pantry-modal-title">
     <!-- Backdrop -->
@@ -259,8 +351,207 @@ function closePantryModal() {
 }
 
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closePantryModal();
+    if (e.key === 'Escape') {
+        closePantryModal();
+        stopScanner();
+        closeScannedPantryModal();
+    }
 });
+
+// ─── Barcode Scanner ──────────────────────────────────────────────────────────
+
+var scannerStream      = null;
+var scannerAnimFrame   = null;
+var barcodeDetector    = null;
+var lastScannedBarcode = null;
+var scanCooldown       = false;
+
+function startShopping() {
+    var modal = document.getElementById('scanner-modal');
+    var errorEl = document.getElementById('scanner-error');
+    modal.classList.remove('hidden');
+    errorEl.classList.add('hidden');
+
+    if (!('BarcodeDetector' in window)) {
+        showScannerError('Barcode scanning is not supported in your browser. Please use Chrome on Android or a Chromium-based browser.');
+        return;
+    }
+
+    try {
+        barcodeDetector = new BarcodeDetector({
+            formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
+        });
+    } catch (e) {
+        showScannerError('Could not initialise barcode detector: ' + e.message);
+        return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(function (stream) {
+            scannerStream = stream;
+            var video = document.getElementById('scanner-video');
+            video.srcObject = stream;
+            video.play();
+            video.addEventListener('loadedmetadata', function () {
+                requestAnimationFrame(function () { scanLoop(video); });
+            });
+        })
+        .catch(function (err) {
+            if (err.name === 'NotAllowedError') {
+                showScannerError('Camera permission denied. Please allow camera access in your browser settings and try again.');
+            } else {
+                showScannerError('Could not start camera: ' + err.message);
+            }
+        });
+}
+
+function scanLoop(video) {
+    if (!barcodeDetector || !scannerStream) return;
+
+    barcodeDetector.detect(video)
+        .then(function (barcodes) {
+            if (barcodes.length > 0 && !scanCooldown) {
+                var barcode = barcodes[0].rawValue;
+                if (barcode !== lastScannedBarcode) {
+                    lastScannedBarcode = barcode;
+                    scanCooldown = true;
+                    handleScannedBarcode(barcode);
+                    setTimeout(function () { scanCooldown = false; }, 3000);
+                }
+            }
+            scannerAnimFrame = requestAnimationFrame(function () { scanLoop(video); });
+        })
+        .catch(function () {
+            scannerAnimFrame = requestAnimationFrame(function () { scanLoop(video); });
+        });
+}
+
+function stopScanner() {
+    if (scannerStream) {
+        scannerStream.getTracks().forEach(function (t) { t.stop(); });
+        scannerStream = null;
+    }
+    if (scannerAnimFrame) {
+        cancelAnimationFrame(scannerAnimFrame);
+        scannerAnimFrame = null;
+    }
+    barcodeDetector    = null;
+    lastScannedBarcode = null;
+    scanCooldown       = false;
+
+    var video = document.getElementById('scanner-video');
+    if (video) { video.srcObject = null; }
+
+    document.getElementById('scanner-modal').classList.add('hidden');
+    document.getElementById('scanner-result').classList.add('hidden');
+}
+
+function showScannerError(msg) {
+    var errorEl  = document.getElementById('scanner-error');
+    var errorMsg = document.getElementById('scanner-error-msg');
+    var video    = document.getElementById('scanner-video');
+    if (errorEl)  errorEl.classList.remove('hidden');
+    if (errorMsg) errorMsg.textContent = msg;
+    if (video)    video.classList.add('hidden');
+}
+
+function handleScannedBarcode(barcode) {
+    var resultEl = document.getElementById('scanner-result');
+    resultEl.classList.remove('hidden');
+    resultEl.innerHTML = '<p class="text-sm text-text-muted text-center">Looking up product\u2026</p>';
+
+    var params = new URLSearchParams({
+        csrf_token: '<?php echo $csrf; ?>',
+        barcode: barcode
+    });
+
+    fetch('/api/shopping/scan-barcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+    .then(function (resp) { return resp.json(); })
+    .then(function (data) {
+        if (!data.found) {
+            resultEl.innerHTML = '<div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 text-center">'
+                + escHtml(data.message || 'Product not found for this barcode.')
+                + '</div>';
+            return;
+        }
+
+        var displayName = data.brand_name
+            ? escHtml(data.brand_name) + ' ' + escHtml(data.food_name)
+            : escHtml(data.food_name);
+
+        if (data.in_list) {
+            resultEl.innerHTML = '<div class="p-3 bg-green-50 border border-green-200 rounded-lg">'
+                + '<p class="text-sm font-semibold text-green-800">' + displayName + '</p>'
+                + '<p class="text-xs text-green-600 mb-2">On your shopping list — move to pantry?</p>'
+                + '<button onclick="openPantryModalFromScan(' + data.list_item_id + ', ' + JSON.stringify(data.list_item_name) + ')" class="btn btn-cta btn-sm w-full">Add to Pantry</button>'
+                + '</div>';
+        } else {
+            resultEl.innerHTML = '<div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">'
+                + '<p class="text-sm font-semibold text-blue-800">' + displayName + '</p>'
+                + '<p class="text-xs text-blue-600 mb-2">Not on your list — add directly to pantry?</p>'
+                + '<button onclick="openScannedPantryForm(' + JSON.stringify(data.food_name) + ', ' + JSON.stringify(data.brand_name || '') + ')" class="btn btn-secondary btn-sm w-full">Add to Pantry</button>'
+                + '</div>';
+        }
+    })
+    .catch(function () {
+        resultEl.innerHTML = '<div class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 text-center">Error looking up product. Please try again.</div>';
+    });
+}
+
+function openPantryModalFromScan(itemId, itemName) {
+    stopScanner();
+    openPantryModal(itemId, itemName);
+}
+
+function openScannedPantryForm(foodName, brandName) {
+    document.getElementById('scanned-food-name').value  = foodName;
+    document.getElementById('scanned-brand-name').value = brandName;
+    document.getElementById('sp-quantity').value = '';
+    document.getElementById('sp-unit').value     = '';
+
+    var label = brandName ? brandName + ' ' + foodName : foodName;
+    document.getElementById('scanned-display-name').textContent = label;
+    document.getElementById('scanned-pantry-modal').classList.remove('hidden');
+}
+
+function closeScannedPantryModal() {
+    document.getElementById('scanned-pantry-modal').classList.add('hidden');
+}
+
+function submitScannedPantry() {
+    var form   = document.getElementById('scanned-pantry-form');
+    var params = new URLSearchParams(new FormData(form));
+
+    fetch('/api/shopping/scanned-to-pantry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+    .then(function (resp) { return resp.json(); })
+    .then(function (data) {
+        if (data.success) {
+            closeScannedPantryModal();
+            stopScanner();
+            // Refresh page so shopping list and pantry counts update
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Something went wrong.'));
+        }
+    })
+    .catch(function () {
+        alert('Error adding to pantry. Please try again.');
+    });
+}
+
+function escHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str || ''));
+    return div.innerHTML;
+}
 </script>
 
 <?php
