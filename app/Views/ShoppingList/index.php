@@ -369,11 +369,14 @@ var scanCooldown       = false;
 function startShopping() {
     var modal = document.getElementById('scanner-modal');
     var errorEl = document.getElementById('scanner-error');
+    var video = document.getElementById('scanner-video');
+
     modal.classList.remove('hidden');
     errorEl.classList.add('hidden');
+    video.classList.remove('hidden'); // Ensure video is visible
 
     if (!('BarcodeDetector' in window)) {
-        showScannerError('Barcode scanning is not supported in your browser. Please use Chrome on Android or a Chromium-based browser.');
+        showScannerError('Barcode scanning is not supported in your browser.');
         return;
     }
 
@@ -386,35 +389,38 @@ function startShopping() {
         return;
     }
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
-        .catch(function (err) {
-            console.log('Rear camera request failed, trying any camera...', err);
-            return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        })
+    // 1. Flatten the constraints. No 'exact' keyword.
+    // 2. Adding ideal resolution helps Android pick the primary lens.
+    var constraints = {
+        video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        },
+        audio: false
+    };
+
+    navigator.mediaDevices.getUserMedia(constraints)
         .then(function (stream) {
             scannerStream = stream;
-            var video = document.getElementById('scanner-video');
-            video.classList.remove('hidden');
             video.srcObject = stream;
+
+            // Explicitly handle the play promise to prevent autoplay blocks
             var playPromise = video.play();
             if (playPromise !== undefined) {
-                playPromise.catch(function (error) {
-                    console.error('Video play was prevented:', error);
+                playPromise.catch(function(error) {
+                    console.error("Video play was prevented by browser:", error);
                 });
             }
+
             video.onloadedmetadata = function () {
                 requestAnimationFrame(function () { scanLoop(video); });
             };
         })
         .catch(function (err) {
-            if (err.name === 'NotAllowedError') {
-                showScannerError('Permission denied. Check Chrome Settings → Site Settings → Camera and try again.');
-            } else {
-                showScannerError('Camera error (' + err.name + '): ' + err.message);
-            }
+            showScannerError('Camera error [' + err.name + ']: ' + err.message);
         });
 }
-
 function scanLoop(video) {
     if (!barcodeDetector || !scannerStream) return;
 
