@@ -453,13 +453,13 @@ function handleScannedBarcode(barcode) {
             : escHtml(data.food_name);
 
         if (data.in_list) {
-            resultEl.innerHTML = '<div class="p-3 bg-green-50 border border-green-200 rounded-lg">'
+            resultEl.innerHTML = '<div class="p-3 bg-green-50 border border-green-200 rounded-lg z-[101]">'
                 + '<p class="text-sm font-semibold text-green-800">' + displayName + '</p>'
                 + '<p class="text-xs text-green-600 mb-2">On your shopping list — move to pantry?</p>'
                 + '<button onclick="openPantryModalFromScan(' + data.list_item_id + ', ' + escHtml(JSON.stringify(data.list_item_name)) + ')" class="btn btn-cta btn-sm w-full">Add to Pantry</button>'
                 + '</div>';
         } else {
-            resultEl.innerHTML = '<div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">'
+            resultEl.innerHTML = '<div class="p-3 bg-blue-50 border border-blue-200 rounded-lg z-[101]">'
                 + '<p class="text-sm font-semibold text-blue-800">' + displayName + '</p>'
                 + '<p class="text-xs text-blue-600 mb-2">Not on your list — add directly to pantry?</p>'
                 + '<button onclick="openScannedPantryForm(' + escHtml(JSON.stringify(data.food_name)) + ', ' + escHtml(JSON.stringify(data.brand_name || '')) + ')" class="btn btn-secondary btn-sm w-full">Add to Pantry</button>'
