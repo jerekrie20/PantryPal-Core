@@ -183,22 +183,9 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
         </button>
     </div>
 
-    <!-- Camera feed area -->
-    <div class="relative flex-1 overflow-hidden flex items-center justify-center bg-black">
-        <video id="scanner-video" class="w-full h-full object-cover" playsinline autoplay muted></video>
-
-        <!-- Viewfinder overlay -->
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div class="relative w-64 h-40">
-                <!-- Corner marks -->
-                <span class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-sm"></span>
-                <span class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-sm"></span>
-                <span class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-sm"></span>
-                <span class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-sm"></span>
-                <!-- Scan line animation -->
-                <span id="scanner-line" class="absolute left-2 right-2 h-0.5 bg-brand/80 animate-bounce" style="top:50%"></span>
-            </div>
-        </div>
+    <!-- Camera feed area — html5-qrcode renders into #scanner-reader -->
+    <div class="relative flex-1 overflow-hidden bg-black">
+        <div id="scanner-reader" class="w-full h-full"></div>
 
         <!-- Error / unsupported message -->
         <div id="scanner-error" class="absolute inset-0 hidden flex items-center justify-center p-6">
@@ -313,6 +300,7 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
     </div>
 </div>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 function toggleEdit(id) {
     var display = document.getElementById('display-' + id);
@@ -358,106 +346,71 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// ─── Barcode Scanner ──────────────────────────────────────────────────────────
+// ─── Barcode Scanner (html5-qrcode) ──────────────────────────────────────────
 
-var scannerStream      = null;
-var scannerAnimFrame   = null;
-var barcodeDetector    = null;
+var html5QrCode        = null;
 var lastScannedBarcode = null;
 var scanCooldown       = false;
 
 function startShopping() {
-    var modal = document.getElementById('scanner-modal');
-    var errorEl = document.getElementById('scanner-error');
-    var video = document.getElementById('scanner-video');
-
-    modal.classList.remove('hidden');
-    errorEl.classList.add('hidden');
-    video.classList.remove('hidden'); // Ensure video is visible
-
-    if (!('BarcodeDetector' in window)) {
-        showScannerError('Barcode scanning is not supported in your browser.');
-        return;
-    }
-
-    try {
-        barcodeDetector = new BarcodeDetector({
-            formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
-        });
-    } catch (e) {
-        showScannerError('Could not initialise barcode detector: ' + e.message);
-        return;
-    }
-
-    // 1. Flatten the constraints. No 'exact' keyword.
-    // 2. Adding ideal resolution helps Android pick the primary lens.
-    var constraints = {
-        video: {
-            facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-        },
-        audio: false
-    };
-
-    navigator.mediaDevices.getUserMedia(constraints)
-        .then(function (stream) {
-            scannerStream = stream;
-            video.srcObject = stream;
-
-            // Explicitly handle the play promise to prevent autoplay blocks
-            var playPromise = video.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(function(error) {
-                    console.error("Video play was prevented by browser:", error);
-                });
-            }
-
-            video.onloadedmetadata = function () {
-                requestAnimationFrame(function () { scanLoop(video); });
-            };
-        })
-        .catch(function (err) {
-            showScannerError('Camera error [' + err.name + ']: ' + err.message);
-        });
-}
-function scanLoop(video) {
-    if (!barcodeDetector || !scannerStream) return;
-
-    barcodeDetector.detect(video)
-        .then(function (barcodes) {
-            if (barcodes.length > 0 && !scanCooldown) {
-                var barcode = barcodes[0].rawValue;
-                if (barcode !== lastScannedBarcode) {
-                    lastScannedBarcode = barcode;
-                    scanCooldown = true;
-                    handleScannedBarcode(barcode);
-                    setTimeout(function () { scanCooldown = false; }, 3000);
-                }
-            }
-            scannerAnimFrame = requestAnimationFrame(function () { scanLoop(video); });
-        })
-        .catch(function () {
-            scannerAnimFrame = requestAnimationFrame(function () { scanLoop(video); });
-        });
-}
-
-function stopScanner() {
-    if (scannerStream) {
-        scannerStream.getTracks().forEach(function (t) { t.stop(); });
-        scannerStream = null;
-    }
-    if (scannerAnimFrame) {
-        cancelAnimationFrame(scannerAnimFrame);
-        scannerAnimFrame = null;
-    }
-    barcodeDetector    = null;
+    document.getElementById('scanner-modal').classList.remove('hidden');
+    document.getElementById('scanner-error').classList.add('hidden');
+    document.getElementById('scanner-result').classList.add('hidden');
     lastScannedBarcode = null;
     scanCooldown       = false;
 
-    var video = document.getElementById('scanner-video');
-    if (video) { video.srcObject = null; }
+    if (typeof Html5Qrcode === 'undefined') {
+        showScannerError('Scanner library failed to load. Please refresh the page and try again.');
+        return;
+    }
 
+    // Clean up any previous instance
+    if (html5QrCode) {
+        html5QrCode.stop().catch(function () {}).finally(function () {
+            html5QrCode.clear();
+            html5QrCode = null;
+            _startHtml5QrCode();
+        });
+    } else {
+        _startHtml5QrCode();
+    }
+}
+
+function _startHtml5QrCode() {
+    html5QrCode = new Html5Qrcode('scanner-reader');
+
+    var config = {
+        fps: 10,
+        qrbox: { width: 250, height: 150 },
+        aspectRatio: 1.7,
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+    };
+
+    html5QrCode.start(
+        { facingMode: 'environment' },
+        config,
+        function (decodedText) {
+            if (scanCooldown || decodedText === lastScannedBarcode) return;
+            lastScannedBarcode = decodedText;
+            scanCooldown = true;
+            handleScannedBarcode(decodedText);
+            setTimeout(function () { scanCooldown = false; }, 3000);
+        },
+        function () { /* per-frame scan errors are normal, ignore */ }
+    ).catch(function (err) {
+        showScannerError('Could not start camera: ' + err);
+    });
+}
+
+function stopScanner() {
+    if (html5QrCode) {
+        html5QrCode.stop().catch(function () {}).finally(function () {
+            html5QrCode.clear();
+            html5QrCode = null;
+        });
+    }
+    lastScannedBarcode = null;
+    scanCooldown       = false;
     document.getElementById('scanner-modal').classList.add('hidden');
     document.getElementById('scanner-result').classList.add('hidden');
 }
@@ -465,10 +418,10 @@ function stopScanner() {
 function showScannerError(msg) {
     var errorEl  = document.getElementById('scanner-error');
     var errorMsg = document.getElementById('scanner-error-msg');
-    var video    = document.getElementById('scanner-video');
+    var reader   = document.getElementById('scanner-reader');
     if (errorEl)  errorEl.classList.remove('hidden');
     if (errorMsg) errorMsg.textContent = msg;
-    if (video)    video.classList.add('hidden');
+    if (reader)   reader.classList.add('hidden');
 }
 
 function handleScannedBarcode(barcode) {
