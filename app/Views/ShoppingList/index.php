@@ -386,19 +386,37 @@ function startShopping() {
         return;
     }
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-        .then(function (stream) {
-            scannerStream = stream;
-            var video = document.getElementById('scanner-video');
-            video.srcObject = stream;
-            video.play();
-            video.addEventListener('loadedmetadata', function () {
-                requestAnimationFrame(function () { scanLoop(video); });
+    var constraints = [
+        { video: { facingMode: { exact: 'environment' } } },
+        { video: { facingMode: 'environment' } },
+        { video: true }
+    ];
+
+    function tryNext(index) {
+        if (index >= constraints.length) {
+            showScannerError('Could not access camera. Please check Chrome Settings → Site Settings → Camera and try again.');
+            return;
+        }
+        navigator.mediaDevices.getUserMedia(constraints[index])
+            .then(function (stream) {
+                scannerStream = stream;
+                var video = document.getElementById('scanner-video');
+                video.srcObject = stream;
+                video.play();
+                video.addEventListener('loadedmetadata', function () {
+                    requestAnimationFrame(function () { scanLoop(video); });
+                });
+            })
+            .catch(function (err) {
+                if (err.name === 'OverconstrainedError' || err.name === 'NotFoundError') {
+                    tryNext(index + 1);
+                } else {
+                    showScannerError('Camera error [' + err.name + ']: ' + err.message);
+                }
             });
-        })
-        .catch(function (err) {
-            showScannerError('Camera error [' + err.name + ']: ' + err.message + '. If permission was denied, check Chrome Settings → Site Settings → Camera.');
-        });
+    }
+
+    tryNext(0);
 }
 
 function scanLoop(video) {
