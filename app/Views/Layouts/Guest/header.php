@@ -5,54 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($title) ? htmlspecialchars($title) . ' · ' : '' ?>PantryPal</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
     <?php echo vite_tags(); ?>
 </head>
-<body class="antialiased">
+<body class="bg-bg-page text-text-base font-body antialiased">
 
-<header class="bg-white shadow-sm sticky top-0 z-50">
+<header class="sticky top-0 z-50 bg-bg-component/90 backdrop-blur border-b border-border-default">
     <div class="container mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
-            <div class="flex items-center">
-                <div class="logo-leaf mr-4"></div>
-                <a href="/" class="text-2xl font-bold text-[#36454F]">PantryPal</a>
-            </div>
-            <nav class="hidden md:flex space-x-8">
-                <a href="/" class="font-medium text-gray-600 hover:text-primary">Home</a>
-                <a href="/about" class="font-medium text-gray-600 hover:text-primary">About</a>
-                <a href="/features" class="font-medium text-gray-600 hover:text-primary">Features</a>
-                <?php if (!empty($_SESSION['user_id'])) { ?>
-                    <a href="/dashboard" class="font-medium text-gray-600 hover:text-primary">Dashboard</a>
+            <a href="/" class="flex items-center gap-2 group" aria-label="PantryPal home">
+                <span class="inline-block w-6 h-6 rounded-md" style="background: var(--color-cta);"></span>
+                <span class="text-xl font-semibold text-text-heading">PantryPal</span>
+            </a>
+
+            <nav class="hidden md:flex items-center gap-1">
+                <a href="/features" class="btn btn-ghost btn-sm">Features</a>
+                <a href="/about" class="btn btn-ghost btn-sm">About</a>
+                <?php if (!empty($_SESSION['user_id'])): ?>
+                    <a href="/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
                     <form action="/logout" method="POST" class="inline">
                         <?php echo csrf_field(); ?>
-                        <button type="submit" class="font-medium text-gray-600 hover:text-primary">Logout</button>
+                        <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
                     </form>
-                <?php } else { ?>
-                    <a href="/login" class="font-medium text-gray-600 hover:text-primary">Login</a>
-                <?php } ?>
+                <?php else: ?>
+                    <a href="/login" class="btn btn-ghost btn-sm">Log in</a>
+                    <a href="/register" class="btn btn-cta btn-sm ml-2">Get started</a>
+                <?php endif; ?>
             </nav>
+
             <div class="md:hidden">
-                <details class="group">
-                    <summary class="list-none inline-flex items-center justify-center text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary cursor-pointer">
-                        <span class="sr-only">Toggle main menu</span>
+                <details class="group relative">
+                    <summary class="list-none inline-flex items-center justify-center text-text-muted hover:text-text-heading cursor-pointer p-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-cta-focus-ring)]">
+                        <span class="sr-only">Toggle menu</span>
                         <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
                         </svg>
                     </summary>
-                    <div class="group-open:block hidden bg-white border-t border-border-default shadow-sm">
-                        <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                            <a href="/" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Home</a>
-                            <a href="/about" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">About</a>
-                            <a href="/features" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Features</a>
-
-                            <?php if (!empty($_SESSION['user_id'])) { ?>
-                                <a href="/dashboard" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Dashboard</a>
+                    <div class="group-open:block hidden absolute right-0 mt-2 w-56 bg-bg-component border border-border-default rounded-xl shadow-lg">
+                        <div class="p-2 space-y-1">
+                            <a href="/features" class="block px-3 py-2 rounded-md text-sm font-medium text-text-base hover:bg-bg-subtle">Features</a>
+                            <a href="/about" class="block px-3 py-2 rounded-md text-sm font-medium text-text-base hover:bg-bg-subtle">About</a>
+                            <?php if (!empty($_SESSION['user_id'])): ?>
+                                <a href="/dashboard" class="block px-3 py-2 rounded-md text-sm font-medium text-text-base hover:bg-bg-subtle">Dashboard</a>
                                 <form action="/logout" method="POST" class="block">
-                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
-                                    <button type="submit" class="w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Logout</button>
+                                    <?php echo csrf_field(); ?>
+                                    <button type="submit" class="w-full text-left px-3 py-2 rounded-md text-sm font-medium text-text-base hover:bg-bg-subtle">Logout</button>
                                 </form>
-                            <?php } else { ?>
-                                <a href="/login" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-white hover:bg-primary">Login</a>
-                            <?php } ?>
+                            <?php else: ?>
+                                <a href="/login" class="block px-3 py-2 rounded-md text-sm font-medium text-text-base hover:bg-bg-subtle">Log in</a>
+                                <a href="/register" class="block mx-2 mt-1 btn btn-cta btn-sm">Get started</a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </details>
@@ -60,4 +64,3 @@
         </div>
     </div>
 </header>
-

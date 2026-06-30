@@ -1,96 +1,104 @@
-<?php include VIEW_PATH . '/Layouts/Guest/header.php'; ?>
+<?php
+require_once VIEW_PATH . '/Components/ui_elements.php';
+include VIEW_PATH . '/Layouts/Guest/header.php';
+?>
 
-<section class="hero-bg py-16 sm:py-24">
-    <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#36454F] leading-tight">
-            Smart Pantry Management with <span class="text-[#4CAF50]">PantryPal</span>
-        </h1>
-        <p class="mt-6 max-w-2xl mx-auto text-lg sm:text-xl text-gray-600">
-            Effortlessly track your groceries, monitor expiration dates, reduce food waste, and discover recipes with what you have on hand.
-        </p>
-        <div class="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="/register" class="btn-primary inline-block px-8 py-3 rounded-lg text-lg font-semibold shadow-md hover:shadow-lg transform hover:scale-105">
-                Get Started Free
-            </a>
-            <a href="/login" class="btn-secondary inline-block px-8 py-3 rounded-lg text-lg font-semibold">
-                Log In
-            </a>
-        </div>
-    </div>
-</section>
-
-<section id="about" class="py-16 sm:py-20 bg-white">
+<!-- Hero -->
+<section class="section-y hero-bg">
     <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-12">
-            <h2 class="text-3xl sm:text-4xl font-bold section-title">What is PantryPal?</h2>
-            <p class="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-                PantryPal is your digital assistant for a smarter, more organized kitchen. Our mission is to help you minimize food waste, save money, and make meal planning easier.
-            </p>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div>
-                <img src="/images/home/pantry.webp" alt="Organized Pantry Illustration" class="rounded-lg shadow-xl w-full h-auto object-cover">
+        <?php ui_hero(
+            'Cook what you have. Waste less. Spend less.',
+            'PantryPal tracks what\'s in your kitchen, surfaces recipes you can make tonight, and turns your shopping list into something that actually pulls its weight.',
+            [
+                ['text' => 'Start free', 'href' => '/register', 'variant' => 'cta'],
+                ['text' => 'See how it works', 'href' => '#how-it-works', 'variant' => 'secondary'],
+            ],
+            'Smart pantry · free to start'
+        ); ?>
+
+        <!-- Trust strip -->
+        <div class="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            <div class="text-center">
+                <p class="font-display text-4xl text-text-heading">$1,500</p>
+                <p class="text-sm text-text-muted mt-1">avg US household food waste / year</p>
             </div>
-            <div class="space-y-6 text-gray-700">
-                <p class="leading-relaxed text-lg">
-                    Tired of finding expired food in the back of your fridge or pantry? PantryPal helps you keep track of all your items, their purchase dates, and their expiration dates.
-                </p>
-                <p class="leading-relaxed">
-                    Add, view, edit, and delete items. Categorize for better organization and track quantities so you always know what you have at a glance.
-                </p>
-                <p class="leading-relaxed">
-                    Built for simplicity and speed using PHP and Tailwind CSS.
-                </p>
+            <div class="text-center">
+                <p class="font-display text-4xl text-text-heading">40%</p>
+                <p class="text-sm text-text-muted mt-1">of US food never gets eaten</p>
+            </div>
+            <div class="text-center">
+                <p class="font-display text-4xl text-text-heading">5 min</p>
+                <p class="text-sm text-text-muted mt-1">to set up your first pantry</p>
+            </div>
+            <div class="text-center">
+                <p class="font-display text-4xl text-text-heading">Free</p>
+                <p class="text-sm text-text-muted mt-1">no credit card required</p>
             </div>
         </div>
     </div>
 </section>
 
-<section id="features" class="py-16 sm:py-20 hero-bg">
+<!-- How it works -->
+<section id="how-it-works" class="section-y bg-bg-component">
     <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-12">
-            <h2 class="text-3xl sm:text-4xl font-bold section-title">PantryPal Features</h2>
-            <p class="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-                Everything you need to manage your kitchen inventory effectively.
-            </p>
+        <div class="text-center max-w-2xl mx-auto mb-12">
+            <p class="eyebrow mb-3">How it works</p>
+            <h2 class="text-text-heading">From grocery bag to dinner — in three steps.</h2>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div class="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 text-center">
-                <div class="feature-icon text-3xl mb-2">🛒</div>
-                <h3 class="text-xl font-semibold text-[#36454F] mb-2">Item Tracking</h3>
-                <p class="text-gray-700 leading-relaxed">
-                    Easily add, view, edit, and delete pantry and fridge items.
-                </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <div class="card relative">
+                <div class="absolute -top-3 -left-3 w-10 h-10 rounded-full flex items-center justify-center font-display text-lg font-semibold" style="background: var(--color-brand-100); color: var(--color-brand-700); border: 1px solid var(--color-brand-200);">1</div>
+                <h3 class="mt-2 mb-2">Scan or type</h3>
+                <p class="text-text-muted">Add items by barcode, voice, or quick search. Expiration dates are filled in automatically when we know them.</p>
             </div>
-            <div class="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 text-center">
-                <div class="feature-icon text-3xl mb-2">📅</div>
-                <h3 class="text-xl font-semibold text-[#36454F] mb-2">Expiration Monitoring</h3>
-                <p class="text-gray-700 leading-relaxed">
-                    Record purchase and expiration dates; reduce spoilage with timely reminders.
-                </p>
+            <div class="card relative">
+                <div class="absolute -top-3 -left-3 w-10 h-10 rounded-full flex items-center justify-center font-display text-lg font-semibold" style="background: var(--color-brand-100); color: var(--color-brand-700); border: 1px solid var(--color-brand-200);">2</div>
+                <h3 class="mt-2 mb-2">See what to cook</h3>
+                <p class="text-text-muted">Get recipes ranked by what you already own, sorted so the items about to expire get used first.</p>
             </div>
-            <div class="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 text-center">
-                <div class="feature-icon text-3xl mb-2">📋</div>
-                <h3 class="text-xl font-semibold text-[#36454F] mb-2">Categorization & Quantity</h3>
-                <p class="text-gray-700 leading-relaxed">
-                    Organize items by category and keep track of quantities.
-                </p>
-            </div>
-            <div class="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 text-center sm:col-span-2 lg:col-span-1 lg:col-start-2">
-                <div class="feature-icon text-3xl mb-2">🍳</div>
-                <h3 class="text-xl font-semibold text-[#36454F] mb-2">Recipe Suggestions</h3>
-                <p class="text-gray-700 leading-relaxed">
-                    Discover recipes based on ingredients you already have.
-                </p>
+            <div class="card relative">
+                <div class="absolute -top-3 -left-3 w-10 h-10 rounded-full flex items-center justify-center font-display text-lg font-semibold" style="background: var(--color-brand-100); color: var(--color-brand-700); border: 1px solid var(--color-brand-200);">3</div>
+                <h3 class="mt-2 mb-2">Shop on purpose</h3>
+                <p class="text-text-muted">Your shopping list auto-fills with what's missing for the week's plan — no duplicates, no forgotten staples.</p>
             </div>
         </div>
-        <div class="text-center mt-12">
-            <a href="/register" class="btn-primary inline-block px-8 py-3 rounded-lg text-lg font-semibold shadow-md hover:shadow-lg transform hover:scale-105">
-                Create Your Free Account
-            </a>
+    </div>
+</section>
+
+<!-- Features -->
+<section id="features" class="section-y bg-bg-subtle">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-2xl mx-auto mb-12">
+            <p class="eyebrow mb-3">Features</p>
+            <h2 class="text-text-heading">Everything you need to stop throwing food away.</h2>
+            <p class="lede mt-4 mx-auto">A pantry tracker that earns its keep — by surfacing what to cook before it spoils, and by knowing exactly what's left in the fridge when you're at the store.</p>
+        </div>
+
+        <?php ui_feature_grid([
+            ['icon' => '🛒', 'title' => 'Barcode + manual entry', 'body' => 'Scan a product to add it in seconds, or type it in. Brand and category fill themselves in.'],
+            ['icon' => '⏰', 'title' => 'Expiration tracking', 'body' => 'See what\'s expiring this week at a glance. Optional alerts let you act before things spoil.'],
+            ['icon' => '🍳', 'title' => 'Cook tonight', 'body' => 'Recipes ranked by what you already own — and what\'s about to expire.'],
+            ['icon' => '📋', 'title' => 'Smart shopping list', 'body' => 'Auto-deduped against your pantry. Add a recipe; the missing ingredients appear in your list.'],
+            ['icon' => '🥕', 'title' => 'Categories & quantities', 'body' => 'Organize by aisle, fridge, or freezer. Track units that match how you actually shop.'],
+            ['icon' => '🤖', 'title' => 'AI cooking assistant', 'body' => 'Ask "what can I make for dinner?" or "substitute for buttermilk?" — answered from your real pantry.'],
+        ]); ?>
+    </div>
+</section>
+
+<!-- Closing CTA -->
+<section class="section-y bg-bg-component">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="card text-center max-w-3xl mx-auto py-12 hero-bg">
+            <p class="eyebrow mb-3">Ready when you are</p>
+            <h2 class="text-text-heading">Spend less on groceries this month.</h2>
+            <p class="lede mt-4 mx-auto">Free to start. Five minutes to set up. No card required.</p>
+            <div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="/register" class="btn btn-cta btn-lg">Create your free account</a>
+                <a href="/login" class="btn btn-secondary btn-lg">Log in</a>
+            </div>
         </div>
     </div>
 </section>
 
 <?php include VIEW_PATH . '/Layouts/Guest/footer.php'; ?>
-
