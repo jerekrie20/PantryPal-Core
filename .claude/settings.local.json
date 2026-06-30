@@ -19,7 +19,9 @@
       "mcp__visualize__show_widget",
       "Bash(php -l app/Views/Components/ui_elements.php app/Views/Pages/styleguide.php app/routes/internals.php)",
       "Bash(php -l app/Views/home.php app/Views/Layouts/Guest/header.php app/Views/Layouts/Guest/footer.php)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(php -l app/Views/Users/dashboard.php)"
     ]
   }
 }
