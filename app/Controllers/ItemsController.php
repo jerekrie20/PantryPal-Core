@@ -506,13 +506,17 @@ class ItemsController
                 ['Potassium',     'potassium',    'mg'],
             ];
 
-            $scope = null; $out = [];
+            $scope = $src['serving_size'] ?? null;
+            if (!$scope && isset($src['serving_quantity'], $src['serving_quantity_unit'])) {
+                $scope = $src['serving_quantity'] . ' ' . $src['serving_quantity_unit'];
+            }
+            $out = [];
             $taken = [];
             foreach ($map as [$name, $base, $defUnit]) {
                 $picked = $pick($base);
                 if ($picked) {
                     $out[] = ['name'=>$name, 'amount'=>$picked['v'], 'unit'=>$unit($base, $defUnit)];
-                    $scope = $scope ?? $picked['scope'];
+                    if ($scope === null) $scope = $picked['scope'];
                     $taken[$base] = true;
                 }
             }
