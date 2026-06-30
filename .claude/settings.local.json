@@ -23,7 +23,8 @@
       "Bash(git commit -m ' *)",
       "Bash(php -l app/Views/Users/dashboard.php)",
       "Bash(php -l app/Views/Items/index.php)",
-      "Bash(php -l app/Views/Items/create.php)"
+      "Bash(php -l app/Views/Items/create.php)",
+      "Bash(php -l app/Views/Pages/login.php app/Views/Pages/register.php)"
     ]
   }
 }
