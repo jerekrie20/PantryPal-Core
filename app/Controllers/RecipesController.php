@@ -9,6 +9,7 @@ use Models\Products;
 use Models\Recipes;
 use Policies\RecipePolicy;
 use Services\ImageService;
+use Services\Pantry\PantryTermNormalizer;
 use Services\Recipes\FatSecretRecipesProvider;
 
 class RecipesController
@@ -64,7 +65,7 @@ class RecipesController
             $selectedPantry = [];
             if (!empty($_GET['pantry']) && is_array($_GET['pantry'])) {
                 foreach ($_GET['pantry'] as $v) {
-                    $t = $this->normalizePantryTerm((string)$v);
+                    $t = PantryTermNormalizer::normalize((string)$v);
                     if ($t !== '') $selectedPantry[] = $t;
                 }
                 // de-dup
@@ -563,86 +564,6 @@ class RecipesController
 
         return $norm;
     }
-
-    /** Normalize a pantry term into a concise ingredient-like query. */
-    private function normalizePantryTerm(string $s): string
-    {
-        $s = trim($s);
-        if ($s === '') return '';
-        // strip surrounding quotes
-        $s = preg_replace("/^['\"]+|['\"]+$/", '', $s);
-        // remove parentheses content
-        $s = preg_replace('/\([^\)]*\)/', '', $s);
-        // split on comma, take the first meaningful segment
-        if (strpos($s, ',') !== false) {
-            $parts = array_map('trim', explode(',', $s));
-            foreach ($parts as $p) { if ($p !== '') { $s = $p; break; } }
-        }
-        // normalize dashes to spaces and lowercase
-        $s = str_replace(['–','—','-','/'], ' ', $s);
-        $s = strtolower($s);
-        // remove descriptor/packaging stopwords
-        $stop = ['raw','california','with','and','or','value','pack','bottle','bottles','enhancing','minerals','purified','drinking','boneless','skinless','shredded','sliced','ground','fresh','large','small','organic','original','classic'];
-        $tokens = preg_split('/\s+/', $s);
-        $clean = [];
-        foreach ($tokens as $t) {
-            $t = trim($t);
-            if ($t === '') continue;
-            // drop numbers and x-pack like terms
-            if (preg_match('/^\d+[a-zA-Z-]*$/', $t)) continue;
-            if (in_array($t, $stop, true)) continue;
-            $clean[] = $t;
-        }
-        if ($clean) {
-            $s = implode(' ', $clean);
-        } else {
-            $s = trim(preg_replace('/\s+/', ' ', $s));
-        }
-
-        // Canonicalize overly specific variants to base ingredients
-        $exactMap = [
-            'milk chocolate' => 'chocolate',
-            'milk chocolate chips' => 'chocolate',
-            'semi sweet chocolate' => 'chocolate',
-            'semisweet chocolate' => 'chocolate',
-            'dark chocolate' => 'chocolate',
-            'white chocolate' => 'chocolate',
-            'chocolate chips' => 'chocolate',
-            'honeycrisp apples' => 'apple',
-            'honeycrisp apple' => 'apple',
-        ];
-        if (isset($exactMap[$s])) {
-            $s = $exactMap[$s];
-        } else {
-            // Apple cultivars → apple
-            $appleCultivars = ['honeycrisp','gala','fuji','granny smith','pink lady','ambrosia','mcintosh','golden delicious','red delicious','braeburn','jonagold'];
-            if (str_contains($s, 'apple')) {
-                foreach ($appleCultivars as $cv) {
-                    if (str_starts_with($s, $cv.' ') || $s === $cv || str_starts_with($s, $cv.' apple') || str_starts_with($s, $cv.' apples')) {
-                        $s = 'apple';
-                        break;
-                    }
-                }
-            }
-            // Normalize any trailing plurals for core items
-            if ($s === 'apples') $s = 'apple';
-        }
-
-        // special cases: common meats and cuts keep last two tokens
-        $meatCuts = ['thighs','breast','breasts','legs','drumsticks','wings','tenderloins','steak','steaks','loin','loins','ribs'];
-        $parts = preg_split('/\s+/', $s);
-        if (count($parts) >= 3) {
-            $last = end($parts);
-            if (in_array($last, $meatCuts, true)) {
-                $s = $parts[count($parts)-2] . ' ' . $parts[count($parts)-1];
-            }
-        }
-        // collapse spaces and trim length
-        $s = trim(preg_replace('/\s+/', ' ', $s));
-        if (strlen($s) > 64) $s = substr($s, 0, 64);
-        return $s;
-    }
-
     /** Collect pantry ingredient/product names for the given user. */
     private function collectPantryNames(int $userId, int $limit = 15): array
     {
@@ -673,7 +594,7 @@ class RecipesController
         }
         // Normalize, de-dup and limit length
         $names = array_values(array_unique(array_filter(array_map(function($s){
-            return $this->normalizePantryTerm((string)$s);
+            return PantryTermNormalizer::normalize((string)$s);
         }, $names))));
         // Keep a reasonable number for the API call
         if (count($names) > $limit) $names = array_slice($names, 0, $limit);

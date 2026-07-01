@@ -7,8 +7,10 @@ use Helpers\View;
 use Models\Items;
 use Models\Ingredients;
 use Models\Products;
-use Models\Recipes;
 use Services\FoodService;
+use Services\Nutrition\Normalizer as NutritionNormalizer;
+use Services\Pantry\CategoryFormatter;
+use Services\Recipes\RelatedRecipeFinder;
 
 class ItemsController
 {
@@ -166,7 +168,7 @@ class ItemsController
                 }
                 if (is_array($decoded)) {
                     $rawNutri = $decoded;
-                    $nutrition = $this->items->normalizeNutrition($decoded);
+                    $nutrition = NutritionNormalizer::normalize($decoded);
                 }
             }
 
@@ -176,7 +178,7 @@ class ItemsController
                 $fsData = $fsSvc->getFatSecretFood($row['product_api_id']);
                 if ($fsData && isset($fsData['food'])) {
                     $productRaw = $fsData['food'];
-                    $nutrition = $this->items->normalizeNutrition($productRaw);
+                    $nutrition = NutritionNormalizer::normalize($productRaw);
                 }
             }
 
@@ -201,7 +203,7 @@ class ItemsController
                         $productRaw['image'] = $productRaw['image_url'];
                     }
                     // OFF nutriments → nutrition
-                    $nutrition = $this->items->normalizeNutrition($productRaw);
+                    $nutrition = NutritionNormalizer::normalize($productRaw);
                 }
             }
 
@@ -210,7 +212,7 @@ class ItemsController
                     ? $row['product_nutrition_info']
                     : json_decode((string)$row['product_nutrition_info'], true);
                 if (is_array($pn)) {
-                    $nutrition = $this->items->normalizeNutrition($pn);
+                    $nutrition = NutritionNormalizer::normalize($pn);
                 }
             }
 
@@ -218,7 +220,7 @@ class ItemsController
             $displayName = $row['ingredient_name'] ?? ($row['product_title'] ?? 'Item');
 
             // Category may be a JSON array / path → stringify safely
-            $displayCategory = $this->items->stringifyCategory($row['ingredient_category'] ?? ($row['product_category'] ?? null));
+            $displayCategory = CategoryFormatter::stringify($row['ingredient_category'] ?? ($row['product_category'] ?? null));
 
             $displayImage = $row['ingredient_image_url']
                 ?? ($row['product_image_url'] ?? ($productRaw['image'] ?? null));
@@ -247,88 +249,9 @@ class ItemsController
             $view = $isIngredient ? 'Ingredients/show' : 'Products/show';
             $title = $isIngredient ? 'Ingredient Details' : 'Product Details';
             return View::render($view, [
-                'title' => $title,
-                'item'  => $item,
-                                // Preload related recipes locally by the item's display name
-                                'recipesList' => (function() use ($item) {
-                                    $list = [];
-                                    try {
-                                        $term = isset($item['name']) ? (string)$item['name'] : '';
-                                        if ($term !== '') {
-                                            // Normalize the term similarly to RecipesController::normalizePantryTerm
-                                            $t = trim($term);
-                                            $t = preg_replace("/^['\"]+|['\"]+$/", '', (string)$t);
-                                            $t = preg_replace('/\([^)]+\)/', '', $t);
-                                            if (strpos($t, ',') !== false) { $parts = array_map('trim', explode(',', $t)); foreach ($parts as $p) { if ($p !== '') { $t = $p; break; } } }
-                                            $t = str_replace(['–','—','-','/'], ' ', $t);
-                                            $t = strtolower($t);
-                                            $stop = ['raw','california','with','and','or','value','pack','bottle','bottles','enhancing','minerals','purified','drinking','boneless','skinless','shredded','sliced','ground','fresh','large','small','organic','original','classic'];
-                                            $tokens = preg_split('/\s+/', $t);
-                                            $clean = [];
-                                            foreach ($tokens as $tok) {
-                                                $tok = trim($tok);
-                                                if ($tok === '') continue;
-                                                if (preg_match('/^\d+[a-zA-Z-]*$/', $tok)) continue;
-                                                if (in_array($tok, $stop, true)) continue;
-                                                $clean[] = $tok;
-                                            }
-                                            if ($clean) { $t = implode(' ', $clean); } else { $t = trim(preg_replace('/\s+/', ' ', $t)); }
-                                            $map = [
-                                                'milk chocolate' => 'chocolate',
-                                                'milk chocolate chips' => 'chocolate',
-                                                'semi sweet chocolate' => 'chocolate',
-                                                'semisweet chocolate' => 'chocolate',
-                                                'dark chocolate' => 'chocolate',
-                                                'white chocolate' => 'chocolate',
-                                                'chocolate chips' => 'chocolate',
-                                                'honeycrisp apples' => 'apple',
-                                                'honeycrisp apple' => 'apple',
-                                            ];
-                                            if (isset($map[$t])) { $t = $map[$t]; }
-                                            else {
-                                                if (str_contains($t, 'apple')) {
-                                                    $appleCultivars = ['honeycrisp','gala','fuji','granny smith','pink lady','ambrosia','mcintosh','golden delicious','red delicious','braeburn','jonagold'];
-                                                    foreach ($appleCultivars as $cv) {
-                                                        if (str_starts_with($t, $cv.' ') || $t === $cv || str_starts_with($t, $cv.' apple') || str_starts_with($t, $cv.' apples')) { $t = 'apple'; break; }
-                                                    }
-                                                    if ($t === 'apples') $t = 'apple';
-                                                }
-                                            }
-                                            $t = trim(preg_replace('/\s+/', ' ', $t));
-                                            if ($t === '') { return []; }
-
-                                            $model = new Recipes();
-                                            // Local search by ingredient keyword (AND with single term)
-                                            $local = $model->findByIngredientsLocal([$t], 6, true);
-                                            $list = $local;
-
-                                            // If underfilled, top up from FatSecret API if configured
-                                            if (count($list) < 6) {
-                                                $needed = 6 - count($list);
-                                                try {
-                                                    $prov = new \Services\Recipes\FatSecretRecipesProvider();
-                                                    if ($prov->isConfigured()) {
-                                                        $apiResults = $prov->findByIngredients([$t], $needed);
-                                                        // De-dup by title|image and persist to DB for Details links
-                                                        $seen = [];
-                                                        foreach ($list as $r0) {
-                                                            $k0 = strtolower(trim(($r0['title'] ?? '').'|'.($r0['image'] ?? '')));
-                                                            if ($k0 !== '') $seen[$k0] = true;
-                                                        }
-                                                        foreach ($apiResults as $r) {
-                                                            $k = strtolower(trim(($r['title'] ?? '').'|'.($r['image'] ?? '')));
-                                                            if ($k === '' || isset($seen[$k])) continue;
-                                                            try { $id = $model->upsertFromProvider($r, null, 'fatsecret'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
-                                                            $list[] = $r; $seen[$k] = true;
-                                                            if (count($list) >= 6) break;
-                                                        }
-                                                    }
-                                                } catch (\Throwable $e) { /* ignore provider errors */ }
-                                            }
-                                        }
-                                    } catch (\Throwable $e) { $list = []; }
-                                    return $list;
-                                })(),
+                'title'       => $title,
+                'item'        => $item,
+                'recipesList' => (new RelatedRecipeFinder())->findByName($item['name'] ?? ''),
             ]);
 
         } catch (\Throwable $e) {
@@ -337,244 +260,6 @@ class ItemsController
             return View::render('Pages/500', ['title' => 'Server Error']);
         }
     }
-
-    /** Stringify category which could be a string, JSON string, or array. */
-    private function stringifyCategory($cat): ?string
-    {
-        if ($cat === null || $cat === '') return null;
-
-        if (is_string($cat)) {
-            $trim = ltrim($cat);
-            if ($trim !== '' && ($trim[0] === '{' || $trim[0] === '[')) {
-                $decoded = json_decode($cat, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    return $this->stringifyCategory($decoded);
-                }
-            }
-            return $cat; // already a plain string
-        }
-
-        if (is_array($cat)) {
-            // OFF sometimes gives category paths / arrays
-            if (isset($cat['categoryPath']) && is_array($cat['categoryPath'])) {
-                return implode(' › ', array_filter($cat['categoryPath'], 'is_string'));
-            }
-            // generic: collapse any stringy array
-            $vals = [];
-            foreach ($cat as $v) {
-                if (is_string($v)) $vals[] = $v;
-            }
-            return $vals ? implode(' › ', $vals) : null;
-        }
-
-        return null;
-    }
-
-    /**
-     * Normalize to:
-     * ['nutrients' => [ ['name','amount','unit'], ... ],
-     *  'servings'  => ['original' => '...']]
-     *
-     * Supports:
-     * - Spoonacular-like structure (nutrients[])
-     * - FDC labelNutrients
-     * - FDC foodNutrients (Foundation/Survey/Branded)
-     * - OFF nutriments (per serving or per 100g)
-     */
-    private function normalizeNutrition($src): ?array
-    {
-        if (!is_array($src) || !$src) return null;
-
-        // If we received a bare FDC-style list of FoodNutrient entries, wrap it.
-        if (isset($src[0]) && is_array($src[0]) && (isset($src[0]['nutrient']) || isset($src[0]['nutrientName']) || (isset($src[0]['type']) && $src[0]['type'] === 'FoodNutrient'))) {
-            $src = ['foodNutrients' => $src];
-        }
-
-        // Already in target form?
-        if (isset($src['nutrients']) && is_array($src['nutrients'])) {
-            return $src;
-        }
-
-        // ---------- FDC: labelNutrients ----------
-        if (isset($src['labelNutrients']) && is_array($src['labelNutrients'])) {
-            $ln = $src['labelNutrients'];
-            $get = fn($k) => isset($ln[$k]['value']) ? (float)$ln[$k]['value'] : null;
-            $nutrients = [
-                ['name'=>'Calories',       'amount'=>$get('calories'),      'unit'=>'kcal'],
-                ['name'=>'Protein',        'amount'=>$get('protein'),       'unit'=>'g'],
-                ['name'=>'Fat',            'amount'=>$get('fat'),           'unit'=>'g'],
-                ['name'=>'Saturated Fat',  'amount'=>$get('saturatedFat'),  'unit'=>'g'],
-                ['name'=>'Carbohydrates',  'amount'=>$get('carbohydrates'), 'unit'=>'g'],
-                ['name'=>'Fiber',          'amount'=>$get('fiber'),         'unit'=>'g'],
-                ['name'=>'Sugar',          'amount'=>$get('sugars'),        'unit'=>'g'],
-                ['name'=>'Sodium',         'amount'=>$get('sodium'),        'unit'=>'mg'],
-                ['name'=>'Calcium',        'amount'=>$get('calcium'),       'unit'=>'mg'],
-                ['name'=>'Iron',           'amount'=>$get('iron'),          'unit'=>'mg'],
-                ['name'=>'Potassium',      'amount'=>$get('potassium'),     'unit'=>'mg'],
-                ['name'=>'Cholesterol',    'amount'=>$get('cholesterol'),   'unit'=>'mg'],
-            ];
-            $nutrients = array_values(array_filter($nutrients, fn($n) => $n['amount'] !== null));
-
-            $servingText = null;
-            if (isset($src['servingSize'], $src['servingSizeUnit'])) {
-                $servingText = $src['servingSize'].' '.$src['servingSizeUnit'];
-            } elseif (isset($src['householdServingFullText'])) {
-                $servingText = $src['householdServingFullText'];
-            }
-
-            return $nutrients ? ['nutrients'=>$nutrients, 'servings'=>['original'=>$servingText ?? 'per serving']] : null;
-        }
-
-        // ---------- FDC: foodNutrients ----------
-        if (isset($src['foodNutrients']) && is_array($src['foodNutrients'])) {
-            $core = [
-                'Energy'                          => ['Calories','kcal'],
-                'Energy (Atwater General Factors)'=> ['Calories','kcal'],
-                'Protein'                         => ['Protein','g'],
-                'Total lipid (fat)'               => ['Fat','g'],
-                'Carbohydrate, by difference'     => ['Carbohydrates','g'],
-                'Fiber, total dietary'            => ['Fiber','g'],
-                'Sugars, total including NLEA'    => ['Sugar','g'],
-                'Sugars, total'                   => ['Sugar','g'],
-                'Sodium, Na'                      => ['Sodium','mg'],
-                'Calcium, Ca'                     => ['Calcium','mg'],
-                'Iron, Fe'                        => ['Iron','mg'],
-                'Potassium, K'                    => ['Potassium','mg'],
-                'Cholesterol'                     => ['Cholesterol','mg'],
-            ];
-            $bucket = [];
-            $extras = [];
-            foreach ($src['foodNutrients'] as $fn) {
-                $name = $fn['nutrient']['name'] ?? $fn['nutrientName'] ?? null;
-                $amount = $fn['amount'] ?? $fn['value'] ?? null;
-                $unit = $fn['nutrient']['unitName'] ?? $fn['unitName'] ?? null;
-                if (!$name || $amount === null) continue;
-                $out = [
-                    'name'   => $core[$name][0] ?? $name,
-                    'amount' => (float)$amount,
-                    'unit'   => $unit ?: ($core[$name][1] ?? ''),
-                ];
-                if (isset($core[$name])) {
-                    $bucket[$out['name']] = $out;
-                } else {
-                    $extras[] = $out;
-                }
-            }
-            $list = array_values($bucket);
-            foreach ($extras as $ex) {
-                if (!isset($bucket[$ex['name']])) $list[] = $ex;
-            }
-            if ($list) {
-                $servingText = null;
-                if (isset($src['servingSize'], $src['servingSizeUnit'])) {
-                    $servingText = $src['servingSize'].' '.$src['servingSizeUnit'];
-                } elseif (isset($src['householdServingFullText'])) {
-                    $servingText = $src['householdServingFullText'];
-                }
-                if (count($list) > 200) $list = array_slice($list, 0, 200);
-                return ['nutrients'=>$list, 'servings'=>['original'=>$servingText ?? 'per 100 g']];
-            }
-        }
-
-        // ---------- OFF: nutriments ----------
-        $nutriments = $src['nutriments'] ?? null;
-        if (!$nutriments && $this->looksLikeOffNutriments($src)) {
-            $nutriments = $src;
-        }
-        if (is_array($nutriments)) {
-            $pick = function(string $base) use ($nutriments) {
-                if (isset($nutriments[$base.'_serving'])) return ['v'=>(float)$nutriments[$base.'_serving'], 'scope'=>'per serving'];
-                if (isset($nutriments[$base.'_100g']))    return ['v'=>(float)$nutriments[$base.'_100g'],    'scope'=>'per 100 g'];
-                return null;
-            };
-            $unit = function(string $base, string $default) use ($nutriments) {
-                $k = $base.'_unit';
-                return isset($nutriments[$k]) && is_string($nutriments[$k]) ? $nutriments[$k] : $default;
-            };
-
-            $map = [
-                ['Calories',      'energy-kcal',  'kcal'],
-                ['Protein',       'proteins',     'g'],
-                ['Fat',           'fat',          'g'],
-                ['Saturated Fat', 'saturated-fat','g'],
-                ['Carbohydrates', 'carbohydrates','g'],
-                ['Fiber',         'fiber',        'g'],
-                ['Sugar',         'sugars',       'g'],
-                ['Sodium',        'sodium',       'mg'],
-                ['Calcium',       'calcium',      'mg'],
-                ['Iron',          'iron',         'mg'],
-                ['Potassium',     'potassium',    'mg'],
-            ];
-
-            $scope = $src['serving_size'] ?? null;
-            if (!$scope && isset($src['serving_quantity'], $src['serving_quantity_unit'])) {
-                $scope = $src['serving_quantity'] . ' ' . $src['serving_quantity_unit'];
-            }
-            $out = [];
-            $taken = [];
-            foreach ($map as [$name, $base, $defUnit]) {
-                $picked = $pick($base);
-                if ($picked) {
-                    $out[] = ['name'=>$name, 'amount'=>$picked['v'], 'unit'=>$unit($base, $defUnit)];
-                    if ($scope === null) $scope = $picked['scope'];
-                    $taken[$base] = true;
-                }
-            }
-            foreach ($nutriments as $key => $val) {
-                if (!is_scalar($val)) continue;
-                if (preg_match('/^(.+?)_(serving|100g)$/', (string)$key, $m)) {
-                    $base = $m[1];
-                    if (isset($taken[$base])) continue;
-                    $v = (float)$val; if (!is_finite($v)) continue;
-                    $nm = ucwords(str_replace(['-', '_'], [' ', ' '], $base));
-                    $out[] = ['name'=>$nm, 'amount'=>$v, 'unit'=>$unit($base, '')];
-                }
-            }
-            if ($out) {
-                if (count($out) > 200) $out = array_slice($out, 0, 200);
-                return ['nutrients'=>$out, 'servings'=>['original'=>$scope ?? 'per 100 g']];
-            }
-        }
-
-        // Flat label-like structure
-        $flatKeys = ['calories','protein','fat','saturatedFat','transFat','carbohydrates','fiber','sugars','sodium','calcium','iron','potassium','cholesterol','addedSugars'];
-        $hasFlat = false;
-        foreach ($flatKeys as $k) {
-            if (isset($src[$k]) && is_array($src[$k]) && array_key_exists('value', $src[$k])) { $hasFlat = true; break; }
-        }
-        if ($hasFlat) {
-            $get = function(string $k) use ($src) { return isset($src[$k]['value']) ? (float)$src[$k]['value'] : null; };
-            $nutrients = [
-                ['name'=>'Calories',       'amount'=>$get('calories'),      'unit'=>'kcal'],
-                ['name'=>'Protein',        'amount'=>$get('protein'),       'unit'=>'g'],
-                ['name'=>'Fat',            'amount'=>$get('fat'),           'unit'=>'g'],
-                ['name'=>'Saturated Fat',  'amount'=>$get('saturatedFat'),  'unit'=>'g'],
-                ['name'=>'Trans Fat',      'amount'=>$get('transFat'),      'unit'=>'g'],
-                ['name'=>'Carbohydrates',  'amount'=>$get('carbohydrates'), 'unit'=>'g'],
-                ['name'=>'Fiber',          'amount'=>$get('fiber'),         'unit'=>'g'],
-                ['name'=>'Sugar',          'amount'=>$get('sugars'),        'unit'=>'g'],
-                ['name'=>'Added Sugars',   'amount'=>$get('addedSugars'),   'unit'=>'g'],
-                ['name'=>'Sodium',         'amount'=>$get('sodium'),        'unit'=>'mg'],
-                ['name'=>'Calcium',        'amount'=>$get('calcium'),       'unit'=>'mg'],
-                ['name'=>'Iron',           'amount'=>$get('iron'),          'unit'=>'mg'],
-                ['name'=>'Potassium',      'amount'=>$get('potassium'),     'unit'=>'mg'],
-                ['name'=>'Cholesterol',    'amount'=>$get('cholesterol'),   'unit'=>'mg'],
-            ];
-            $nutrients = array_values(array_filter($nutrients, fn($n) => $n['amount'] !== null));
-            return $nutrients ? ['nutrients'=>$nutrients, 'servings'=>['original'=>'per serving']] : null;
-        }
-
-        return null;
-    }
-
-    private function looksLikeOffNutriments(array $a): bool
-    {
-        foreach (['energy-kcal_100g','fat_100g','proteins_100g','carbohydrates_100g'] as $k) {
-            if (array_key_exists($k, $a)) return true;
-        }
-        return false;
-    }
-
 
     public function validation(): ?string
     {
@@ -639,7 +324,7 @@ class ItemsController
             ];
             // Display name/category/image for context
             $name = $row['ingredient_name'] ?? ($row['product_title'] ?? ($row['entered_name'] ?? 'Item'));
-            $category = $this->items->stringifyCategory($row['ingredient_category'] ?? ($row['product_category'] ?? null));
+            $category = CategoryFormatter::stringify($row['ingredient_category'] ?? ($row['product_category'] ?? null));
             $image = $row['ingredient_image_url'] ?? ($row['product_image_url'] ?? null);
             return View::render('Items/edit', [
                 'title' => 'Edit Item',

@@ -9,6 +9,9 @@
  */
 
 require_once VIEW_PATH . '/Components/ui_elements.php';
+
+use Services\Pantry\CategoryFormatter;
+
 ob_start();
 
 if (!function_exists('e')) {
@@ -21,31 +24,6 @@ if (!function_exists('e')) {
 // Build display items separated by kind (enrich with category/name/image like Dashboard)
 $ingredients = [];
 $products    = [];
-
-if (!function_exists('stringify_category')) {
-    function stringify_category($cat): ?string {
-        if ($cat === null || $cat === '') return null;
-        if (is_string($cat)) {
-            $trim = ltrim($cat);
-            if ($trim !== '' && ($trim[0] === '{' || $trim[0] === '[')) {
-                $decoded = json_decode($cat, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    return stringify_category($decoded);
-                }
-            }
-            return $cat;
-        }
-        if (is_array($cat)) {
-            if (isset($cat['categoryPath']) && is_array($cat['categoryPath'])) {
-                return implode(' › ', array_filter($cat['categoryPath'], 'is_string'));
-            }
-            $vals = [];
-            foreach ($cat as $v) if (is_string($v)) $vals[] = $v;
-            return $vals ? implode(' › ', $vals) : null;
-        }
-        return null;
-    }
-}
 
 try { $today = new \DateTimeImmutable('today'); } catch (\Exception $e) { $today = null; }
 
@@ -87,11 +65,11 @@ if (!empty($items) && is_array($items)) {
 
         if ($isIngredient) {
             $name = $row['ingredient_name'] ?? $name;
-            $category = stringify_category($row['ingredient_category'] ?? null);
+            $category = CategoryFormatter::stringify($row['ingredient_category'] ?? null);
             $image = $row['ingredient_image_url'] ?? null;
         } elseif ($isProduct) {
             $name = $row['product_title'] ?? $name;
-            $category = stringify_category($row['product_category'] ?? null);
+            $category = CategoryFormatter::stringify($row['product_category'] ?? null);
             $image = $row['product_image_url'] ?? null;
         }
 
