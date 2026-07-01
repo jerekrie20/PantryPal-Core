@@ -1,25 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo isset($title) ? htmlspecialchars($title) : 'Forbidden'; ?></title>
-    <?php echo function_exists('vite_tags') ? vite_tags() : ''; ?>
-</head>
-<body class="bg-gray-100">
-    <div class="container mx-auto py-16 px-4">
-        <div class="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden">
-            <div class="py-8 px-6">
-                <div class="text-center">
-                    <h1 class="text-6xl font-bold text-red-600 mb-4">403</h1>
-                    <h2 class="text-2xl font-semibold text-gray-800 mb-2">Forbidden</h2>
-                    <p class="text-gray-600 mb-6">
-                        You do not have permission to access this resource.
-                    </p>
-                    <a href="/" class="inline-block px-5 py-3 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 transition">Go to Homepage</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+<?php
+$errStatus  = 403;
+$errTitle   = 'You don\'t have access to this';
+$errBody    = 'This page is off-limits for your account. If you think that\'s wrong, get in touch with an admin.';
+$errAccent  = 'danger';
+$errActions = [
+    ['text' => 'Go home', 'href' => '/', 'variant' => 'cta'],
+];
+require VIEW_PATH . '/Components/error_page.php';

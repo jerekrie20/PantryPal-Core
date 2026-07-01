@@ -27,7 +27,8 @@
       "Bash(php -l app/Views/Pages/login.php app/Views/Pages/register.php)",
       "Bash(php -l app/Views/Recipes/index.php)",
       "Bash(php -l app/Views/Items/edit.php app/Views/Items/confirm.php app/Views/Ingredients/show.php app/Views/Products/show.php)",
-      "Bash(php -l app/Views/Recipes/show.php app/Views/Recipes/recipe_form.php)"
+      "Bash(php -l app/Views/Recipes/show.php app/Views/Recipes/recipe_form.php)",
+      "Bash(php -l app/Views/Pages/about.php app/Views/Pages/401.php app/Views/Pages/403.php app/Views/Pages/404.php app/Views/Pages/500.php app/Views/Components/error_page.php)"
     ]
   }
 }
