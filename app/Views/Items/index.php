@@ -14,13 +14,6 @@ use Services\Pantry\CategoryFormatter;
 
 ob_start();
 
-if (!function_exists('e')) {
-    function e($v): string {
-        if ($v === null) return '';
-        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
-    }
-}
-
 // Build display items separated by kind (enrich with category/name/image like Dashboard)
 $ingredients = [];
 $products    = [];

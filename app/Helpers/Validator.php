@@ -125,7 +125,7 @@ class Validator
 
                     case 'unique':
                         if (!$this->_pdo) {
-                            throw new Exception("Database connection is required for the 'unique' validation rule.");
+                            throw new \RuntimeException("Database connection is required for the 'unique' validation rule.");
                         }
                         $check = $this->_pdo->prepare("SELECT COUNT(*) FROM `{$ruleValue}` WHERE `{$field}` = ?");
                         $check->execute([$value]);

@@ -7,7 +7,6 @@
 require_once VIEW_PATH . '/Components/ui_elements.php';
 ob_start();
 
-if (!function_exists('e')) { function e($v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); } }
 
 $confirm_action = $confirm_action ?? '/items/confirm';
 $searchedName  = $original_input['name']  ?? '';

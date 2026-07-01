@@ -9,7 +9,6 @@
 require_once VIEW_PATH . '/Components/ui_elements.php';
 ob_start();
 
-if (!function_exists('e')) { function e($v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); } }
 $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
 
 $startShoppingBtn = '<button type="button" onclick="startShopping()" class="btn btn-cta btn-md">'

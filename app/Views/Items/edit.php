@@ -16,7 +16,6 @@ $item    = $item    ?? [];
 $display = $display ?? [];
 $errors  = $errors  ?? [];
 
-if (!function_exists('e')) { function e($v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); } }
 
 $img = !empty($display['image']) && preg_match('#^https?://#i', $display['image'])
     ? $display['image']

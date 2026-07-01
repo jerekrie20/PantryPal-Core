@@ -58,7 +58,9 @@
       "Bash(vendor/bin/phpunit --no-coverage)",
       "Bash(php -r ' *)",
       "Bash(php \"C:\\\\Users\\\\Jeremiah\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Jeremiah-Herd-PantryPal-Core\\\\c8849b0b-0896-4a1c-8edf-fd7e19ca54ae\\\\scratchpad\\\\smoke_services.php\")",
-      "Bash(composer dump-autoload *)"
+      "Bash(composer dump-autoload *)",
+      "Bash(git rm *)",
+      "Bash(php -l app/Helpers/support.php app/Helpers/Validator.php app/routes/web.php app/Views/Items/index.php app/Views/Items/confirm.php app/Views/Items/edit.php app/Views/Recipes/index.php app/Views/Recipes/recipe_form.php app/Views/Recipes/show.php app/Views/ShoppingList/index.php app/Views/Ingredients/show.php app/Views/Products/show.php)"
     ]
   }
 }
