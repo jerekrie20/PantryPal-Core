@@ -78,17 +78,14 @@ class PantryItemAssembler
             $name     = $row['ingredient_name'] ?? ($row['entered_name'] ?? null);
             $category = CategoryFormatter::stringify($row['ingredient_category'] ?? null);
             $image    = $row['ingredient_image_url'] ?? null;
-            $url      = '/ingredients/view/' . $id;
         } elseif ($isProduct) {
             $name     = $row['product_title'] ?? ($row['entered_name'] ?? null);
             $category = CategoryFormatter::stringify($row['product_category'] ?? null);
             $image    = $row['product_image_url'] ?? null;
-            $url      = '/products/view/' . $id;
         } else {
             $name     = $row['entered_name'] ?? null;
             $category = null;
             $image    = null;
-            $url      = '/items/view/' . $id;
         }
 
         if (!$name) {
@@ -106,7 +103,7 @@ class PantryItemAssembler
             'category'    => $category ?? 'Uncategorized',
             'image'       => $image,
             'expired'     => $exp['expired'],
-            'url'         => $url,
+            'url'         => '/items/view/' . $id,
         ];
     }
 

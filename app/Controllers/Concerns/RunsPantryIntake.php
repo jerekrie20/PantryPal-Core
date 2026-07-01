@@ -54,8 +54,8 @@ trait RunsPantryIntake
         return null;
     }
 
-    /** POST <kind>-store: validate, then save-or-confirm. */
-    protected function beginIntake(CatalogSource $source, array $input, string $confirmAction): string
+    /** POST store: validate, then save-or-confirm. */
+    protected function beginIntake(CatalogSource $source, array $input): string
     {
         if ($errorView = $this->pantryValidation($input)) {
             return $errorView;
@@ -74,7 +74,7 @@ trait RunsPantryIntake
             'choices'        => $result['choices'],
             'original_input' => $input,
             'api_kind'       => $source->kind(),
-            'confirm_action' => $confirmAction,
+            'confirm_action' => '/items/confirm',
         ]);
     }
 
@@ -90,7 +90,7 @@ trait RunsPantryIntake
         }
 
         if ($result['type'] === 'manual_unsupported') {
-            header('Location: /ingredients/create');
+            header('Location: /items/create?kind=ingredient');
             exit;
         }
 

@@ -65,10 +65,15 @@ class ItemsController
 
     public function create(): string
     {
+        // ?kind=ingredient|product preselects the type (used by legacy
+        // /ingredients/create and /products/create redirects).
+        $kind  = $_GET['kind'] ?? null;
+        $input = in_array($kind, ['ingredient', 'product'], true) ? ['api_kind' => $kind] : [];
+
         return View::render('Items/create', [
-            'title' => 'Add Item',
+            'title'  => 'Add Item',
             'errors' => [],
-            'input' => [],
+            'input'  => $input,
         ]);
     }
 
@@ -87,11 +92,7 @@ class ItemsController
             ]);
         }
 
-        return $this->beginIntake(
-            $this->sourceFor($kind),
-            $_POST,
-            $kind === 'product' ? '/products/confirm' : '/ingredients/confirm'
-        );
+        return $this->beginIntake($this->sourceFor($kind), $_POST);
     }
 
     /** POST /items/confirm (finalize selection) */
@@ -126,12 +127,6 @@ class ItemsController
             if (!$row) {
                 http_response_code(404);
                 return View::render('Pages/404', ['title' => 'Item Not Found']);
-            }
-
-            // If this is an ingredient-backed item, delegate to the IngredientsController show route
-            if (!empty($row['ingredient_id'])) {
-                header('Location: /ingredients/view/' . (int)$id);
-                exit;
             }
 
             $item = (new PantryItemAssembler())->detail($row);

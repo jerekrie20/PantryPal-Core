@@ -73,7 +73,7 @@ class PantryItemAssemblerTest extends TestCase
         $this->assertSame('ingredient', $s['kind']);
         $this->assertSame('Gala Apple', $s['name']);
         $this->assertSame('Fruits', $s['category']);
-        $this->assertSame('/ingredients/view/7', $s['url']);
+        $this->assertSame('/items/view/7', $s['url']);
         $this->assertSame('In Stock', $s['status']);
     }
 
@@ -88,7 +88,7 @@ class PantryItemAssemblerTest extends TestCase
 
         $this->assertSame('product', $s['kind']);
         $this->assertSame('Ritz Crackers', $s['name']);
-        $this->assertSame('/products/view/9', $s['url']);
+        $this->assertSame('/items/view/9', $s['url']);
     }
 
     public function testSummaryFallsBackToEnteredNameThenPlaceholder()
