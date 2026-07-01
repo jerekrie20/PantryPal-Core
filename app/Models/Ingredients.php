@@ -111,7 +111,9 @@ class Ingredients
             ':api_id'          => isset($d['api_id']) ? (string)$d['api_id'] : null,
             ':api_kind'        => $d['api_kind'] ?? null,
             ':image_url'       => $d['image_url'] ?? null,
-            ':category'        => $d['category'] ?? null,
+            ':category'        => isset($d['category'])
+                ? (is_array($d['category']) ? json_encode($d['category']) : $d['category'])
+                : null,
             ':nutrition_info'  => isset($d['nutrition_info'])
                 ? (is_array($d['nutrition_info']) ? json_encode($d['nutrition_info']) : $d['nutrition_info'])
                 : null,

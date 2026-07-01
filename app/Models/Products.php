@@ -82,7 +82,9 @@ class Products
             ':upc'            => $d['upc'] ?? null,
             ':size_text'      => $d['size_text'] ?? null,
             ':image_url'      => $d['image_url'] ?? null,
-            ':category'       => $d['category'] ?? null,
+            ':category'       => isset($d['category'])
+                ? (is_array($d['category']) ? json_encode($d['category']) : $d['category'])
+                : null,
             ':nutrition_info' => isset($d['nutrition_info'])
                 ? (is_array($d['nutrition_info']) ? json_encode($d['nutrition_info']) : $d['nutrition_info'])
                 : null,

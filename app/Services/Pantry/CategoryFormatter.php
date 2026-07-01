@@ -27,6 +27,10 @@ class CategoryFormatter
             if (isset($cat['categoryPath']) && is_array($cat['categoryPath'])) {
                 return implode(' › ', array_filter($cat['categoryPath'], 'is_string'));
             }
+            // FDC Foundation/SR Legacy objects: {id, code, description}
+            if (isset($cat['description']) && is_string($cat['description']) && trim($cat['description']) !== '') {
+                return trim($cat['description']);
+            }
             $vals = [];
             foreach ($cat as $v) {
                 if (is_string($v)) $vals[] = $v;

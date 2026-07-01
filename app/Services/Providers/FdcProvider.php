@@ -60,7 +60,7 @@ class FdcProvider implements FoodProvider
             $d = json_decode($r->getBody(), true) ?: null;
             if (!$d) return null;
 
-            $category = $d['foodCategory'] ?? ($d['brandedFoodCategory'] ?? null);
+            $category = self::categoryFrom($d);
             $nutrition = $d['labelNutrients'] ?? ($d['foodNutrients'] ?? null);
 
             return [
@@ -78,4 +78,26 @@ class FdcProvider implements FoodProvider
 
     public function searchProducts(string $q, int $limit = 5): array { return []; }
     public function fetchProduct(int|string $id): ?array { return null; }
+
+    /**
+     * FDC's category field changes shape by data type: Branded foods give a
+     * plain string (brandedFoodCategory); Foundation/SR Legacy give an object
+     * {id, code, description}; Survey (FNDDS) gives wweiaFoodCategory with a
+     * wweiaFoodCategoryDescription. Collapse all of them to a display string.
+     */
+    public static function categoryFrom(array $d): ?string
+    {
+        $cat = $d['foodCategory'] ?? $d['brandedFoodCategory'] ?? $d['wweiaFoodCategory'] ?? null;
+        if (is_string($cat)) {
+            $cat = trim($cat);
+            return $cat !== '' ? $cat : null;
+        }
+        if (is_array($cat)) {
+            $desc = $cat['description'] ?? $cat['wweiaFoodCategoryDescription'] ?? null;
+            if (is_string($desc) && trim($desc) !== '') {
+                return trim($desc);
+            }
+        }
+        return null;
+    }
 }
