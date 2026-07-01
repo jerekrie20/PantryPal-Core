@@ -4,92 +4,17 @@
  *
  * Expects from controller:
  * - $title string
- * - $items array (raw rows from items table with keys: id, ingredient_id, product_id, expiration_date, entered_name, etc.)
- * - $pagination array (currentPage, totalPages, totalItems, itemsPerPage)
+ * - $ingredients array  Display items from PantryItemAssembler::summary
+ * - $products array     Display items from PantryItemAssembler::summary
+ * - $pagination array   (currentPage, totalPages, totalItems, itemsPerPage)
  */
 
 require_once VIEW_PATH . '/Components/ui_elements.php';
 
-use Services\Pantry\CategoryFormatter;
-
 ob_start();
 
-// Build display items separated by kind (enrich with category/name/image like Dashboard)
-$ingredients = [];
-$products    = [];
-
-try { $today = new \DateTimeImmutable('today'); } catch (\Exception $e) { $today = null; }
-
-if (!empty($items) && is_array($items)) {
-    foreach ($items as $row) {
-        $id = (int)($row['id'] ?? 0);
-        if ($id <= 0) continue;
-
-        $status = 'In Stock';
-        $badge  = 'badge-success';
-        $expiredFlag = false;
-        if (!empty($row['expiration_date']) && $today) {
-            try {
-                $exp      = new \DateTimeImmutable($row['expiration_date']);
-                $diffDays = (int)$today->diff($exp)->format('%r%a');
-                if ($diffDays < 0) {
-                    $status = 'Expired ' . (abs($diffDays) === 1 ? '1 day ago' : abs($diffDays) . ' days ago');
-                    $badge  = 'badge-danger';
-                    $expiredFlag = true;
-                } elseif ($diffDays === 0) {
-                    $status = 'Expires today';
-                    $badge  = 'badge-warning';
-                } elseif ($diffDays <= 3) {
-                    $status = 'Expires in ' . ($diffDays === 1 ? '1 day' : $diffDays . ' days');
-                    $badge  = 'badge-warning';
-                } else {
-                    $status = 'Expires in ' . $diffDays . ' days';
-                    $badge  = 'badge-neutral';
-                }
-            } catch (\Exception $e) { /* keep defaults */ }
-        }
-
-        $isIngredient = !empty($row['ingredient_id']);
-        $isProduct    = !$isIngredient && !empty($row['product_id']);
-
-        $name = $row['entered_name'] ?? null;
-        $category = null;
-        $image = null;
-
-        if ($isIngredient) {
-            $name = $row['ingredient_name'] ?? $name;
-            $category = CategoryFormatter::stringify($row['ingredient_category'] ?? null);
-            $image = $row['ingredient_image_url'] ?? null;
-        } elseif ($isProduct) {
-            $name = $row['product_title'] ?? $name;
-            $category = CategoryFormatter::stringify($row['product_category'] ?? null);
-            $image = $row['product_image_url'] ?? null;
-        }
-
-        if (!$name) {
-            $name = $isIngredient ? ('Ingredient #' . $id) : ($isProduct ? ('Product #' . $id) : ('Item #' . $id));
-        }
-
-        $display = [
-            'id'          => $id,
-            'name'        => $name,
-            'status'      => $status,
-            'category'    => $category ?? 'Uncategorized',
-            'badge_class' => $badge,
-            'image'       => $image,
-            'expired'     => $expiredFlag,
-            'url'         => $isIngredient ? ('/ingredients/view/' . $id) : ($isProduct ? ('/products/view/' . $id) : ('/items/view/' . $id)),
-        ];
-
-        if ($isIngredient) {
-            $ingredients[] = $display;
-        } elseif ($isProduct) {
-            $products[] = $display;
-        } else {
-            $ingredients[] = $display;
-        }
-    }
-}
+$ingredients = $ingredients ?? [];
+$products    = $products ?? [];
 
 $ingredientsCount = count($ingredients);
 $productsCount = count($products);

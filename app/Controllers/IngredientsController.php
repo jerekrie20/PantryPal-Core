@@ -6,8 +6,7 @@ use Helpers\View;
 use Models\Items;
 use Models\Ingredients;
 use Services\FoodService;
-use Services\Nutrition\Normalizer as NutritionNormalizer;
-use Services\Pantry\CategoryFormatter;
+use Services\Pantry\PantryItemAssembler;
 use Services\Recipes\RelatedRecipeFinder;
 
 /**
@@ -225,104 +224,20 @@ class IngredientsController
                 return View::render('Pages/401', ['title' => 'Unauthorized']);
             }
 
-            // Load the base item and ensure it belongs to the user
-            $itemRow = $this->items->find($id);
-            if (!$itemRow || (int)$itemRow['user_id'] !== (int)$userId) {
+            // Load the joined item row and ensure it belongs to the user
+            $row = $this->items->find($id, (int)$userId);
+            if (!$row) {
                 http_response_code(404);
                 return View::render('Pages/404', ['title' => 'Item Not Found']);
             }
 
             // Ingredient must exist for this view
-            if (empty($itemRow['ingredient_id'])) {
+            if (empty($row['ingredient_id'])) {
                 http_response_code(404);
                 return View::render('Pages/404', ['title' => 'Ingredient Not Found']);
             }
 
-            $ing = $this->ingredients->find((int)$itemRow['ingredient_id']);
-            if (!$ing) {
-                http_response_code(404);
-                return View::render('Pages/404', ['title' => 'Ingredient Not Found']);
-            }
-
-            // Status/badge
-            $status = 'In Stock';
-            $badge  = 'badge-success';
-            if (!empty($itemRow['expiration_date'])) {
-                try {
-                    $today    = new \DateTimeImmutable('today');
-                    $exp      = new \DateTimeImmutable($itemRow['expiration_date']);
-                    $diffDays = (int)$today->diff($exp)->format('%r%a');
-                    if     ($diffDays < 0) { $status = 'Expired ' . (abs($diffDays) === 1 ? '1 day ago' : abs($diffDays) . ' days ago'); $badge = 'badge-danger'; }
-                    elseif ($diffDays === 0){ $status = 'Expires today'; $badge = 'badge-warning'; }
-                    elseif ($diffDays <= 3){ $status = 'Expires in ' . ($diffDays === 1 ? '1 day' : $diffDays . ' days'); $badge = 'badge-warning'; }
-                    else                    { $status = 'Expires in ' . $diffDays . ' days'; $badge = 'badge-neutral'; }
-                } catch (\Exception $e) {}
-            }
-
-            // Nutrition: robustly decode and normalize the ingredient's nutrition_info
-            $nutrition = null;
-            $rawNutri = null;
-
-            if (($ing['api_source'] ?? '') === 'fatsecret' && !empty($ing['api_id'])) {
-                $fsSvc = new \Services\FoodService();
-                $fsData = $fsSvc->getFatSecretFood($ing['api_id']);
-                if ($fsData && isset($fsData['food'])) {
-                    $rawNutri = $fsData['food'];
-                    $nutrition = NutritionNormalizer::normalize($rawNutri);
-                }
-            }
-
-            $ingNutri = $ing['nutrition_info'] ?? null;
-            if ($nutrition === null && $ingNutri) {
-                $decoded = is_array($ingNutri) ? $ingNutri : json_decode((string)$ingNutri, true);
-                if (!is_array($decoded)) {
-                    $s = (string)$ingNutri;
-                    $stripped = stripslashes($s);
-                    $decoded = json_decode($stripped, true);
-                    if (!is_array($decoded)) {
-                        $once = json_decode($s, true);
-                        if (is_string($once)) {
-                            $decoded = json_decode($once, true);
-                        } elseif (is_array($once)) {
-                            foreach ($once as $vv) {
-                                if (is_string($vv) && strlen($vv) > 10 && ($vv[0] === '{' || $vv[0] === '[')) {
-                                    $decoded = json_decode($vv, true);
-                                    if (is_array($decoded)) break;
-                                }
-                            }
-                        }
-                    }
-                }
-                // Handle bare array of FoodNutrient entries
-                if (is_array($decoded) && isset($decoded[0]) && is_array($decoded[0]) && (isset($decoded[0]['nutrient']) || isset($decoded[0]['nutrientName']) || (isset($decoded[0]['type']) && $decoded[0]['type'] === 'FoodNutrient'))) {
-                    $decoded = ['foodNutrients' => $decoded];
-                }
-                if (is_array($decoded)) {
-                    $rawNutri = $decoded;
-                    $nutrition = NutritionNormalizer::normalize($decoded);
-                }
-            }
-
-            // Display fields
-            $displayName = $ing['name'] ?? ($itemRow['entered_name'] ?? 'Ingredient');
-            $displayCategory = CategoryFormatter::stringify($ing['category'] ?? null);
-            $displayImage = $ing['image_url'] ?? null;
-
-            $item = [
-                'id'              => (int)$itemRow['id'],
-                'name'            => $displayName,
-                'category'        => $displayCategory,
-                'image'           => $displayImage,
-                'quantity'        => $itemRow['quantity'] ?? null,
-                'unit'            => $itemRow['unit'] ?? null,
-                'purchase_date'   => $itemRow['purchase_date'] ?? null,
-                'expiration_date' => $itemRow['expiration_date'] ?? null,
-                'status'          => $status,
-                'badge_class'     => $badge,
-                'nutrition'       => $nutrition,
-                'nutrition_raw'   => $rawNutri,
-                'brand'           => $ing['brand'] ?? ($itemRow['entered_brand'] ?? null),
-            ];
+            $item = (new PantryItemAssembler())->detail($row);
 
             return View::render('Ingredients/show', [
                 'title'       => 'Ingredient Details',

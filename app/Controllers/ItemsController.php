@@ -8,8 +8,8 @@ use Models\Items;
 use Models\Ingredients;
 use Models\Products;
 use Services\FoodService;
-use Services\Nutrition\Normalizer as NutritionNormalizer;
 use Services\Pantry\CategoryFormatter;
+use Services\Pantry\PantryItemAssembler;
 use Services\Recipes\RelatedRecipeFinder;
 
 class ItemsController
@@ -37,17 +37,27 @@ class ItemsController
             // 2. Get the Authenticated User's ID
             $userId = $_SESSION['user_id'];
 
-            // 3. Fetch
+            // 3. Fetch and assemble display items, split by kind for the tabs
             $results = $this->items->findAll($userId, $currentPage, $itemsPerPage);
 
-            // 4. Render
-            $data = [
-                'title' => 'My Pantry',
-                'items' => $results['items'],
-                'pagination' => $results['pagination']
-            ];
+            $ingredients = [];
+            $products    = [];
+            foreach ($results['items'] as $row) {
+                $display = PantryItemAssembler::summary($row);
+                if ($display['kind'] === 'product') {
+                    $products[] = $display;
+                } else {
+                    $ingredients[] = $display;
+                }
+            }
 
-            return View::render('Items/index', $data);
+            // 4. Render
+            return View::render('Items/index', [
+                'title'       => 'My Pantry',
+                'ingredients' => $ingredients,
+                'products'    => $products,
+                'pagination'  => $results['pagination'],
+            ]);
 
         } catch (\PDOException $e) {
             error_log("Database Error in ItemsController::index(): " . $e->getMessage());
@@ -128,122 +138,7 @@ class ItemsController
                 exit;
             }
 
-            // ----- status / badge
-            $statusData = $this->items->getExpirationStatus($row['expiration_date'] ?? null);
-            $status = $statusData['status'];
-            $badge = $statusData['badge'];
-
-            // ----- nutrition (ingredient first)
-            $nutrition = null;
-            $rawNutri = null;
-
-            // Ingredients: prefer ingredient_nutrition_info; also accept plain 'nutrition_info'
-            $ingNutri = $row['ingredient_nutrition_info']
-                ?? $row['nutrition_info']
-                ?? null;
-
-            if ($ingNutri) {
-                $decoded = is_array($ingNutri) ? $ingNutri : json_decode((string)$ingNutri, true);
-                // Flexible decode: handle escaped or double-encoded JSON stored in DB
-                if (!is_array($decoded)) {
-                    $s = (string)$ingNutri;
-                    // remove common escaping
-                    $stripped = stripslashes($s);
-                    $decoded = json_decode($stripped, true);
-                    if (!is_array($decoded)) {
-                        // Sometimes JSON is string inside JSON {"nutrition":"{...}"}
-                        $once = json_decode($s, true);
-                        if (is_string($once)) {
-                            $decoded = json_decode($once, true);
-                        } elseif (is_array($once)) {
-                            // find first large JSON-ish string value
-                            foreach ($once as $vv) {
-                                if (is_string($vv) && strlen($vv) > 10 && ($vv[0] === '{' || $vv[0] === '[')) {
-                                    $decoded = json_decode($vv, true);
-                                    if (is_array($decoded)) break;
-                                }
-                            }
-                        }
-                    }
-                }
-                if (is_array($decoded)) {
-                    $rawNutri = $decoded;
-                    $nutrition = NutritionNormalizer::normalize($decoded);
-                }
-            }
-
-            $productRaw = null;
-            if ($nutrition === null && ($row['product_api_source'] ?? '') === 'fatsecret' && !empty($row['product_api_id'])) {
-                $fsSvc = new \Services\FoodService();
-                $fsData = $fsSvc->getFatSecretFood($row['product_api_id']);
-                if ($fsData && isset($fsData['food'])) {
-                    $productRaw = $fsData['food'];
-                    $nutrition = NutritionNormalizer::normalize($productRaw);
-                }
-            }
-
-            // Products (if no nutrition yet): try OFF raw payload, then product_nutrition_info
-            if ($nutrition === null && !empty($row['product_raw_payload'])) {
-                $productRaw = is_array($row['product_raw_payload'])
-                    ? $row['product_raw_payload']
-                    : json_decode((string)$row['product_raw_payload'], true);
-
-                if (is_array($productRaw) && isset($productRaw['product']) && is_array($productRaw['product'])) {
-                    $productRaw = $productRaw['product']; // OFF embeds under 'product'
-                }
-                if (is_array($productRaw)) {
-                    // normalize a few common keys used by the view
-                    if (!isset($productRaw['brand']) && isset($productRaw['brands'])) {
-                        $productRaw['brand'] = $productRaw['brands'];
-                    }
-                    if (!isset($productRaw['upc'])) {
-                        $productRaw['upc'] = $productRaw['code'] ?? ($row['product_upc'] ?? null);
-                    }
-                    if (!isset($productRaw['image']) && isset($productRaw['image_url'])) {
-                        $productRaw['image'] = $productRaw['image_url'];
-                    }
-                    // OFF nutriments → nutrition
-                    $nutrition = NutritionNormalizer::normalize($productRaw);
-                }
-            }
-
-            if ($nutrition === null && !empty($row['product_nutrition_info'])) {
-                $pn = is_array($row['product_nutrition_info'])
-                    ? $row['product_nutrition_info']
-                    : json_decode((string)$row['product_nutrition_info'], true);
-                if (is_array($pn)) {
-                    $nutrition = NutritionNormalizer::normalize($pn);
-                }
-            }
-
-            // ----- display fields (prefer ingredient, then product)
-            $displayName = $row['ingredient_name'] ?? ($row['product_title'] ?? 'Item');
-
-            // Category may be a JSON array / path → stringify safely
-            $displayCategory = CategoryFormatter::stringify($row['ingredient_category'] ?? ($row['product_category'] ?? null));
-
-            $displayImage = $row['ingredient_image_url']
-                ?? ($row['product_image_url'] ?? ($productRaw['image'] ?? null));
-
-            $item = [
-                'id'              => (int)$row['id'],
-                'name'            => $displayName,
-                'category'        => $displayCategory,
-                'image'           => $displayImage,
-                'quantity'        => $row['quantity'] ?? null,
-                'unit'            => $row['unit'] ?? null,
-                'purchase_date'   => $row['purchase_date'] ?? null,
-                'expiration_date' => $row['expiration_date'] ?? null,
-                'status'          => $status,
-                'badge_class'     => $badge,
-                'nutrition'       => $nutrition,
-                'nutrition_raw'   => $rawNutri,
-
-                // Brand: prefer product brand, else ingredient brand, else entered brand
-                'brand'           => $row['product_brand'] ?? ($row['ingredient_brand'] ?? ($row['entered_brand'] ?? null)),
-                'product_title'   => $row['product_title'] ?? null,
-                'product_raw'     => $productRaw,
-            ];
+            $item = (new PantryItemAssembler())->detail($row);
 
             $isIngredient = !empty($row['ingredient_id']);
             $view = $isIngredient ? 'Ingredients/show' : 'Products/show';
