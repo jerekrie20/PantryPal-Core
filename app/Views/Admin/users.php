@@ -13,12 +13,12 @@ require VIEW_PATH . '/Admin/partials/nav.php';
   <form method="get" action="/admin/users" class="bg-bg-component rounded-lg p-3 shadow flex flex-col sm:flex-row gap-3">
     <div class="flex-1">
       <label class="block text-xs text-text-muted mb-1">Search</label>
-      <input class="input w-full" type="text" name="q" placeholder="Username or email" value="<?php echo htmlspecialchars((string)($filters['q'] ?? '')); ?>">
+      <input class="w-full" type="text" name="q" placeholder="Username or email" value="<?php echo htmlspecialchars((string)($filters['q'] ?? '')); ?>">
     </div>
     <div>
       <label class="block text-xs text-text-muted mb-1">Role</label>
       <?php $role = (string)($filters['role'] ?? ''); ?>
-      <select class="input" name="role">
+      <select name="role">
         <option value="" <?php echo $role===''?'selected':''; ?>>— any —</option>
         <option value="admin" <?php echo $role==='admin'?'selected':''; ?>>Admin</option>
         <option value="user" <?php echo $role==='user'?'selected':''; ?>>User</option>
@@ -27,7 +27,7 @@ require VIEW_PATH . '/Admin/partials/nav.php';
     <div>
       <label class="block text-xs text-text-muted mb-1">Per Page</label>
       <?php $pp = (int)($filters['perPage'] ?? 25); ?>
-      <select class="input" name="perPage">
+      <select name="perPage">
         <?php foreach ([10,25,50,100] as $n): ?>
           <option value="<?php echo $n; ?>" <?php echo $pp === $n ? 'selected' : ''; ?>><?php echo $n; ?></option>
         <?php endforeach; ?>
@@ -48,12 +48,12 @@ require VIEW_PATH . '/Admin/partials/nav.php';
         <div class="font-semibold text-text-heading">
           <?php echo htmlspecialchars($u['username'] ?? ''); ?>
         </div>
-        <span class="text-xs px-2 py-0.5 rounded-full <?php echo !empty($u['is_admin']) ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'; ?>">
+        <span class="text-xs px-2 py-0.5 rounded-full <?php echo !empty($u['is_admin']) ? 'badge-success' : 'badge-neutral'; ?>">
           <?php echo !empty($u['is_admin']) ? 'Admin' : 'User'; ?>
         </span>
       </div>
       <div class="text-sm text-text-muted mt-1">ID #<?php echo (int)$u['id']; ?> · <?php echo htmlspecialchars((string)($u['created_at'] ?? '')); ?></div>
-      <div class="mt-2 text-sm"><a class="text-link" href="mailto:<?php echo htmlspecialchars($u['email'] ?? ''); ?>"><?php echo htmlspecialchars($u['email'] ?? ''); ?></a></div>
+      <div class="mt-2 text-sm"><a href="mailto:<?php echo htmlspecialchars($u['email'] ?? ''); ?>"><?php echo htmlspecialchars($u['email'] ?? ''); ?></a></div>
       <div class="mt-3 flex gap-2">
         <form method="post" action="/admin/users/<?php echo (int)$u['id']; ?>/toggle-admin">
           <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
@@ -86,9 +86,9 @@ require VIEW_PATH . '/Admin/partials/nav.php';
 <tr class="border-b border-border-default">
   <td class="px-4 py-2"><?php echo (int)$u['id']; ?></td>
   <td class="px-4 py-2"><?php echo htmlspecialchars($u['username'] ?? ''); ?></td>
-  <td class="px-4 py-2"><a class="text-link" href="mailto:<?php echo htmlspecialchars($u['email'] ?? ''); ?>"><?php echo htmlspecialchars($u['email'] ?? ''); ?></a></td>
+  <td class="px-4 py-2"><a href="mailto:<?php echo htmlspecialchars($u['email'] ?? ''); ?>"><?php echo htmlspecialchars($u['email'] ?? ''); ?></a></td>
   <td class="px-4 py-2">
-    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs <?php echo !empty($u['is_admin']) ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'; ?>">
+    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs <?php echo !empty($u['is_admin']) ? 'badge-success' : 'badge-neutral'; ?>">
       <?php echo !empty($u['is_admin']) ? 'Admin' : 'User'; ?>
     </span>
   </td>
@@ -97,11 +97,11 @@ require VIEW_PATH . '/Admin/partials/nav.php';
     <div class="flex items-center gap-2">
       <form method="post" action="/admin/users/<?php echo (int)$u['id']; ?>/toggle-admin">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
-        <button class="btn btn-subtle btn-xs" type="submit"><?php echo !empty($u['is_admin']) ? 'Revoke' : 'Make Admin'; ?></button>
+        <button class="btn btn-subtle btn-sm" type="submit"><?php echo !empty($u['is_admin']) ? 'Revoke' : 'Make Admin'; ?></button>
       </form>
       <form method="post" action="/admin/users/<?php echo (int)$u['id']; ?>/delete" onsubmit="return confirm('Delete this user? This cannot be undone.');">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
-        <button class="btn btn-danger btn-xs" type="submit">Delete</button>
+        <button class="btn btn-danger btn-sm" type="submit">Delete</button>
       </form>
     </div>
   </td>
@@ -119,8 +119,8 @@ require VIEW_PATH . '/Admin/partials/nav.php';
   <div class="flex items-center gap-2">
     <?php $qs = $_GET; $qs['page'] = max(1, $cur - 1); $prevUrl = '/admin/users' . ($qs ? ('?' . http_build_query($qs)) : ''); ?>
     <?php $qs2 = $_GET; $qs2['page'] = min($tot, $cur + 1); $nextUrl = '/admin/users' . ($qs2 ? ('?' . http_build_query($qs2)) : ''); ?>
-    <a class="btn btn-subtle btn-xs <?php echo $cur <= 1 ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($prevUrl); ?>">Prev</a>
-    <a class="btn btn-subtle btn-xs <?php echo $cur >= $tot ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($nextUrl); ?>">Next</a>
+    <a class="btn btn-subtle btn-sm <?php echo $cur <= 1 ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($prevUrl); ?>">Prev</a>
+    <a class="btn btn-subtle btn-sm <?php echo $cur >= $tot ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($nextUrl); ?>">Next</a>
   </div>
 </div>
 <?php endif; ?>

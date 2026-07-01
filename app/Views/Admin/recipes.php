@@ -15,12 +15,12 @@ require VIEW_PATH . '/Admin/partials/nav.php';
   <form method="get" action="/admin/recipes" class="bg-bg-component rounded-lg p-3 shadow flex flex-col sm:flex-row gap-3">
     <div class="flex-1">
       <label class="block text-xs text-text-muted mb-1">Search</label>
-      <input class="input w-full" type="text" name="q" placeholder="Title, source URL, ID..." value="<?php echo htmlspecialchars((string)($filters['q'] ?? '')); ?>">
+      <input class="w-full" type="text" name="q" placeholder="Title, source URL, ID..." value="<?php echo htmlspecialchars((string)($filters['q'] ?? '')); ?>">
     </div>
     <div>
       <label class="block text-xs text-text-muted mb-1">Source</label>
       <?php $src = (string)($filters['source'] ?? ''); $opts = ['', 'manual','fdc','off','fatsecret']; ?>
-      <select class="input" name="source">
+      <select name="source">
         <?php foreach ($opts as $opt): $label = $opt === '' ? '— any —' : ucwords(str_replace('_',' ', $opt)); ?>
           <option value="<?php echo htmlspecialchars($opt); ?>" <?php echo $src === $opt ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
         <?php endforeach; ?>
@@ -28,12 +28,12 @@ require VIEW_PATH . '/Admin/partials/nav.php';
     </div>
     <div>
       <label class="block text-xs text-text-muted mb-1">Owner User ID</label>
-      <input class="input w-28" type="number" name="user_id" value="<?php echo htmlspecialchars((string)($filters['user_id'] ?? '')); ?>" placeholder="Any">
+      <input class="w-28" type="number" name="user_id" value="<?php echo htmlspecialchars((string)($filters['user_id'] ?? '')); ?>" placeholder="Any">
     </div>
     <div>
       <label class="block text-xs text-text-muted mb-1">Per Page</label>
       <?php $pp = (int)($filters['perPage'] ?? 25); ?>
-      <select class="input" name="perPage">
+      <select name="perPage">
         <?php foreach ([10,25,50,100] as $n): ?>
           <option value="<?php echo $n; ?>" <?php echo $pp === $n ? 'selected' : ''; ?>><?php echo $n; ?></option>
         <?php endforeach; ?>
@@ -92,10 +92,10 @@ require VIEW_PATH . '/Admin/partials/nav.php';
   <td class="px-4 py-2"><?php echo htmlspecialchars((string)($r['created_at'] ?? '')); ?></td>
   <td class="px-4 py-2">
     <div class="flex items-center gap-2">
-      <a class="btn btn-subtle btn-xs" href="/admin/recipes/<?php echo (int)$r['id']; ?>/edit">Edit</a>
+      <a class="btn btn-subtle btn-sm" href="/admin/recipes/<?php echo (int)$r['id']; ?>/edit">Edit</a>
       <form method="post" action="/admin/recipes/<?php echo (int)$r['id']; ?>/delete" onsubmit="return confirm('Delete this recipe?');">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
-        <button class="btn btn-danger btn-xs" type="submit">Delete</button>
+        <button class="btn btn-danger btn-sm" type="submit">Delete</button>
       </form>
     </div>
   </td>
@@ -113,8 +113,8 @@ require VIEW_PATH . '/Admin/partials/nav.php';
   <div class="flex items-center gap-2">
     <?php $qs = $_GET; $qs['page'] = max(1, $cur - 1); $prevUrl = '/admin/recipes' . ($qs ? ('?' . http_build_query($qs)) : ''); ?>
     <?php $qs2 = $_GET; $qs2['page'] = min($tot, $cur + 1); $nextUrl = '/admin/recipes' . ($qs2 ? ('?' . http_build_query($qs2)) : ''); ?>
-    <a class="btn btn-subtle btn-xs <?php echo $cur <= 1 ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($prevUrl); ?>">Prev</a>
-    <a class="btn btn-subtle btn-xs <?php echo $cur >= $tot ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($nextUrl); ?>">Next</a>
+    <a class="btn btn-subtle btn-sm <?php echo $cur <= 1 ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($prevUrl); ?>">Prev</a>
+    <a class="btn btn-subtle btn-sm <?php echo $cur >= $tot ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($nextUrl); ?>">Next</a>
   </div>
 </div>
 <?php endif; ?>
