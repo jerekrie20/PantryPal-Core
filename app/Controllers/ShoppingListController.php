@@ -6,6 +6,7 @@ use Helpers\View;
 use Models\Items;
 use Models\ShoppingList;
 use Services\FoodService;
+use Services\Pantry\PantryCache;
 use Services\Providers\FatSecretProvider;
 
 class ShoppingListController
@@ -263,6 +264,7 @@ class ShoppingListController
             ]);
 
             $this->list->delete($id, $userId);
+            PantryCache::bustForUser($userId);
 
             $_SESSION['flash'] = ['type' => 'success', 'message' => "'{$rawName}' added to your pantry."];
         } catch (\Throwable $e) {
@@ -441,6 +443,8 @@ class ShoppingListController
                 'entered_name'    => ($productId || $ingredientId) ? null : $foodName,
                 'entered_brand'   => $brandName,
             ]);
+
+            PantryCache::bustForUser($userId);
 
             echo json_encode([
                 'success' => true,

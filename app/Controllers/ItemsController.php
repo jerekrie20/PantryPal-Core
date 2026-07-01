@@ -2,29 +2,26 @@
 
 namespace Controllers;
 
-use Helpers\Validator;
+use Controllers\Concerns\RunsPantryIntake;
 use Helpers\View;
 use Models\Items;
-use Models\Ingredients;
-use Models\Products;
-use Services\FoodService;
 use Services\Pantry\CategoryFormatter;
+use Services\Pantry\PantryCache;
 use Services\Pantry\PantryItemAssembler;
+use Services\Pantry\Sources\CatalogSource;
+use Services\Pantry\Sources\IngredientSource;
+use Services\Pantry\Sources\ProductSource;
 use Services\Recipes\RelatedRecipeFinder;
 
 class ItemsController
 {
+    use RunsPantryIntake;
+
     protected Items $items;
-    protected Ingredients $ingredients;
-    protected Products $products;
-    protected FoodService $svc;
 
     public function __construct()
     {
         $this->items = new Items();
-        $this->ingredients = new Ingredients();
-        $this->products = new Products();
-        $this->svc = new FoodService();
     }
 
     public function index(): string
@@ -75,46 +72,45 @@ class ItemsController
         ]);
     }
 
-    public function store()
+    public function store(): string
     {
-        // Slim controller: delegate based on api_kind
         $kind = $_POST['api_kind'] ?? 'ingredient';
-        if ($kind === 'product') {
-            $ctrl = new ProductsController();
-            return $ctrl->store();
-        }
-        // treat manual as ingredient flow (manual ingredient creation)
+
+        // Manual skips the search/confirm round-trip entirely.
         if ($kind === 'manual') {
-            // Force a manual confirm path via IngredientsController
-            $_POST['api_kind'] = 'manual';
-            $_POST['picked_source'] = 'manual';
-            $_POST['api_id'] = 0;
-            $_POST['original_input'] = $_POST;
-            $ctrl = new IngredientsController();
-            return $ctrl->confirm();
+            if ($errorView = $this->pantryValidation($_POST)) {
+                return $errorView;
+            }
+            return $this->completeIntake(new IngredientSource(), [
+                'picked_source'  => 'manual',
+                'original_input' => $_POST,
+            ]);
         }
-        $ctrl = new IngredientsController();
-        return $ctrl->store();
+
+        return $this->beginIntake(
+            $this->sourceFor($kind),
+            $_POST,
+            $kind === 'product' ? '/products/confirm' : '/ingredients/confirm'
+        );
     }
 
     /** POST /items/confirm (finalize selection) */
-    public function confirm()
+    public function confirm(): string
     {
-        // Slim controller: delegate based on api_kind (POST or original_input)
         $apiKind = $_POST['api_kind'] ?? ($_POST['original_input']['api_kind'] ?? 'ingredient');
-        if ($apiKind === 'product') {
-            $ctrl = new ProductsController();
-            return $ctrl->confirm();
-        }
-        // manual treated in ingredient flow
-        $ctrl = new IngredientsController();
-        return $ctrl->confirm();
+        return $this->completeIntake($this->sourceFor($apiKind), $_POST);
     }
 
     // If you still have a route pointing to storeConfirmed(), keep this shim:
-    public function storeConfirmed(): ?string
+    public function storeConfirmed(): string
     {
         return $this->confirm();
+    }
+
+    /** Pick the catalog for an api_kind value; manual runs through ingredients. */
+    private function sourceFor(string $kind): CatalogSource
+    {
+        return $kind === 'product' ? new ProductSource() : new IngredientSource();
     }
 
     public function show(int $id): string
@@ -154,44 +150,6 @@ class ItemsController
             http_response_code(500);
             return View::render('Pages/500', ['title' => 'Server Error']);
         }
-    }
-
-    public function validation(): ?string
-    {
-        global $conn;
-        $validator = new Validator($_POST, $conn);
-
-        $rules = [
-            'name' => ['required' => true, 'min' => 2, 'max' => 255],
-            'quantity' => ['required' => true, 'numeric' => true],
-            'unit' => ['required' => false, 'max' => 10, 'string' => true],
-            'purchase_date' => ['required' => false, 'date' => true],
-            'expiration_date' => ['required' => false, 'date' => true]
-        ];
-
-        $validator->check($rules);
-
-        // Cross-field validation: expiration_date not before purchase_date
-        $errors = $validator->errors();
-        $pd = $_POST['purchase_date'] ?? null;
-        $ed = $_POST['expiration_date'] ?? null;
-        if (!empty($pd) && !empty($ed)) {
-            $pdObj = \DateTime::createFromFormat('Y-m-d', (string)$pd);
-            $edObj = \DateTime::createFromFormat('Y-m-d', (string)$ed);
-            if ($pdObj && $edObj && $edObj < $pdObj) {
-                $errors['expiration_date'] = 'Expiration date cannot be before the purchase date';
-            }
-        }
-
-        if (!empty($errors)) {
-            return View::render('Items/create', [
-                'title' => 'Add New Item',
-                'errors' => $errors,
-                'input' => $_POST
-            ]);
-        }
-
-        return null; // success
     }
 
     public function edit(int $id): string
@@ -307,11 +265,7 @@ class ItemsController
                     'display' => ['name' => $_POST['display_name'] ?? 'Item', 'category' => $_POST['display_category'] ?? null, 'image' => $_POST['display_image'] ?? null],
                 ]);
             }
-            // Invalidate dashboard caches after successful update
-            try {
-                \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
-                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
-            } catch (\Throwable $e) { /* ignore */ }
+            PantryCache::bustForUser((int)$userId);
             header('Location: /items/view/' . (int)$id);
             exit;
         } catch (\Throwable $e) {
@@ -340,11 +294,7 @@ class ItemsController
             }
 
             $this->items->delete($id, (int)$userId);
-            // Invalidate dashboard caches after delete
-            try {
-                \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
-                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
-            } catch (\Throwable $e) { /* ignore */ }
+            PantryCache::bustForUser((int)$userId);
             header('Location: /dashboard');
             exit;
         } catch (\Throwable $e) {
@@ -380,11 +330,7 @@ class ItemsController
                 exit;
             }
 
-            // Invalidate caches after renew
-            try {
-                \Helpers\Cache::del('pp:user:' . (int)$userId . ':items:recent:v1');
-                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
-            } catch (\Throwable $e) { /* ignore */ }
+            PantryCache::bustForUser((int)$userId);
 
             header('Location: /items/view/' . (int)$id);
             exit;

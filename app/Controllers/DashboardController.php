@@ -8,6 +8,7 @@ use Models\Ingredients;
 use Models\Products;
 use Models\Recipes;
 use Models\Updates;
+use Services\Pantry\PantryCache;
 use Services\Pantry\PantryItemAssembler;
 
 class DashboardController
@@ -33,8 +34,8 @@ class DashboardController
         $userId   = $_SESSION['user_id'];
 
         // Cache keys
-        $statsKey  = 'pp:user:' . (int)$userId . ':dashboard:stats:v1';
-        $recentKey = 'pp:user:' . (int)$userId . ':items:recent:v1';
+        $statsKey  = PantryCache::dashboardStatsKey((int)$userId);
+        $recentKey = PantryCache::recentItemsKey((int)$userId);
         $pantry_stats = \Helpers\Cache::get($statsKey);
         $rawItems = \Helpers\Cache::get($recentKey);
 
