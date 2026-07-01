@@ -1,292 +1,377 @@
 <?php
 /**
  * Recipes Search/Suggested View
- * Expects: $title, $query, $recipes (array), $error (string|null), $mode ('search'|'suggested'), optional $pantryKeywords
+ * Expects: $title, $query, $recipes (array), $error (string|null), $mode ('search'|'suggested'|'saved'|'ugc'|'browse_api'),
+ *          $pantryKeywords (array|null), $pantrySelected (array|null), $pantryMode (string|null),
+ *          $filters (array|null), $pagination (array|null)
  */
 
+require_once VIEW_PATH . '/Components/ui_elements.php';
 ob_start();
 
 if (!function_exists('e')) {
     function e($v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); }
 }
 
-$hasApi = (getenv('SUGGESTIC_API_KEY') || (!empty($_ENV['SUGGESTIC_API_KEY'])))
-       || (getenv('SPOONACULAR_API_KEY') || (!empty($_ENV['SPOONACULAR_API_KEY'])))
-       || (getenv('FATSECRET_CLIENT_ID') || (!empty($_ENV['FATSECRET_CLIENT_ID'])));
+$hasApi = (getenv('SUGGESTIC_API_KEY') || !empty($_ENV['SUGGESTIC_API_KEY']))
+       || (getenv('SPOONACULAR_API_KEY') || !empty($_ENV['SPOONACULAR_API_KEY']))
+       || (getenv('FATSECRET_CLIENT_ID') || !empty($_ENV['FATSECRET_CLIENT_ID']));
+
+// Tab detection
+$_ugcMode      = (isset($_GET['ugc']) && (string)$_GET['ugc'] === '1') || (($mode ?? '') === 'ugc');
+$_suggestMode  = (($mode ?? '') === 'suggested') || isset($_GET['browse']);
+$_apiMode      = isset($_GET['api']) && !$_suggestMode && !$_ugcMode;
+$_savedMode    = !$_ugcMode && !$_suggestMode && !$_apiMode;
+
+$pantrySelectedList = isset($pantrySelected) && is_array($pantrySelected)
+    ? $pantrySelected
+    : (isset($_GET['pantry']) && is_array($_GET['pantry']) ? array_map('strval', $_GET['pantry']) : []);
+$pmode = isset($pantryMode) ? $pantryMode : (isset($_GET['pantry_mode']) ? (string)$_GET['pantry_mode'] : 'all');
+$pmode = $pmode === 'any' ? 'any' : 'all';
+$pantryToggleOpen = !empty($pantrySelectedList) || !empty($_GET['pantry']);
+
+$tabClasses = function (bool $active): string {
+    return $active
+        ? 'px-4 py-1.5 text-sm font-semibold rounded-md bg-bg-component text-text-heading shadow-sm'
+        : 'px-4 py-1.5 text-sm font-semibold rounded-md text-text-muted hover:text-text-heading transition-colors';
+};
 ?>
 
-<?php
-// Determine active tab
-$_ugcMode    = (isset($_GET['ugc']) && (string)$_GET['ugc'] === '1') || (($mode ?? '') === 'ugc');
-$_apiMode    = isset($_GET['api']) || isset($_GET['browse']);
-$_savedMode  = !$_ugcMode && !$_apiMode;
-?>
-<section class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between">
-    <div>
-        <h1 class="text-3xl font-bold text-text-heading"><?php echo e($title ?? 'Recipes'); ?></h1>
-    </div>
-    <div class="mt-3 sm:mt-0">
-        <a href="/recipes/create" class="btn btn-cta btn-sm">+ Add Recipe</a>
-    </div>
-</section>
+<?php ui_page_header(
+    $title ?? 'Recipes',
+    'Find something to cook, save what you love, and build a personal cookbook.',
+    '<a href="/recipes/create" class="btn btn-cta btn-md">+ Add recipe</a>',
+    'Recipes'
+); ?>
 
-<!-- Recipe mode tabs -->
-<div class="mb-5 flex gap-1 border-b border-border-default">
-    <a href="/recipes"
-       class="px-4 py-2 text-sm font-medium rounded-t <?php echo $_savedMode ? 'border border-b-bg-default border-border-default bg-bg-default text-text-heading -mb-px' : 'text-text-muted hover:text-text-heading'; ?>">
-       Saved
-    </a>
-    <a href="/recipes?ugc=1"
-       class="px-4 py-2 text-sm font-medium rounded-t <?php echo $_ugcMode ? 'border border-b-bg-default border-border-default bg-bg-default text-text-heading -mb-px' : 'text-text-muted hover:text-text-heading'; ?>">
-       My Recipes
-    </a>
-    <a href="/recipes/suggested"
-       class="px-4 py-2 text-sm font-medium rounded-t text-text-muted hover:text-text-heading">
-       Suggested
-    </a>
+<!-- Tabs -->
+<div role="tablist" aria-label="Recipe collections" class="inline-flex bg-bg-subtle rounded-lg p-1 gap-1 mb-6">
+    <a role="tab" aria-selected="<?= $_savedMode ? 'true' : 'false' ?>" href="/recipes" class="<?= $tabClasses($_savedMode) ?>">Saved</a>
+    <a role="tab" aria-selected="<?= $_ugcMode ? 'true' : 'false' ?>" href="/recipes?ugc=1" class="<?= $tabClasses($_ugcMode) ?>">My recipes</a>
+    <a role="tab" aria-selected="<?= ($_suggestMode || $_apiMode) ? 'true' : 'false' ?>" href="/recipes/suggested" class="<?= $tabClasses($_suggestMode || $_apiMode) ?>">Discover</a>
 </div>
 
-<div class="card p-4 md:p-6 mb-6">
-    <form action="/recipes" method="GET" class="flex flex-col gap-3">
-        <div class="flex flex-col sm:flex-row gap-3 sm:items-stretch">
-            <input type="text" name="q" placeholder="Search recipes (e.g., chicken pasta)" value="<?php echo e($query ?? ''); ?>"
-                   class="flex-1 min-w-0 border border-border-default rounded px-3 py-2 bg-surface-default" />
-            <button type="submit" name="api" value="1" class="btn btn-cta btn-md sm:w-auto w-full">Web Search</button>
-            <button type="submit" name="ugc" value="1" class="btn btn-secondary btn-md sm:w-auto w-full">User Recipes</button>
-            <button type="button" id="toggle-pantry" class="btn btn-secondary btn-md sm:w-auto w-full">Use My Pantry</button>
+<!-- Search / filters card -->
+<div class="card mb-6">
+    <form action="/recipes" method="GET" class="space-y-4">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <div class="relative flex-1 min-w-0">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/>
+                </svg>
+                <input type="text" name="q" placeholder="Search recipes (e.g. chicken pasta)" value="<?= e($query ?? '') ?>" class="w-full pl-9" />
+            </div>
+            <button type="submit" name="api" value="1" class="btn btn-cta btn-md sm:w-auto w-full">Search the web</button>
+            <button type="submit" name="ugc" value="1" class="btn btn-secondary btn-md sm:w-auto w-full">Search my recipes</button>
+            <button type="button" id="toggle-pantry" class="btn btn-secondary btn-md sm:w-auto w-full">
+                <?= $pantryToggleOpen ? 'Hide pantry' : 'Use my pantry' ?>
+            </button>
         </div>
+
         <?php if (empty($mode) || $mode !== 'browse_api'): ?>
-            <div class="flex items-center gap-3">
-                <label class="text-sm">Results</label>
-                <select name="perPage" class="border border-border-default rounded px-2 py-1 bg-surface-default">
-                    <?php $pp = isset($_GET['perPage']) ? (int)$_GET['perPage'] : 10; foreach ([10,12,18,24,30] as $n): ?>
-                        <option value="<?php echo (int)$n; ?>" <?php echo ($pp===$n?'selected':''); ?>><?php echo (int)$n; ?></option>
+            <div class="flex items-center gap-3 text-sm">
+                <label for="perPage" class="text-text-muted">Results per page</label>
+                <select id="perPage" name="perPage" class="!py-1">
+                    <?php $pp = isset($_GET['perPage']) ? (int)$_GET['perPage'] : 10; foreach ([10, 12, 18, 24, 30] as $n): ?>
+                        <option value="<?= (int)$n ?>" <?= $pp === $n ? 'selected' : '' ?>><?= (int)$n ?></option>
                     <?php endforeach; ?>
                 </select>
-                <span class="text-xs text-text-muted">Use pages to see more results.</span>
             </div>
         <?php endif; ?>
 
-        <div id="pantry-area" class="<?php echo (!empty($_GET['pantry']) ? '' : 'hidden '); ?>mt-3 border border-border-default rounded p-3 bg-surface-subtle">
-            <div class="flex items-center justify-between">
-                <h3 class="font-semibold">Select items from your pantry</h3>
-                <button type="button" id="close-pantry" class="text-sm text-text-muted hover:underline">Hide</button>
+        <!-- Pantry selector -->
+        <div id="pantry-area" class="<?= $pantryToggleOpen ? '' : 'hidden ' ?>rounded-lg p-4 bg-bg-subtle border border-border-default">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h3 class="text-text-heading font-semibold text-base">Pick from your pantry</h3>
+                    <p class="text-xs text-text-muted">We'll find recipes that use what you select.</p>
+                </div>
+                <button type="button" id="close-pantry" class="btn btn-ghost btn-sm">Hide</button>
             </div>
+
             <?php if (!empty($pantryKeywords) && is_array($pantryKeywords)): ?>
-                <?php 
-                  $selected = isset($pantrySelected) && is_array($pantrySelected) ? $pantrySelected : (isset($_GET['pantry']) && is_array($_GET['pantry']) ? array_map('strval', $_GET['pantry']) : []);
-                  $pmode = isset($pantryMode) ? $pantryMode : (isset($_GET['pantry_mode']) ? (string)$_GET['pantry_mode'] : 'all');
-                  $pmode = ($pmode === 'any') ? 'any' : 'all';
-                ?>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-3">
-                    <?php foreach ($pantryKeywords as $kw): if (!is_string($kw) || $kw==='') continue; ?>
-                        <?php $isChecked = in_array($kw, $selected, true); ?>
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="checkbox" name="pantry[]" value="<?php echo e($kw); ?>" class="accent-primary-600" <?php echo $isChecked ? 'checked' : ''; ?> />
-                            <span><?php echo e(ucwords($kw)); ?></span>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-2">
+                    <?php foreach ($pantryKeywords as $kw): if (!is_string($kw) || $kw === '') continue; ?>
+                        <?php $isChecked = in_array($kw, $pantrySelectedList, true); ?>
+                        <label class="flex items-center gap-2 text-sm cursor-pointer p-2 rounded hover:bg-bg-component">
+                            <input type="checkbox" name="pantry[]" value="<?= e($kw) ?>" class="!w-4 !h-4" <?= $isChecked ? 'checked' : '' ?> />
+                            <span class="truncate"><?= e(ucwords($kw)) ?></span>
                         </label>
                     <?php endforeach; ?>
                 </div>
-                <div class="mt-3 flex flex-wrap items-center gap-4">
-                    <div class="flex items-center gap-2 text-sm">
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 text-sm">
                         <span class="text-text-muted">Match</span>
-                        <label class="inline-flex items-center gap-1">
-                            <input type="radio" name="pantry_mode" value="all" <?php echo ($pmode==='all'?'checked':''); ?> /> AlL
+                        <label class="inline-flex items-center gap-1.5">
+                            <input type="radio" name="pantry_mode" value="all" class="!w-4 !h-4" <?= $pmode === 'all' ? 'checked' : '' ?> /> All
                         </label>
-                        <label class="inline-flex items-center gap-1">
-                            <input type="radio" name="pantry_mode" value="any" <?php echo ($pmode==='any'?'checked':''); ?> /> Any
+                        <label class="inline-flex items-center gap-1.5">
+                            <input type="radio" name="pantry_mode" value="any" class="!w-4 !h-4" <?= $pmode === 'any' ? 'checked' : '' ?> /> Any
                         </label>
                     </div>
                     <div class="flex gap-2">
-                        <button type="submit" class="btn btn-primary btn-sm">Search with Selected</button>
-                        <button type="button" id="clear-pantry-selection" class="btn btn-secondary btn-sm">Clear Selection</button>
+                        <button type="button" id="clear-pantry-selection" class="btn btn-ghost btn-sm">Clear</button>
+                        <button type="submit" name="api" value="1" class="btn btn-cta btn-sm">Search with selected</button>
                     </div>
                 </div>
             <?php else: ?>
-                <div class="mt-2 text-sm text-text-muted">
-                    No pantry items found. Add items in your pantry first.
-                    <a href="/items" class="text-primary-600 hover:underline">Go to My Pantry</a>
-                </div>
+                <p class="text-sm text-text-muted">
+                    Your pantry is empty. <a href="/items" class="font-semibold">Add items</a> to use this filter.
+                </p>
             <?php endif; ?>
         </div>
 
         <?php if (!empty($mode) && $mode === 'browse_api'): ?>
+            <!-- Advanced filters -->
             <input type="hidden" name="browse" value="1" />
             <input type="hidden" name="api" value="1" />
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <select name="diet" class="border border-border-default rounded px-3 py-2 bg-surface-default">
-                    <?php $diet = $filters['diet'] ?? ''; ?>
-                    <option value="">Any Diet</option>
-                    <?php foreach (['gluten free','ketogenic','vegetarian','vegan','pescetarian','paleo','primal','whole30'] as $d): ?>
-                        <option value="<?php echo e($d); ?>" <?php echo ($diet===$d?'selected':''); ?>><?php echo e(ucwords($d)); ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <select name="cuisine" class="border border-border-default rounded px-3 py-2 bg-surface-default">
-                    <?php $cuisine = $filters['cuisine'] ?? ''; ?>
-                    <option value="">Any Cuisine</option>
-                    <?php foreach (['american','italian','mexican','indian','thai','chinese','japanese','french','mediterranean'] as $c): ?>
-                        <option value="<?php echo e($c); ?>" <?php echo ($cuisine===$c?'selected':''); ?>><?php echo e(ucwords($c)); ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <select name="type" class="border border-border-default rounded px-3 py-2 bg-surface-default">
-                    <?php $type = $filters['type'] ?? ''; ?>
-                    <option value="">Any Type</option>
-                    <?php foreach (['main course','side dish','dessert','appetizer','salad','bread','breakfast','soup','beverage','snack'] as $t): ?>
-                        <option value="<?php echo e($t); ?>" <?php echo ($type===$t?'selected':''); ?>><?php echo e(ucwords($t)); ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <input type="text" name="intolerances" placeholder="Intolerances (comma-separated)" value="<?php echo e(is_array($filters['intolerances'] ?? null) ? implode(',', $filters['intolerances']) : ($filters['intolerances'] ?? '')); ?>" class="border border-border-default rounded px-3 py-2 bg-surface-default" />
-                <input type="number" min="0" name="maxReadyTime" placeholder="Max Ready Time (min)" value="<?php echo e((string)($filters['maxReadyTime'] ?? '')); ?>" class="border border-border-default rounded px-3 py-2 bg-surface-default" />
-                <select name="sort" class="border border-border-default rounded px-3 py-2 bg-surface-default">
-                    <?php $sort = $filters['sort'] ?? ''; ?>
-                    <option value="">Sort: Default</option>
-                    <?php foreach (['popularity','healthiness','time','price','random'] as $s): ?>
-                        <option value="<?php echo e($s); ?>" <?php echo ($sort===$s?'selected':''); ?>><?php echo e(ucwords($s)); ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <div class="flex items-center gap-3">
-                    <label class="text-sm">Per Page</label>
-                    <select name="perPage" class="border border-border-default rounded px-3 py-1 bg-surface-default">
-                        <?php $pp = isset($_GET['perPage']) ? (int)$_GET['perPage'] : 12; foreach ([6,12,18,24,30] as $n): ?>
-                            <option value="<?php echo (int)$n; ?>" <?php echo ($pp===$n?'selected':''); ?>><?php echo (int)$n; ?></option>
-                        <?php endforeach; ?>
-                    </select>
+            <details open class="rounded-lg border border-border-default">
+                <summary class="cursor-pointer px-4 py-3 font-semibold text-sm flex items-center justify-between">
+                    Advanced filters
+                    <span class="text-text-muted text-xs">click to toggle</span>
+                </summary>
+                <div class="px-4 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Diet</label>
+                        <select name="diet" class="w-full">
+                            <?php $diet = $filters['diet'] ?? ''; ?>
+                            <option value="">Any</option>
+                            <?php foreach (['gluten free','ketogenic','vegetarian','vegan','pescetarian','paleo','primal','whole30'] as $d): ?>
+                                <option value="<?= e($d) ?>" <?= $diet === $d ? 'selected' : '' ?>><?= e(ucwords($d)) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Cuisine</label>
+                        <select name="cuisine" class="w-full">
+                            <?php $cuisine = $filters['cuisine'] ?? ''; ?>
+                            <option value="">Any</option>
+                            <?php foreach (['american','italian','mexican','indian','thai','chinese','japanese','french','mediterranean'] as $c): ?>
+                                <option value="<?= e($c) ?>" <?= $cuisine === $c ? 'selected' : '' ?>><?= e(ucwords($c)) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Course</label>
+                        <select name="type" class="w-full">
+                            <?php $type = $filters['type'] ?? ''; ?>
+                            <option value="">Any</option>
+                            <?php foreach (['main course','side dish','dessert','appetizer','salad','bread','breakfast','soup','beverage','snack'] as $t): ?>
+                                <option value="<?= e($t) ?>" <?= $type === $t ? 'selected' : '' ?>><?= e(ucwords($t)) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Intolerances</label>
+                        <input type="text" name="intolerances" placeholder="comma-separated" value="<?= e(is_array($filters['intolerances'] ?? null) ? implode(',', $filters['intolerances']) : ($filters['intolerances'] ?? '')) ?>" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Max ready time (min)</label>
+                        <input type="number" min="0" name="maxReadyTime" placeholder="30" value="<?= e((string)($filters['maxReadyTime'] ?? '')) ?>" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Sort by</label>
+                        <select name="sort" class="w-full">
+                            <?php $sort = $filters['sort'] ?? ''; ?>
+                            <option value="">Default</option>
+                            <?php foreach (['popularity','healthiness','time','price','random'] as $s): ?>
+                                <option value="<?= e($s) ?>" <?= $sort === $s ? 'selected' : '' ?>><?= e(ucwords($s)) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Per page</label>
+                        <select name="perPage" class="w-full">
+                            <?php $pp = isset($_GET['perPage']) ? (int)$_GET['perPage'] : 12; foreach ([6, 12, 18, 24, 30] as $n): ?>
+                                <option value="<?= (int)$n ?>" <?= $pp === $n ? 'selected' : '' ?>><?= (int)$n ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-2 md:col-span-3">
+                        <button type="submit" class="btn btn-cta btn-md">Apply filters</button>
+                    </div>
                 </div>
-                <div class="md:col-span-3">
-                    <button type="submit" class="btn btn-cta btn-md">Apply Filters</button>
-                </div>
-            </div>
+            </details>
         <?php endif; ?>
 
-        <?php 
-            $sel = isset($pantrySelected) && is_array($pantrySelected) ? $pantrySelected : (isset($_GET['pantry']) && is_array($_GET['pantry']) ? array_map('strval', $_GET['pantry']) : []);
-            if (!empty($sel)):
-        ?>
-            <p class="text-xs text-text-muted">Using your pantry: <?php echo e(implode(', ', $sel)); ?></p>
+        <?php if (!empty($pantrySelectedList)): ?>
+            <p class="text-xs text-text-muted">Using your pantry: <?= e(implode(', ', $pantrySelectedList)) ?></p>
         <?php elseif (!empty($mode) && $mode === 'suggested' && !empty($pantryKeywords) && is_array($pantryKeywords)): ?>
-            <p class="text-xs text-text-muted">Using your pantry: <?php echo e(implode(', ', $pantryKeywords)); ?></p>
+            <p class="text-xs text-text-muted">Using your pantry: <?= e(implode(', ', $pantryKeywords)) ?></p>
         <?php endif; ?>
 
         <?php if (!$hasApi): ?>
-            <div class="mt-3 p-3 rounded bg-amber-50 text-amber-800 text-sm">
-                No recipe API configured. Set SUGGESTIC_API_KEY (preferred) or SPOONACULAR_API_KEY to enable live results.
+            <div class="alert-warning">
+                <p class="text-sm font-semibold">No recipe API configured</p>
+                <p class="text-sm">Set <code>SUGGESTIC_API_KEY</code> (preferred) or <code>SPOONACULAR_API_KEY</code> to enable live results.</p>
             </div>
         <?php endif; ?>
+
         <?php if (!empty($error)): ?>
-            <div class="mt-3 p-3 rounded bg-red-50 text-red-700 text-sm"><?php echo e($error); ?></div>
+            <div class="alert-danger text-sm"><?= e($error) ?></div>
         <?php endif; ?>
     </form>
 </div>
 
+<?php
+// Section heading by mode
+$sectionHeading = null;
+if (!empty($mode)) {
+    $sectionHeading = match ($mode) {
+        'saved'      => 'Saved recipes',
+        'ugc'        => 'My recipes',
+        'browse_api' => 'Discover',
+        'suggested'  => 'Suggested for your pantry',
+        'search'     => !empty($query) ? 'Results for "' . e($query) . '"' : null,
+        default      => null,
+    };
+}
+?>
+
 <?php if (!empty($recipes) && is_array($recipes)): ?>
-    <?php if (!empty($mode) && $mode === 'saved'): ?>
-        <h2 class="text-xl font-semibold mb-3">Your Saved Recipes</h2>
-    <?php elseif (!empty($mode) && $mode === 'ugc'): ?>
-        <h2 class="text-xl font-semibold mb-3">My Recipes</h2>
-    <?php elseif (!empty($mode) && $mode === 'browse_api'): ?>
-        <h2 class="text-xl font-semibold mb-3">Browsing Live Results</h2>
+    <?php if ($sectionHeading): ?>
+        <h2 class="text-text-heading mb-4"><?= $sectionHeading ?></h2>
     <?php endif; ?>
+
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <?php foreach ($recipes as $r): ?>
             <?php
             $img = (!empty($r['image']) && (preg_match('#^https?://#i', $r['image']) || str_starts_with($r['image'], '/')))
                 ? $r['image']
-                : ('https://placehold.co/400x240/E8F5E9/36454F?text=' . urlencode($r['title'] ?? 'Recipe'));
+                : ('https://placehold.co/400x240/FAF5EC/B45309?text=' . urlencode($r['title'] ?? 'Recipe'));
+            $sessionUid = (int)($_SESSION['user_id'] ?? 0);
+            $isAdmin    = !empty($_SESSION['is_admin']);
+            $rOwner     = (int)($r['user_id'] ?? 0);
+            $rManual    = ($r['api_source'] ?? null) === 'manual';
+            $canEditCard = $rManual && ($isAdmin || ($sessionUid > 0 && $rOwner === $sessionUid));
+            $prov = !empty($r['provider']) ? (string)$r['provider'] : (!empty($r['api_source']) ? (string)$r['api_source'] : 'fatsecret');
             ?>
-            <div class="card overflow-hidden">
-                <img src="<?php echo e($img); ?>" alt="Image of <?php echo e($r['title'] ?? 'Recipe'); ?>" class="w-full h-40 object-cover" />
-                <div class="p-4">
-                    <h3 class="font-semibold text-lg mb-1"><?php echo e($r['title'] ?? 'Recipe'); ?></h3>
+            <article class="card-flush overflow-hidden flex flex-col">
+                <div class="relative">
+                    <img src="<?= e($img) ?>" alt="<?= e($r['title'] ?? 'Recipe') ?>" class="w-full h-44 object-cover" />
                     <?php if (!empty($r['usedIngredients'])): ?>
-                        <div class="mb-2 text-xs text-text-muted">Uses: <?php echo e(implode(', ', array_slice($r['usedIngredients'], 0, 6))); ?></div>
+                        <span class="badge-success absolute top-3 left-3 shadow-sm">
+                            <?= (int)count($r['usedIngredients']) ?> from your pantry
+                        </span>
+                    <?php endif; ?>
+                </div>
+                <div class="p-4 flex-1 flex flex-col">
+                    <h3 class="font-semibold text-text-heading text-lg leading-snug line-clamp-2"><?= e($r['title'] ?? 'Recipe') ?></h3>
+
+                    <?php if (!empty($r['usedIngredients'])): ?>
+                        <p class="mt-2 text-xs text-text-muted line-clamp-1">
+                            <span class="font-semibold text-text-base">Uses:</span> <?= e(implode(', ', array_slice($r['usedIngredients'], 0, 6))) ?>
+                        </p>
                     <?php endif; ?>
                     <?php if (!empty($r['missedIngredients'])): ?>
-                        <div class="mb-2 text-xs text-text-muted">Missing: <?php echo e(implode(', ', array_slice($r['missedIngredients'], 0, 6))); ?></div>
+                        <p class="mt-1 text-xs text-text-muted line-clamp-1">
+                            <span class="font-semibold text-text-base">Missing:</span> <?= e(implode(', ', array_slice($r['missedIngredients'], 0, 6))) ?>
+                        </p>
                     <?php endif; ?>
-                    <div class="flex flex-wrap gap-2 mt-2">
+
+                    <div class="mt-4 pt-4 border-t border-border-default flex flex-wrap gap-2 items-center">
                         <?php if (!empty($r['db_id'])): ?>
-                            <a href="/recipes/view/<?php echo (int)$r['db_id']; ?>" class="btn btn-cta btn-sm">Details</a>
+                            <a href="/recipes/view/<?= (int)$r['db_id'] ?>" class="btn btn-cta btn-sm">View</a>
                         <?php endif; ?>
-                        <?php
-                        $sessionUid = (int)($_SESSION['user_id'] ?? 0);
-                        $isAdmin    = !empty($_SESSION['is_admin']);
-                        $rOwner     = (int)($r['user_id'] ?? 0);
-                        $rManual    = ($r['api_source'] ?? null) === 'manual';
-                        $canEditCard = $rManual && ($isAdmin || ($sessionUid > 0 && $rOwner === $sessionUid));
-                        ?>
                         <?php if ($canEditCard && !empty($r['db_id'])): ?>
-                            <a href="/recipes/<?php echo (int)$r['db_id']; ?>/edit" class="btn btn-subtle btn-sm">Edit</a>
+                            <a href="/recipes/<?= (int)$r['db_id'] ?>/edit" class="btn btn-ghost btn-sm">Edit</a>
                         <?php endif; ?>
                         <?php if (!empty($r['sourceUrl'])): ?>
-                            <a href="<?php echo e($r['sourceUrl']); ?>" target="_blank" rel="noopener" class="btn btn-subtle btn-sm">Source</a>
+                            <a href="<?= e($r['sourceUrl']) ?>" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Source ↗</a>
                         <?php endif; ?>
-                        <form action="/recipes/save" method="POST" class="inline">
-                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
-                            <input type="hidden" name="id" value="<?php echo e((string)($r['id'] ?? '')); ?>" />
-                            <input type="hidden" name="title" value="<?php echo e($r['title'] ?? 'Recipe'); ?>" />
-                            <input type="hidden" name="image" value="<?php echo e($r['image'] ?? ''); ?>" />
-                            <input type="hidden" name="sourceUrl" value="<?php echo e($r['sourceUrl'] ?? ''); ?>" />
-                            <input type="hidden" name="payload" value='<?php echo e(json_encode($r)); ?>' />
-                            <?php 
-                                $prov = 'fatsecret';
-                                if (!empty($r['provider'])) { $prov = (string)$r['provider']; }
-                                elseif (!empty($r['api_source'])) { $prov = (string)$r['api_source']; }
-                            ?>
-                            <input type="hidden" name="provider" value="<?php echo e($prov); ?>" />
+                        <form action="/recipes/save" method="POST" class="inline ml-auto">
+                            <input type="hidden" name="csrf_token" value="<?= e($_SESSION['csrf_token'] ?? '') ?>" />
+                            <input type="hidden" name="id" value="<?= e((string)($r['id'] ?? '')) ?>" />
+                            <input type="hidden" name="title" value="<?= e($r['title'] ?? 'Recipe') ?>" />
+                            <input type="hidden" name="image" value="<?= e($r['image'] ?? '') ?>" />
+                            <input type="hidden" name="sourceUrl" value="<?= e($r['sourceUrl'] ?? '') ?>" />
+                            <input type="hidden" name="payload" value='<?= e(json_encode($r)) ?>' />
+                            <input type="hidden" name="provider" value="<?= e($prov) ?>" />
                             <button type="submit" class="btn btn-secondary btn-sm">Save</button>
                         </form>
                     </div>
                 </div>
-            </div>
+            </article>
         <?php endforeach; ?>
     </div>
 
-    <?php if (!empty($pagination)): ?>
-        <?php
-        // Build base query string preserving filters
+    <?php if (!empty($pagination)):
         $qs = $_GET; unset($qs['page']);
         $isSuggested = (!empty($mode) && $mode === 'suggested');
         $base = ($isSuggested ? '/recipes/suggested' : '/recipes') . '?' . http_build_query($qs);
         $cur = (int)($pagination['currentPage'] ?? 1);
         $totalPages = (int)($pagination['totalPages'] ?? 0);
-        // Determine if we should show Next: if totalPages known, use it; else prefer provider hint hasNext; else assume more
-        $hasNext = false;
-        if ($totalPages > 0) {
-            $hasNext = ($cur < $totalPages);
-        } elseif (array_key_exists('hasNext', (array)$pagination)) {
-            $hasNext = (bool)$pagination['hasNext'];
-        } else {
-            $hasNext = true;
-        }
-        ?>
-        <div class="mt-6 flex items-center justify-center gap-2">
+        $hasNext = $totalPages > 0
+            ? ($cur < $totalPages)
+            : (array_key_exists('hasNext', (array)$pagination) ? (bool)$pagination['hasNext'] : true);
+    ?>
+        <nav class="mt-8 flex items-center justify-center gap-3" aria-label="Pagination">
             <?php if ($cur > 1): ?>
-                <a class="btn btn-subtle btn-sm" href="<?php echo e($base . '&page=' . ($cur-1)); ?>">Prev</a>
+                <a class="btn btn-secondary btn-sm" href="<?= e($base . '&page=' . ($cur - 1)) ?>">← Prev</a>
+            <?php else: ?>
+                <span class="btn btn-secondary btn-sm" aria-disabled="true" style="opacity:.4; pointer-events:none;">← Prev</span>
             <?php endif; ?>
-            <span class="text-sm text-text-muted">Page <?php echo (int)$cur; ?><?php echo ($totalPages ? (' of ' . (int)$totalPages) : ''); ?></span>
+            <span class="text-sm text-text-muted">Page <?= (int)$cur ?><?= $totalPages ? ' of ' . (int)$totalPages : '' ?></span>
             <?php if ($hasNext): ?>
-                <a class="btn btn-subtle btn-sm" href="<?php echo e($base . '&page=' . ($cur+1)); ?>">Next</a>
+                <a class="btn btn-secondary btn-sm" href="<?= e($base . '&page=' . ($cur + 1)) ?>">Next →</a>
+            <?php else: ?>
+                <span class="btn btn-secondary btn-sm" aria-disabled="true" style="opacity:.4; pointer-events:none;">Next →</span>
             <?php endif; ?>
-        </div>
+        </nav>
     <?php endif; ?>
 <?php else: ?>
-    <div class="text-center text-text-muted mt-8">
-        <?php if ($_ugcMode || ($mode ?? '') === 'ugc'): ?>
-            <p class="mb-3">You haven't created any recipes yet.</p>
-            <a href="/recipes/create" class="btn btn-cta">Create Your First Recipe</a>
-        <?php elseif (!empty($mode) && $mode === 'search' && !empty($query)): ?>
-            No recipes found for "<?php echo e($query); ?>".
-        <?php elseif (!empty($mode) && $mode === 'suggested'): ?>
-            No suggestions yet. Try adding more items or using the search above.
-        <?php elseif (!empty($mode) && $mode === 'saved'): ?>
-            <p class="mb-3">You haven't saved any recipes yet.</p>
-            <a href="/recipes?api=1&q=popular" class="btn btn-subtle">Discover Recipes</a>
-        <?php elseif (!empty($mode) && $mode === 'browse_api'): ?>
-            No recipes returned by API for these filters.
-        <?php else: ?>
-            Start by searching for a recipe or using your pantry.
-        <?php endif; ?>
-    </div>
+    <?php
+    // Empty states
+    if ($_ugcMode || ($mode ?? '') === 'ugc') {
+        ui_empty_state(
+            'You haven\'t created any recipes yet',
+            'Build your own cookbook. Add your favourite family recipes — title, ingredients, steps.',
+            'Create your first recipe',
+            '/recipes/create',
+            '📖'
+        );
+    } elseif (!empty($mode) && $mode === 'search' && !empty($query)) {
+        ui_empty_state(
+            'No recipes for "' . e($query) . '"',
+            'Try a broader term or switch to "Use my pantry" to find recipes that match what you already have.',
+            null,
+            null,
+            '🔍'
+        );
+    } elseif (!empty($mode) && $mode === 'suggested') {
+        ui_empty_state(
+            'No suggestions yet',
+            'Add more items to your pantry, or try the search above.',
+            'Open my pantry',
+            '/items',
+            '🥕'
+        );
+    } elseif (!empty($mode) && $mode === 'saved') {
+        ui_empty_state(
+            'You haven\'t saved any recipes yet',
+            'Search the web or browse suggestions, then tap Save on anything that catches your eye.',
+            'Discover recipes',
+            '/recipes?api=1&q=popular',
+            '🍳'
+        );
+    } elseif (!empty($mode) && $mode === 'browse_api') {
+        ui_empty_state(
+            'No recipes match those filters',
+            'Try loosening one of the filters — diet, cuisine, or max ready time.',
+            null,
+            null,
+            '🍽️'
+        );
+    } else {
+        ui_empty_state(
+            'Start by searching for a recipe',
+            'Type something above, or use your pantry to find dishes that fit what you already have.',
+            null,
+            null,
+            '🍳'
+        );
+    }
+    ?>
 <?php endif; ?>
 
 <script>
@@ -294,29 +379,28 @@ $_savedMode  = !$_ugcMode && !$_apiMode;
   var form = document.querySelector('form[action="/recipes"]');
   if (!form) return;
   var toggleBtn = document.getElementById('toggle-pantry');
-  var closeBtn = document.getElementById('close-pantry');
-  var clearBtn = document.getElementById('clear-pantry-selection');
-  var area = document.getElementById('pantry-area');
-  if (toggleBtn && area) {
-    toggleBtn.addEventListener('click', function(){ area.classList.toggle('hidden'); });
+  var closeBtn  = document.getElementById('close-pantry');
+  var clearBtn  = document.getElementById('clear-pantry-selection');
+  var area      = document.getElementById('pantry-area');
+
+  function setOpen(open) {
+    if (!area || !toggleBtn) return;
+    area.classList.toggle('hidden', !open);
+    toggleBtn.textContent = open ? 'Hide pantry' : 'Use my pantry';
   }
-  if (closeBtn && area) {
-    closeBtn.addEventListener('click', function(){ area.classList.add('hidden'); });
-  }
-  if (clearBtn) {
-    clearBtn.addEventListener('click', function(){
-      var boxes = form.querySelectorAll('input[name="pantry[]"]:checked');
-      boxes.forEach(function(cb){ cb.checked = false; });
-    });
-  }
+
+  if (toggleBtn && area) toggleBtn.addEventListener('click', function(){ setOpen(area.classList.contains('hidden')); });
+  if (closeBtn) closeBtn.addEventListener('click', function(){ setOpen(false); });
+  if (clearBtn) clearBtn.addEventListener('click', function(){
+    form.querySelectorAll('input[name="pantry[]"]:checked').forEach(function(cb){ cb.checked = false; });
+  });
+
+  // When pantry items are selected, populate q with them on submit so the controller has a hint.
   form.addEventListener('submit', function(){
-    var boxes = form.querySelectorAll('input[name="pantry[]"]:checked');
-    var selected = [];
-    boxes.forEach(function(cb){ var v = (cb.value || '').trim(); if (v) selected.push(v); });
-    if (selected.length) {
-      var qInput = form.querySelector('input[name="q"]');
-      if (qInput) { qInput.value = selected.join(', '); }
-    }
+    var checked = form.querySelectorAll('input[name="pantry[]"]:checked');
+    if (!checked.length) return;
+    var qInput = form.querySelector('input[name="q"]');
+    if (qInput) qInput.value = Array.from(checked).map(function(cb){ return cb.value.trim(); }).filter(Boolean).join(', ');
   });
 })();
 </script>

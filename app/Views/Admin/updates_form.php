@@ -14,18 +14,18 @@ require VIEW_PATH . '/Admin/partials/nav.php';
     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
     <div>
         <label class="block text-sm font-medium mb-1">Title</label>
-        <input class="input w-full" type="text" name="title" placeholder="e.g., New features released" value="<?php echo htmlspecialchars($input['title'] ?? ''); ?>" required>
+        <input class="w-full" type="text" name="title" placeholder="e.g., New features released" value="<?php echo htmlspecialchars($input['title'] ?? ''); ?>" required>
     </div>
     <div>
         <label class="block text-sm font-medium mb-1">Message</label>
-        <textarea class="input w-full" name="message" rows="6" placeholder="Write your announcement..." required><?php echo htmlspecialchars($input['message'] ?? ''); ?></textarea>
+        <textarea class="w-full" name="message" rows="6" placeholder="Write your announcement..." required><?php echo htmlspecialchars($input['message'] ?? ''); ?></textarea>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
             <label class="block text-sm font-medium mb-1">Target User ID
               <span class="text-xs text-text-muted font-normal">(optional)</span>
             </label>
-            <input class="input w-full" type="number" name="target_user_id" value="<?php echo htmlspecialchars($input['target_user_id'] ?? ''); ?>" placeholder="Leave empty for all users">
+            <input class="w-full" type="number" name="target_user_id" value="<?php echo htmlspecialchars($input['target_user_id'] ?? ''); ?>" placeholder="Leave empty for all users">
         </div>
         <div class="flex items-center">
             <label class="inline-flex items-center space-x-2">

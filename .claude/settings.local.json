@@ -11,7 +11,26 @@
       "Bash(php.exe -l app/Services/Providers/FatSecretProvider.php)",
       "Bash(php.exe -l app/Controllers/ShoppingListController.php)",
       "Bash(php.exe -l app/routes/web.php)",
-      "Bash(/c/Users/Jeremiah/AppData/Roaming/Herd/bin/php.bat -l app/Services/Providers/FatSecretProvider.php)"
+      "Bash(/c/Users/Jeremiah/AppData/Roaming/Herd/bin/php.bat -l app/Services/Providers/FatSecretProvider.php)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Bash(git push *)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(php -l app/Views/Components/ui_elements.php app/Views/Pages/styleguide.php app/routes/internals.php)",
+      "Bash(php -l app/Views/home.php app/Views/Layouts/Guest/header.php app/Views/Layouts/Guest/footer.php)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(php -l app/Views/Users/dashboard.php)",
+      "Bash(php -l app/Views/Items/index.php)",
+      "Bash(php -l app/Views/Items/create.php)",
+      "Bash(php -l app/Views/Pages/login.php app/Views/Pages/register.php)",
+      "Bash(php -l app/Views/Recipes/index.php)",
+      "Bash(php -l app/Views/Items/edit.php app/Views/Items/confirm.php app/Views/Ingredients/show.php app/Views/Products/show.php)",
+      "Bash(php -l app/Views/Recipes/show.php app/Views/Recipes/recipe_form.php)",
+      "Bash(php -l app/Views/Pages/about.php app/Views/Pages/401.php app/Views/Pages/403.php app/Views/Pages/404.php app/Views/Pages/500.php app/Views/Components/error_page.php)",
+      "Bash(php -l app/Views/Admin/index.php app/Views/Admin/partials/nav.php app/Views/Admin/users.php app/Views/Admin/items.php app/Views/Admin/recipes.php app/Views/Admin/updates.php app/Views/Admin/item_form.php app/Views/Admin/recipe_form.php app/Views/Admin/updates_form.php)",
+      "Bash(php -l app/Views/Components/ai_chat.php)"
     ]
   }
 }

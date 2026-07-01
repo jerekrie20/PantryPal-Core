@@ -1,129 +1,176 @@
 @import "tailwindcss";
 
-/* Badge base & sizes */
-@utility badge {
-    display: inline-block;
-    padding: var(--spacing-1) var(--spacing-3);
-    font-size: 0.75rem;
-    font-weight: 600;
-    border-radius: var(--radius-full);
-    border-width: 0px;
-}
-@utility badge-success { @apply badge; background-color: var(--color-success-bg); color: var(--color-success-text); }
-@utility badge-warning { @apply badge; background-color: var(--color-warning-bg); color: var(--color-warning-text); }
-@utility badge-danger  { @apply badge; background-color: var(--color-danger-bg);  color: var(--color-danger-text); }
-@utility badge-info    { @apply badge; background-color: var(--color-info-bg);    color: var(--color-info-text); }
-@utility badge-neutral { @apply badge; background-color: var(--color-neutral-bg); color: var(--color-neutral-text); }
+/* =========================================================================
+   PantryPal Design System — "Spice Market"
+   Tailwind v4 (@theme tokens + @utility custom utilities)
 
-/* Alert base & variants */
-@utility alert {
-    padding: var(--spacing-4);
-    border-radius: var(--radius-lg);
-    border-width: 1px;
-}
-@utility alert-success { @apply alert; background-color: var(--color-success-bg); border-color: var(--color-success-border); color: var(--color-success-text); }
-@utility alert-warning { @apply alert; background-color: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
-@utility alert-danger  { @apply alert; background-color: var(--color-danger-bg);  border-color: var(--color-danger-border);  color: var(--color-danger-text); }
-@utility alert-info    { @apply alert; background-color: var(--color-info-bg);    border-color: var(--color-info-border);    color: var(--color-info-text); }
+   Brand identity:
+   - Terracotta primary (warm, appetite-forward, distinct from competitors)
+   - Sage secondary/link (calm, fresh)
+   - Warm cream surfaces (vs. clinical white SaaS look)
+   - Fraunces display + Inter body (premium consumer-app feel)
+
+   Backwards-compatible token names: the existing class vocabulary
+   (--color-cta, --color-text-heading, btn-cta, badge-success, etc.)
+   still works — only the values move.
+   ========================================================================= */
 
 @theme {
-    /* PantryPal Theme - CSS Custom Properties for Tailwind CSS v4 */
+    /* ---------- Palette: brand (terracotta) ---------- */
+    --color-brand-50:  #FEF7EC;
+    --color-brand-100: #FEF3C7;
+    --color-brand-200: #FDE68A;
+    --color-brand-300: #FBBF24;
+    --color-brand-400: #D97706;
+    --color-brand-500: #B45309;
+    --color-brand-600: #B45309;
+    --color-brand-700: #92400E;
+    --color-brand-800: #78350F;
+    --color-brand-900: #422006;
 
-    /* Color Palette */
-    --color-bg-page: #FDFBF6;
-    --color-bg-subtle: #E8F5E9;
+    /* ---------- Palette: accent (sage) ---------- */
+    --color-accent-50:  #F7FEE7;
+    --color-accent-100: #ECFCCB;
+    --color-accent-200: #D9F99D;
+    --color-accent-300: #BEF264;
+    --color-accent-400: #84CC16;
+    --color-accent-500: #65A30D;
+    --color-accent-600: #4D7C0F;
+    --color-accent-700: #3F6212;
+    --color-accent-800: #365314;
+    --color-accent-900: #1A2E05;
+
+    /* ---------- Surfaces (warm cream, not clinical white) ---------- */
+    --color-bg-page:      #FFFBF5;
+    --color-bg-subtle:    #FAF5EC;
     --color-bg-component: #FFFFFF;
+    --color-bg-elevated:  #FFFFFF;
 
-    --color-text-base: #36454F;
-    --color-text-heading: #2E7D32;
-    --color-text-muted: #52667A; /* Darkened for WCAG AA compliance */
-    --color-text-on-cta: #FFFFFF;
-    --color-text-on-dark: #FFFFFF;
+    /* ---------- Text (warm charcoal, separate from CTA) ---------- */
+    --color-text-base:    #292524;
+    --color-text-heading: #1C1917;
+    --color-text-muted:   #78716C;
+    --color-text-subtle:  #A8A29E;
+    --color-text-on-cta:  #FFFFFF;
+    --color-text-on-dark: #FFFBF5;
 
-    --color-cta: #4CAF50;
-    --color-cta-hover: #388E3C;
-    --color-cta-focus-ring: #66BB6A;
+    /* ---------- Borders ---------- */
+    --color-border-default: #E7E5E4;
+    --color-border-strong:  #D6D3D1;
+    --color-border-input:   #D6D3D1;
+    --color-border-input-focus: var(--color-brand-600);
 
-    --color-link: #2E7D32;
-    --color-link-hover: #1B5E20;
+    /* ---------- CTA aliases (backwards compat) ---------- */
+    --color-cta:            var(--color-brand-600);
+    --color-cta-hover:      var(--color-brand-700);
+    --color-cta-focus-ring: var(--color-brand-300);
+    --color-brand-accent:   var(--color-accent-600);
 
-    --color-brand-accent: #66BB6A;
+    /* ---------- Links ---------- */
+    --color-link:       var(--color-accent-600);
+    --color-link-hover: var(--color-accent-700);
 
-    --color-border-default: #E0E0E0;
-    --color-border-input: #D1D5DB;
-    --color-border-input-focus: var(--color-cta);
-
-    /* Status Colors (adjusted to meet WCAG AA contrast on light bg) */
-    --color-success-text: #065F46;  /* 6.2:1 on #BBF7D0 */
-    --color-success-bg:   #BBF7D0;  /* darker than #DCFCE7 for contrast */
+    /* ---------- Status: tuned for warm cream backgrounds ---------- */
+    --color-success-bg:     #DCFCE7;
     --color-success-border: #86EFAC;
+    --color-success-text:   #14532D;
 
-    --color-warning-text: #713F12;  /* 5.0:1 on #FEF3C7 */
-    --color-warning-bg:   #FEF3C7;  /* darker than #FEF9C3 for contrast */
-    --color-warning-border: #FDE047;
+    --color-warning-bg:     #FEF3C7;
+    --color-warning-border: #FCD34D;
+    --color-warning-text:   #92400E;
 
-    --color-danger-text: #7F1D1D;   /* 5.5:1 on #FECACA */
-    --color-danger-text-strong: #7F1D1D; /* align strong with base to ensure contrast */
-    --color-danger-bg:   #FECACA;   /* darker than #FEE2E2 for contrast */
+    --color-danger-bg:     #FEE2E2;
     --color-danger-border: #FCA5A5;
+    --color-danger-text:   #991B1B;
+    --color-danger-text-strong: #7F1D1D;
 
-    --color-info-text: #1E3A8A;     /* 5.2:1 on #BFDBFE */
-    --color-info-bg:   #BFDBFE;     /* darker than #DBEAFE for contrast */
+    --color-info-bg:     #DBEAFE;
     --color-info-border: #93C5FD;
+    --color-info-text:   #1E40AF;
 
-    --color-neutral-text: #374151;
-    --color-neutral-bg: #F3F4F6;
-    --color-neutral-border: #D1D5DB;
+    --color-neutral-bg:     #F5F5F4;
+    --color-neutral-border: #D6D3D1;
+    --color-neutral-text:   #44403C;
 
+    /* ---------- Typography ---------- */
+    --font-body:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
+    --font-mono:    'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
 
-    /* Typography */
-    --font-body: 'Inter', sans-serif;
-    --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-
-    /* Spacing System */
+    /* ---------- Spacing ---------- */
     --spacing-unit: 0.25rem;
-    --spacing-1: var(--spacing-unit);
-    --spacing-2: calc(var(--spacing-unit) * 2);
-    --spacing-3: calc(var(--spacing-unit) * 3);
-    --spacing-4: calc(var(--spacing-unit) * 4);
-    --spacing-6: calc(var(--spacing-unit) * 6);
-    --spacing-8: calc(var(--spacing-unit) * 8);
+    --spacing-1:  var(--spacing-unit);
+    --spacing-2:  calc(var(--spacing-unit) * 2);
+    --spacing-3:  calc(var(--spacing-unit) * 3);
+    --spacing-4:  calc(var(--spacing-unit) * 4);
+    --spacing-5:  calc(var(--spacing-unit) * 5);
+    --spacing-6:  calc(var(--spacing-unit) * 6);
+    --spacing-8:  calc(var(--spacing-unit) * 8);
+    --spacing-10: calc(var(--spacing-unit) * 10);
     --spacing-12: calc(var(--spacing-unit) * 12);
+    --spacing-14: calc(var(--spacing-unit) * 14);
     --spacing-16: calc(var(--spacing-unit) * 16);
+    --spacing-20: calc(var(--spacing-unit) * 20);
+    --spacing-24: calc(var(--spacing-unit) * 24);
 
-    /* Border Radius */
-    --radius-sm: 0.125rem;
-    --radius-md: 0.375rem;
-    --radius-lg: 0.5rem;
-    --radius-xl: 0.75rem;
+    /* ---------- Radii ---------- */
+    --radius-sm:   0.25rem;
+    --radius-md:   0.5rem;
+    --radius-lg:   0.75rem;
+    --radius-xl:   1rem;
+    --radius-2xl:  1.5rem;
     --radius-full: 9999px;
 
-    /* Transitions */
+    /* ---------- Shadows (warm-tinted, subtle) ---------- */
+    --shadow-sm:      0 1px 2px 0 rgb(28 25 23 / 0.06);
+    --shadow-DEFAULT: 0 1px 3px 0 rgb(28 25 23 / 0.08), 0 1px 2px -1px rgb(28 25 23 / 0.06);
+    --shadow-md:      0 4px 6px -1px rgb(28 25 23 / 0.08), 0 2px 4px -2px rgb(28 25 23 / 0.04);
+    --shadow-lg:      0 10px 15px -3px rgb(28 25 23 / 0.08), 0 4px 6px -4px rgb(28 25 23 / 0.04);
+    --shadow-xl:      0 20px 25px -5px rgb(28 25 23 / 0.10), 0 8px 10px -6px rgb(28 25 23 / 0.04);
+    --shadow-card:    0 1px 3px 0 rgb(28 25 23 / 0.05), 0 4px 12px -4px rgb(28 25 23 / 0.06);
+
+    /* ---------- Motion ---------- */
     --transition-property-common: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
     --transition-timing-default: cubic-bezier(0.4, 0, 0.2, 1);
     --transition-duration-default: 150ms;
-
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-DEFAULT: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
+
+/* =========================================================================
+   Base layer — element defaults
+   ========================================================================= */
 @layer base {
     body {
         font-family: var(--font-body);
         background-color: var(--color-bg-page);
         color: var(--color-text-base);
+        font-feature-settings: 'cv11', 'ss01';
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
     }
 
-    h1, h2, h3, h4, h5, h6 {
+    /* Headings use the display serif by default */
+    h1, h2, h3, .h-display {
+        font-family: var(--font-display);
+        color: var(--color-text-heading);
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+    }
+    h4, h5, h6 {
+        font-family: var(--font-body);
         color: var(--color-text-heading);
         font-weight: 600;
+        letter-spacing: -0.005em;
+        line-height: 1.25;
     }
+
+    h1 { font-size: clamp(2.25rem, 4vw + 1rem, 3.75rem); }
+    h2 { font-size: clamp(1.75rem, 2vw + 1rem, 2.5rem); }
+    h3 { font-size: 1.5rem; }
+    h4 { font-size: 1.25rem; }
+    h5 { font-size: 1.125rem; }
+    h6 { font-size: 1rem; }
 
     a {
         color: var(--color-link);
@@ -134,16 +181,17 @@
         color: var(--color-link-hover);
         text-decoration: underline;
     }
+
     *:focus-visible {
         outline: 2px solid var(--color-cta-focus-ring);
         outline-offset: 2px;
         border-radius: var(--radius-sm);
     }
 
+    /* Form element defaults */
     input, textarea, select {
         background-color: var(--color-bg-component);
-        border-color: var(--color-border-input);
-        border-width: 1px;
+        border: 1px solid var(--color-border-input);
         border-radius: var(--radius-md);
         padding: var(--spacing-2) var(--spacing-3);
         color: var(--color-text-base);
@@ -151,186 +199,202 @@
     }
     input:focus, textarea:focus, select:focus {
         outline: 2px solid transparent;
-        outline-offset: 2px;
         border-color: var(--color-border-input-focus);
-        box-shadow: 0 0 0 2px var(--color-cta-focus-ring);
+        box-shadow: 0 0 0 3px var(--color-cta-focus-ring);
+    }
+
+    /* Selection */
+    ::selection {
+        background-color: var(--color-brand-200);
+        color: var(--color-brand-900);
     }
 }
 
-@layer components {
-    /* Base Button */
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: var(--spacing-2);
-        border-radius: var(--radius-lg);
-        font-weight: 600;
-        text-align: center;
-        text-decoration: none;
-        cursor: pointer;
-        transition-property: var(--transition-property-common);
-        transition-timing-function: var(--transition-timing-default);
-        transition-duration: var(--transition-duration-default);
-        border: 1px solid transparent;
-    }
-    .btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    .btn-lg { padding: var(--spacing-3) var(--spacing-6); font-size: 1.125rem; }
-    .btn-md { padding: var(--spacing-2) var(--spacing-4); font-size: 1rem; }
-    .btn-sm { padding: var(--spacing-1) var(--spacing-3); font-size: 0.875rem; }
 
-    /* Button Variants */
-    .btn-cta { @apply btn; background-color: var(--color-cta); color: var(--color-text-on-cta); border-color: var(--color-cta); }
-    .btn-cta:hover:not(:disabled) { background-color: var(--color-cta-hover); border-color: var(--color-cta-hover); }
+/* =========================================================================
+   Typography utilities
+   ========================================================================= */
+@utility font-display { font-family: var(--font-display); }
+@utility font-body    { font-family: var(--font-body); }
+@utility font-mono    { font-family: var(--font-mono); }
 
-    .btn-secondary { @apply btn; background-color: var(--color-bg-component); color: var(--color-cta); border-color: var(--color-cta); }
-    .btn-secondary:hover:not(:disabled) { background-color: var(--color-bg-subtle); border-color: var(--color-cta-hover); color: var(--color-cta-hover); }
+@utility eyebrow {
+    display: inline-block;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-brand-600);
+}
 
-    .btn-subtle { @apply btn; background-color: transparent; color: var(--color-cta); border-color: transparent; }
-    .btn-subtle:hover:not(:disabled) { background-color: var(--color-bg-subtle); color: var(--color-cta-hover); }
-
-    .btn-danger { @apply btn; background-color: var(--color-danger-bg); color: var(--color-danger-text); border-color: var(--color-danger-border); }
-    .btn-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--color-danger-bg) 90%, black); }
-
-    /* Card */
-    .card {
-        background-color: var(--color-bg-component);
-        border-radius: var(--radius-xl);
-        padding: var(--spacing-6);
-        box-shadow: var(--shadow-md);
-    }
-
-    /* Badges */
-    .badge { display: inline-block; padding: var(--spacing-1) var(--spacing-3); font-size: 0.75rem; font-weight: 600; border-radius: var(--radius-full); }
-    .badge-success { @apply badge; background-color: var(--color-success-bg); color: var(--color-success-text); }
-    .badge-warning { @apply badge; background-color: var(--color-warning-bg); color: var(--color-warning-text); }
-    .badge-danger { @apply badge; background-color: var(--color-danger-bg); color: var(--color-danger-text); }
-    .badge-info { @apply badge; background-color: var(--color-info-bg); color: var(--color-info-text); }
-    .badge-neutral { @apply badge; background-color: var(--color-neutral-bg); color: var(--color-neutral-text); }
-
-    /* Alerts */
-    .alert { padding: var(--spacing-4); border-radius: var(--radius-lg); border-width: 1px; }
-    .alert-success { @apply alert; background-color: var(--color-success-bg); border-color: var(--color-success-border); color: var(--color-success-text); }
-    .alert-warning { @apply alert; background-color: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
-    .alert-danger { @apply alert; background-color: var(--color-danger-bg); border-color: var(--color-danger-border); color: var(--color-danger-text); }
-    .alert-info { @apply alert; background-color: var(--color-info-bg); border-color: var(--color-info-border); color: var(--color-info-text); }
+@utility lede {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+    max-width: 42rem;
 }
 
 
-/* =============================
-   Compatibility shim for HTML usage
-   - Adds aliases like .text-danger, .bg-danger, .border-danger
-   - Adds size+variant button combos (e.g., .btn-cta-lg)
-   - Adds escaped focus utility classes (e.g., .focus:ring-danger)
-   ============================= */
-@layer utilities {
-    /* Text color aliases */
-    .text-success { color: var(--color-success-text); }
-    .text-warning { color: var(--color-warning-text); }
-    .text-danger  { color: var(--color-danger-text); }
-    .text-info    { color: var(--color-info-text); }
-
-    /* Background color aliases */
-    .bg-success { background-color: var(--color-success-bg); }
-    .bg-warning { background-color: var(--color-warning-bg); }
-    .bg-danger  { background-color: var(--color-danger-bg); }
-    .bg-info    { background-color: var(--color-info-bg); }
-
-    /* Border color aliases */
-    .border-success { border-color: var(--color-success-border); }
-    .border-warning { border-color: var(--color-warning-border); }
-    .border-danger  { border-color: var(--color-danger-border); }
-    .border-info    { border-color: var(--color-info-border); }
-
-    /* Font family utility alias */
-    .font-body { font-family: var(--font-body); }
-
-    /* Focus ring/border aliases with escaped colon */
-    .focus\:ring-danger:focus { box-shadow: 0 0 0 2px var(--color-danger-border); }
-    .focus\:ring-success:focus { box-shadow: 0 0 0 2px var(--color-success-border); }
-    .focus\:ring-warning:focus { box-shadow: 0 0 0 2px var(--color-warning-border); }
-    .focus\:ring-info:focus    { box-shadow: 0 0 0 2px var(--color-info-border); }
-
-    .focus\:border-danger:focus { border-color: var(--color-danger-border); }
-    .focus\:border-success:focus { border-color: var(--color-success-border); }
-    .focus\:border-warning:focus { border-color: var(--color-warning-border); }
-    .focus\:border-info:focus    { border-color: var(--color-info-border); }
-}
-
-/* Button size+variant convenience classes (useful for HTML like .btn-cta-lg) */
-@layer components {
-    .btn-cta-lg { @apply btn-cta btn-lg; }
-    .btn-cta-sm { @apply btn-cta btn-sm; }
-
-    .btn-secondary-lg { @apply btn-secondary btn-lg; }
-    .btn-secondary-sm { @apply btn-secondary btn-sm; }
-
-    .btn-subtle-lg { @apply btn-subtle btn-lg; }
-    .btn-subtle-sm { @apply btn-subtle btn-sm; }
-
-    .btn-danger-lg { @apply btn-danger btn-lg; }
-    .btn-danger-sm { @apply btn-danger btn-sm; }
-}
-
-
-/* ===== Tailwind v4 custom utilities (TOP-LEVEL, not nested) ===== */
-
-/* Button base & sizes */
+/* =========================================================================
+   Buttons — single source of truth
+   Sizes: btn-sm / btn-md / btn-lg
+   Variants: btn-cta / btn-secondary / btn-subtle / btn-danger / btn-ghost
+   ========================================================================= */
 @utility btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--spacing-2);
+    gap: 0.5rem;
     border-radius: var(--radius-lg);
+    font-family: var(--font-body);
     font-weight: 600;
-    text-align: center;
+    letter-spacing: -0.005em;
     text-decoration: none;
     cursor: pointer;
-    transition-property: var(--transition-property-common);
-    transition-timing-function: var(--transition-timing-default);
-    transition-duration: var(--transition-duration-default);
     border: 1px solid transparent;
+    transition: background-color var(--transition-duration-default) var(--transition-timing-default),
+                color var(--transition-duration-default) var(--transition-timing-default),
+                border-color var(--transition-duration-default) var(--transition-timing-default),
+                box-shadow var(--transition-duration-default) var(--transition-timing-default),
+                transform var(--transition-duration-default) var(--transition-timing-default);
+    transform: translateZ(0);
 }
-@utility btn-lg { padding: var(--spacing-3) var(--spacing-6); font-size: 1.125rem; }
-@utility btn-md { padding: var(--spacing-2) var(--spacing-4); font-size: 1rem; }
-@utility btn-sm { padding: var(--spacing-1) var(--spacing-3); font-size: 0.875rem; }
 
-/* Variants */
+@utility btn-sm { height: 32px; padding-left: 12px; padding-right: 12px; font-size: 0.875rem; line-height: 1; }
+@utility btn-md { height: 40px; padding-left: 16px; padding-right: 16px; font-size: 1rem;     line-height: 1; }
+@utility btn-lg { height: 48px; padding-left: 22px; padding-right: 22px; font-size: 1.0625rem; line-height: 1; }
+
 @utility btn-cta {
     background-color: var(--color-cta);
     color: var(--color-text-on-cta);
     border-color: var(--color-cta);
+    box-shadow: var(--shadow-sm);
 }
 @utility btn-secondary {
     background-color: var(--color-bg-component);
-    color: var(--color-cta);
-    border-color: var(--color-cta);
+    color: var(--color-text-heading);
+    border-color: var(--color-border-strong);
 }
-@utility btn-subtle { background-color: transparent; color: var(--color-cta); border-color: transparent; }
+@utility btn-subtle {
+    background-color: transparent;
+    color: var(--color-brand-700);
+    border-color: transparent;
+}
+@utility btn-ghost {
+    background-color: transparent;
+    color: var(--color-text-muted);
+    border-color: transparent;
+}
 @utility btn-danger {
-    background-color: var(--color-danger-bg);
-    color: var(--color-danger-text);
-    border-color: var(--color-danger-border);
+    background-color: #DC2626;
+    color: #FFFFFF;
+    border-color: #DC2626;
+    box-shadow: var(--shadow-sm);
 }
 
-/* Convenience combos */
-@utility btn-cta-lg { @apply btn btn-cta btn-lg; }
-@utility btn-cta-sm { @apply btn btn-cta btn-sm; }
+@utility btn-cta-lg       { @apply btn btn-cta btn-lg; }
+@utility btn-cta-sm       { @apply btn btn-cta btn-sm; }
 @utility btn-secondary-lg { @apply btn btn-secondary btn-lg; }
 @utility btn-secondary-sm { @apply btn btn-secondary btn-sm; }
-@utility btn-subtle-lg { @apply btn btn-subtle btn-lg; }
-@utility btn-subtle-sm { @apply btn btn-subtle btn-sm; }
-@utility btn-danger-lg { @apply btn btn-danger btn-lg; }
-@utility btn-danger-sm { @apply btn btn-danger btn-sm; }
+@utility btn-subtle-lg    { @apply btn btn-subtle btn-lg; }
+@utility btn-subtle-sm    { @apply btn btn-subtle btn-sm; }
+@utility btn-danger-lg    { @apply btn btn-danger btn-lg; }
+@utility btn-danger-sm    { @apply btn btn-danger btn-sm; }
 
-/* Status text/bg/border aliases */
+@layer components {
+    .btn-cta:hover:not(:disabled)       { background-color: var(--color-cta-hover); border-color: var(--color-cta-hover); }
+    .btn-cta:active:not(:disabled)      { transform: translateY(1px); }
+
+    .btn-secondary:hover:not(:disabled) { background-color: var(--color-bg-subtle); border-color: var(--color-text-muted); }
+    .btn-secondary:active:not(:disabled){ transform: translateY(1px); }
+
+    .btn-subtle:hover:not(:disabled)    { background-color: var(--color-brand-50); color: var(--color-cta-hover); }
+    .btn-subtle:active:not(:disabled)   { transform: translateY(1px); }
+
+    .btn-ghost:hover:not(:disabled)     { background-color: var(--color-bg-subtle); color: var(--color-text-heading); }
+    .btn-ghost:active:not(:disabled)    { transform: translateY(1px); }
+
+    .btn-danger:hover:not(:disabled)    { background-color: #B91C1C; border-color: #B91C1C; }
+    .btn-danger:active:not(:disabled)   { transform: translateY(1px); }
+
+    .btn:focus-visible,
+    .btn-cta:focus-visible,
+    .btn-secondary:focus-visible,
+    .btn-subtle:focus-visible,
+    .btn-ghost:focus-visible,
+    .btn-danger:focus-visible {
+        outline: 2px solid transparent;
+        box-shadow: 0 0 0 3px var(--color-cta-focus-ring);
+    }
+
+    .btn:disabled,
+    .btn-cta:disabled,
+    .btn-secondary:disabled,
+    .btn-subtle:disabled,
+    .btn-ghost:disabled,
+    .btn-danger:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+        box-shadow: none;
+    }
+}
+
+
+/* =========================================================================
+   Cards, badges, alerts
+   ========================================================================= */
+@utility card {
+    background-color: var(--color-bg-component);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--color-border-default);
+    padding: var(--spacing-6);
+    box-shadow: var(--shadow-card);
+}
+@utility card-flush {
+    background-color: var(--color-bg-component);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--color-border-default);
+    box-shadow: var(--shadow-card);
+}
+
+@utility badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    border: 1px solid transparent;
+}
+@utility badge-success { @apply badge; background-color: var(--color-success-bg); color: var(--color-success-text); border-color: var(--color-success-border); }
+@utility badge-warning { @apply badge; background-color: var(--color-warning-bg); color: var(--color-warning-text); border-color: var(--color-warning-border); }
+@utility badge-danger  { @apply badge; background-color: var(--color-danger-bg);  color: var(--color-danger-text);  border-color: var(--color-danger-border); }
+@utility badge-info    { @apply badge; background-color: var(--color-info-bg);    color: var(--color-info-text);    border-color: var(--color-info-border); }
+@utility badge-neutral { @apply badge; background-color: var(--color-neutral-bg); color: var(--color-neutral-text); border-color: var(--color-neutral-border); }
+@utility badge-brand   { @apply badge; background-color: var(--color-brand-100);  color: var(--color-brand-800);    border-color: var(--color-brand-200); }
+
+@utility alert {
+    padding: var(--spacing-4);
+    border-radius: var(--radius-lg);
+    border: 1px solid transparent;
+}
+@utility alert-success { @apply alert; background-color: var(--color-success-bg); border-color: var(--color-success-border); color: var(--color-success-text); }
+@utility alert-warning { @apply alert; background-color: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
+@utility alert-danger  { @apply alert; background-color: var(--color-danger-bg);  border-color: var(--color-danger-border);  color: var(--color-danger-text); }
+@utility alert-info    { @apply alert; background-color: var(--color-info-bg);    border-color: var(--color-info-border);    color: var(--color-info-text); }
+
+
+/* =========================================================================
+   Status color aliases (text-/bg-/border- helpers used across views)
+   ========================================================================= */
 @utility text-success { color: var(--color-success-text); }
 @utility text-warning { color: var(--color-warning-text); }
 @utility text-danger  { color: var(--color-danger-text); }
 @utility text-info    { color: var(--color-info-text); }
+@utility text-brand   { color: var(--color-brand-700); }
 
 @utility bg-success { background-color: var(--color-success-bg); }
 @utility bg-warning { background-color: var(--color-warning-bg); }
@@ -342,145 +406,45 @@
 @utility border-danger  { border-color: var(--color-danger-border); }
 @utility border-info    { border-color: var(--color-info-border); }
 
-/* Font alias */
-@utility font-body { font-family: var(--font-body); }
 
+/* =========================================================================
+   Layout primitives
+   ========================================================================= */
+@utility container-prose {
+    max-width: 65ch;
+    margin-left: auto;
+    margin-right: auto;
+}
 
-/* ===== Component/hover states (regular CSS) ===== */
-@layer components {
-    .btn-cta:hover:not(:disabled) { background-color: var(--color-cta-hover); border-color: var(--color-cta-hover); }
-    .btn-secondary:hover:not(:disabled) { background-color: var(--color-bg-subtle); border-color: var(--color-cta-hover); color: var(--color-cta-hover); }
-    .btn-subtle:hover:not(:disabled) { background-color: var(--color-bg-subtle); color: var(--color-cta-hover); }
-    .btn-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--color-danger-bg) 90%, black); }
+@utility section-y {
+    padding-top: clamp(3rem, 6vw, 6rem);
+    padding-bottom: clamp(3rem, 6vw, 6rem);
+}
 
-    .btn:disabled,
-    .btn-cta:disabled,
-    .btn-secondary:disabled,
-    .btn-subtle:disabled,
-    .btn-danger:disabled,
-    .btn-cta-lg:disabled, .btn-cta-sm:disabled,
-    .btn-secondary-lg:disabled, .btn-secondary-sm:disabled,
-    .btn-subtle-lg:disabled, .btn-subtle-sm:disabled,
-    .btn-danger-lg:disabled, .btn-danger-sm:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
+@utility hero-bg {
+    background-color: var(--color-bg-page);
+    background-image:
+        radial-gradient(60% 60% at 0% 0%, color-mix(in srgb, var(--color-brand-100) 55%, transparent) 0%, transparent 60%),
+        radial-gradient(50% 50% at 100% 0%, color-mix(in srgb, var(--color-accent-100) 50%, transparent) 0%, transparent 65%);
 }
 
 
-/* ===============================
-   BUTTON REFINEMENTS (best practice)
-   - Consistent heights, padding, and typography
-   - Clear primary/outline/ghost/danger variants
-   - Proper :focus-visible ring and :disabled behavior
-   - Higher contrast for destructive (solid red)
-   =============================== */
+/* =========================================================================
+   Backwards-compat aliases for older class names still in views
+   (text-text-heading, bg-bg-component, border-border-default, etc.)
+   These let migration happen page-by-page without breaking anything.
+   ========================================================================= */
+@utility text-text-base    { color: var(--color-text-base); }
+@utility text-text-heading { color: var(--color-text-heading); }
+@utility text-text-muted   { color: var(--color-text-muted); }
+@utility text-text-subtle  { color: var(--color-text-subtle); }
 
-/* Sizes (use fixed heights for better vertical rhythm) */
-@utility btn-sm { height: 32px; padding-left: 12px; padding-right: 12px; font-size: 0.875rem; line-height: 1; }
-@utility btn-md { height: 40px; padding-left: 16px; padding-right: 16px; font-size: 1rem; line-height: 1; }
-@utility btn-lg { height: 48px; padding-left: 20px; padding-right: 20px; font-size: 1.125rem; line-height: 1; }
+@utility bg-bg-page      { background-color: var(--color-bg-page); }
+@utility bg-bg-subtle    { background-color: var(--color-bg-subtle); }
+@utility bg-bg-component { background-color: var(--color-bg-component); }
+@utility bg-surface-default { background-color: var(--color-bg-component); }
+@utility bg-surface-subtle  { background-color: var(--color-bg-subtle); }
 
-/* Base button improvements */
-@utility btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    border-radius: var(--radius-lg);
-    font-weight: 600;
-    letter-spacing: 0.005em;
-    text-decoration: none;
-    cursor: pointer;
-    border-width: 1px;
-    border-style: solid;
-    transition: background-color var(--transition-duration-default) var(--transition-timing-default),
-    color var(--transition-duration-default) var(--transition-timing-default),
-    border-color var(--transition-duration-default) var(--transition-timing-default),
-    box-shadow var(--transition-duration-default) var(--transition-timing-default),
-    transform var(--transition-duration-default) var(--transition-timing-default);
-    transform: translateZ(0); /* perf */
-}
-
-/* Primary (CTA) — solid */
-@utility btn-cta {
-    background-color: var(--color-cta);
-    color: var(--color-text-on-cta);
-    border-color: var(--color-cta);
-    box-shadow: var(--shadow-sm);
-}
-/* Outline (Secondary) */
-@utility btn-secondary {
-    background-color: transparent;
-    color: var(--color-cta);
-    border-color: var(--color-cta);
-}
-/* Ghost/Subtle */
-@utility btn-subtle {
-    background-color: transparent;
-    color: var(--color-cta);
-    border-color: transparent;
-}
-
-/* Danger (Destructive) — use a strong solid for clarity & contrast */
-@utility btn-danger {
-    background-color: #DC2626;      /* solid red */
-    color: #FFFFFF;
-    border-color: #DC2626;
-    box-shadow: var(--shadow-sm);
-}
-
-/* Hover & active states */
-@layer components {
-    .btn-cta:hover:not(:disabled) { background-color: var(--color-cta-hover); border-color: var(--color-cta-hover); }
-    .btn-cta:active:not(:disabled) { transform: translateY(1px); }
-
-    .btn-secondary:hover:not(:disabled) { background-color: var(--color-bg-subtle); border-color: var(--color-cta-hover); color: var(--color-cta-hover); }
-    .btn-secondary:active:not(:disabled) { transform: translateY(1px); }
-
-    .btn-subtle:hover:not(:disabled) { background-color: var(--color-bg-subtle); color: var(--color-cta-hover); }
-    .btn-subtle:active:not(:disabled) { transform: translateY(1px); }
-
-    .btn-danger:hover:not(:disabled) { background-color: #B91C1C; border-color: #B91C1C; }
-    .btn-danger:active:not(:disabled) { transform: translateY(1px); }
-
-    /* Focus-visible ring for all buttons */
-    .btn:focus-visible,
-    .btn-cta:focus-visible,
-    .btn-secondary:focus-visible,
-    .btn-subtle:focus-visible,
-    .btn-danger:focus-visible,
-    .btn-cta-lg:focus-visible, .btn-cta-sm:focus-visible,
-    .btn-secondary-lg:focus-visible, .btn-secondary-sm:focus-visible,
-    .btn-subtle-lg:focus-visible, .btn-subtle-sm:focus-visible,
-    .btn-danger-lg:focus-visible, .btn-danger-sm:focus-visible {
-        outline: 2px solid transparent;
-        box-shadow: 0 0 0 3px var(--color-cta-focus-ring);
-    }
-
-    /* Disabled */
-    .btn:disabled,
-    .btn-cta:disabled,
-    .btn-secondary:disabled,
-    .btn-subtle:disabled,
-    .btn-danger:disabled,
-    .btn-cta-lg:disabled, .btn-cta-sm:disabled,
-    .btn-secondary-lg:disabled, .btn-secondary-sm:disabled,
-    .btn-subtle-lg:disabled, .btn-subtle-sm:disabled,
-    .btn-danger-lg:disabled, .btn-danger-sm:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        pointer-events: none;
-        box-shadow: none;
-    }
-}
-
-/* Convenience combos */
-@utility btn-cta-lg { @apply btn btn-cta btn-lg; }
-@utility btn-cta-sm { @apply btn btn-cta btn-sm; }
-@utility btn-secondary-lg { @apply btn btn-secondary btn-lg; }
-@utility btn-secondary-sm { @apply btn btn-secondary btn-sm; }
-@utility btn-subtle-lg { @apply btn btn-subtle btn-lg; }
-@utility btn-subtle-sm { @apply btn btn-subtle btn-sm; }
-@utility btn-danger-lg { @apply btn btn-danger btn-lg; }
-@utility btn-danger-sm { @apply btn btn-danger btn-sm; }
+@utility border-border-default { border-color: var(--color-border-default); }
+@utility border-border-strong  { border-color: var(--color-border-strong); }
+@utility border-border-muted   { border-color: var(--color-border-default); }

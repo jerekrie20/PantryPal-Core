@@ -25,6 +25,23 @@ $router->get('/__internal/learning', function () {
     require VIEW_PATH . '/Learning/overview.html';
 });
 
+$router->get('/__internal/styleguide', function () {
+    $enabled = getenv('INTERNAL_TOOLS_ENABLED') ?: '';
+    if (strtolower((string)$enabled) !== 'true') {
+        http_response_code(404);
+        require VIEW_PATH . '/Pages/404.php';
+        return;
+    }
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (empty($_SESSION['is_admin'])) {
+        http_response_code(403);
+        require VIEW_PATH . '/Pages/403.php';
+        return;
+    }
+    $title = 'Style Guide';
+    require VIEW_PATH . '/Pages/styleguide.php';
+});
+
 $router->get('/__internal/theme', function () {
     $enabled = getenv('INTERNAL_TOOLS_ENABLED') ?: '';
     if (strtolower((string)$enabled) !== 'true') { 

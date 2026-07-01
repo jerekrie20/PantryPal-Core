@@ -32,37 +32,37 @@ if (isset($item) && is_array($item)) {
 }
 ?>
 
-<div id="ai-chat-widget" class="fixed bottom-4 right-4 z-50"
+<div id="ai-chat-widget" class="fixed bottom-4 right-4 z-50 font-body"
      data-page-context='<?php echo htmlspecialchars(json_encode($pageContext), ENT_QUOTES, 'UTF-8'); ?>'>
     <!-- Chat Button (collapsed state) -->
     <button
         id="ai-chat-toggle"
-        class="rounded-full p-4 shadow-lg transition-all duration-200 flex items-center gap-2 font-medium"
-        style="background-color: var(--color-cta); color: var(--color-text-on-cta);"
+        class="rounded-full pl-4 pr-5 py-3 transition-all duration-200 flex items-center gap-2 font-semibold text-sm"
+        style="background-color: var(--color-cta); color: var(--color-text-on-cta); box-shadow: var(--shadow-lg);"
         onmouseover="this.style.backgroundColor='var(--color-cta-hover)'"
         onmouseout="this.style.backgroundColor='var(--color-cta)'"
         onclick="toggleAIChat()"
         aria-label="Open AI Assistant"
     >
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
         </svg>
-        <span>AI Chef</span>
+        <span>Ask AI Chef</span>
     </button>
 
     <!-- Chat Window (expanded state) -->
     <div
         id="ai-chat-window"
-        class="hidden absolute bottom-20 right-0 w-96 h-[500px] flex flex-col overflow-hidden shadow-2xl"
-        style="background-color: var(--color-bg-component); border: 1px solid var(--color-border-default); border-radius: var(--radius-lg);"
+        class="hidden absolute bottom-20 right-0 w-96 max-w-[calc(100vw-2rem)] h-[500px] flex flex-col overflow-hidden"
+        style="background-color: var(--color-bg-component); border: 1px solid var(--color-border-default); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl);"
     >
         <!-- Header -->
         <div class="px-4 py-3 flex justify-between items-center" style="background-color: var(--color-cta); color: var(--color-text-on-cta);">
             <div class="flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                 </svg>
-                <h3 class="font-semibold">AI Cooking Assistant</h3>
+                <h3 class="font-semibold text-sm">AI Chef</h3>
             </div>
             <button
                 onclick="toggleAIChat()"
@@ -113,7 +113,7 @@ if (isset($item) && is_array($item)) {
                     </div>
                 </div>
                 <div class="flex-1">
-                    <div class="px-4 py-2 text-sm" style="background-color: var(--color-neutral-bg); color: var(--color-neutral-text); border-radius: var(--radius-lg);">
+                    <div class="px-4 py-2 text-sm" style="background-color: var(--color-bg-subtle); color: var(--color-text-base); border: 1px solid var(--color-border-default); border-radius: var(--radius-lg);">
                         <p>Hi! I'm your AI cooking assistant. I can help with:</p>
                         <ul class="mt-2 space-y-1 list-disc list-inside">
                             <li>Measurement conversions</li>
@@ -219,12 +219,12 @@ async function loadAIUsage() {
             const usageText = document.getElementById('ai-usage-text');
 
             if (isPremium) {
-                usageInfo.style.backgroundColor = 'var(--color-brand-accent)';
-                usageInfo.style.color = 'var(--color-text-on-dark)';
-                usageInfo.style.borderColor = 'var(--color-brand-accent)';
-                usageText.textContent = '✨ Premium: Unlimited AI queries';
+                usageInfo.style.backgroundColor = 'var(--color-brand-100)';
+                usageInfo.style.color = 'var(--color-brand-800)';
+                usageInfo.style.borderColor = 'var(--color-brand-200)';
+                usageText.textContent = '✨ Pro — unlimited AI queries';
             } else {
-                usageText.textContent = `${remaining} of ${limit} free queries remaining today`;
+                usageText.textContent = `${remaining} of ${limit} free queries left today`;
             }
         }
     } catch (error) {
@@ -358,7 +358,7 @@ function appendMessage(role, content) {
                 </div>
             </div>
             <div class="flex-1">
-                <div class="px-4 py-2 text-sm" style="background-color: var(--color-neutral-bg); color: var(--color-neutral-text); border-radius: var(--radius-lg);">
+                <div class="px-4 py-2 text-sm" style="background-color: var(--color-bg-subtle); color: var(--color-text-base); border: 1px solid var(--color-border-default); border-radius: var(--radius-lg);">
                     ${escapeHtml(content).replace(/\n/g, '<br>')}
                 </div>
             </div>

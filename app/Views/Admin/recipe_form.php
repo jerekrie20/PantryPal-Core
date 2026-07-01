@@ -16,13 +16,13 @@ require VIEW_PATH . '/Admin/partials/nav.php';
     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
     <div>
         <label class="block text-sm font-medium mb-1">Title</label>
-        <input class="input w-full" type="text" name="title" placeholder="e.g., Easy Chickpea Salad" value="<?php echo htmlspecialchars($input['title'] ?? ''); ?>" required>
+        <input class="w-full" type="text" name="title" placeholder="e.g., Easy Chickpea Salad" value="<?php echo htmlspecialchars($input['title'] ?? ''); ?>" required>
     </div>
     <div>
         <label class="block text-sm font-medium mb-1">Description
           <span class="text-xs text-text-muted font-normal">(optional)</span>
         </label>
-        <textarea class="input w-full" name="description" rows="4" placeholder="Short summary or notes..."><?php echo htmlspecialchars($input['description'] ?? ''); ?></textarea>
+        <textarea class="w-full" name="description" rows="4" placeholder="Short summary or notes..."><?php echo htmlspecialchars($input['description'] ?? ''); ?></textarea>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
@@ -30,7 +30,7 @@ require VIEW_PATH . '/Admin/partials/nav.php';
               <span class="text-xs text-text-muted font-normal">(optional)</span>
             </label>
             <?php $src = $input['api_source'] ?? ''; ?>
-            <select class="input w-full" name="api_source">
+            <select class="w-full" name="api_source">
                 <option value="" <?php echo $src === '' ? 'selected' : ''; ?>>— none —</option>
                 <?php foreach (['manual','fdc','off','fatsecret'] as $opt): ?>
                     <option value="<?php echo htmlspecialchars($opt); ?>" <?php echo $src === $opt ? 'selected' : ''; ?>><?php echo htmlspecialchars(ucwords(str_replace('_',' ', $opt))); ?></option>
@@ -41,13 +41,13 @@ require VIEW_PATH . '/Admin/partials/nav.php';
             <label class="block text-sm font-medium mb-1">API ID
               <span class="text-xs text-text-muted font-normal">(optional)</span>
             </label>
-            <input class="input w-full" type="text" name="api_id" placeholder="Provider-specific ID" value="<?php echo htmlspecialchars($input['api_id'] ?? ''); ?>">
+            <input class="w-full" type="text" name="api_id" placeholder="Provider-specific ID" value="<?php echo htmlspecialchars($input['api_id'] ?? ''); ?>">
         </div>
         <div>
             <label class="block text-sm font-medium mb-1">Owner User ID
               <span class="text-xs text-text-muted font-normal">(optional)</span>
             </label>
-            <input class="input w-full" type="number" name="user_id" placeholder="Leave empty for none" value="<?php echo htmlspecialchars((string)($input['user_id'] ?? '')); ?>">
+            <input class="w-full" type="number" name="user_id" placeholder="Leave empty for none" value="<?php echo htmlspecialchars((string)($input['user_id'] ?? '')); ?>">
         </div>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -55,32 +55,32 @@ require VIEW_PATH . '/Admin/partials/nav.php';
             <label class="block text-sm font-medium mb-1">Image URL
               <span class="text-xs text-text-muted font-normal">(optional)</span>
             </label>
-            <input class="input w-full" type="url" name="image_url" placeholder="https://..." value="<?php echo htmlspecialchars($input['image_url'] ?? ''); ?>">
+            <input class="w-full" type="url" name="image_url" placeholder="https://..." value="<?php echo htmlspecialchars($input['image_url'] ?? ''); ?>">
         </div>
         <div>
             <label class="block text-sm font-medium mb-1">Source URL
               <span class="text-xs text-text-muted font-normal">(optional)</span>
             </label>
-            <input class="input w-full" type="url" name="source_url" placeholder="https://..." value="<?php echo htmlspecialchars($input['source_url'] ?? ''); ?>">
+            <input class="w-full" type="url" name="source_url" placeholder="https://..." value="<?php echo htmlspecialchars($input['source_url'] ?? ''); ?>">
         </div>
     </div>
     <div>
         <label class="block text-sm font-medium mb-1">Ingredients
           <span class="text-xs text-text-muted font-normal">One per line or comma-separated. JSON also accepted.</span>
         </label>
-        <textarea class="input w-full font-mono text-xs" name="ingredients_list" rows="5" placeholder="1 cup flour, 2 eggs or one per line"><?php echo htmlspecialchars(is_array($input['ingredients_list'] ?? null) ? implode("\n", array_map('strval', $input['ingredients_list'])) : (string)($input['ingredients_list'] ?? '')); ?></textarea>
+        <textarea class="w-full font-mono text-xs" name="ingredients_list" rows="5" placeholder="1 cup flour, 2 eggs or one per line"><?php echo htmlspecialchars(is_array($input['ingredients_list'] ?? null) ? implode("\n", array_map('strval', $input['ingredients_list'])) : (string)($input['ingredients_list'] ?? '')); ?></textarea>
     </div>
     <div>
         <label class="block text-sm font-medium mb-1">Instructions
           <span class="text-xs text-text-muted font-normal">One step per line. JSON also accepted.</span>
         </label>
-        <textarea class="input w-full font-mono text-xs" name="instructions_list" rows="5" placeholder="Preheat oven to 350°F\nMix ingredients\nBake 20 min"><?php echo htmlspecialchars(is_array($input['instructions_list'] ?? null) ? implode("\n", array_map('strval', $input['instructions_list'])) : (string)($input['instructions_list'] ?? '')); ?></textarea>
+        <textarea class="w-full font-mono text-xs" name="instructions_list" rows="5" placeholder="Preheat oven to 350°F\nMix ingredients\nBake 20 min"><?php echo htmlspecialchars(is_array($input['instructions_list'] ?? null) ? implode("\n", array_map('strval', $input['instructions_list'])) : (string)($input['instructions_list'] ?? '')); ?></textarea>
     </div>
     <div>
         <label class="block text-sm font-medium mb-1">Nutrition per serving
           <span class="text-xs text-text-muted font-normal">One per line (Label: amount unit). Comma-separated also works. Example: Calories: 250 kcal</span>
         </label>
-        <textarea class="input w-full font-mono text-xs" name="nutrition_per_serving" rows="6" placeholder="Calories: 250 kcal\nProtein: 12 g\nCarbs: 20 g"><?php
+        <textarea class="w-full font-mono text-xs" name="nutrition_per_serving" rows="6" placeholder="Calories: 250 kcal\nProtein: 12 g\nCarbs: 20 g"><?php
             $nutVal = '';
             $nut = $input['nutrition_per_serving'] ?? null;
             if (is_array($nut)) {

@@ -7,114 +7,106 @@
  * - $display array with keys: name, category, image (for context header)
  * - $errors array
  */
+require_once VIEW_PATH . '/Components/ui_elements.php';
+require_once VIEW_PATH . '/Components/form_elements.php';
 
 ob_start();
 
-// Ensure variables exist
-$item = $item ?? [];
+$item    = $item    ?? [];
 $display = $display ?? [];
-$errors = $errors ?? [];
+$errors  = $errors  ?? [];
 
-if (!function_exists('e')) {
-    function e($v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); }
-}
+if (!function_exists('e')) { function e($v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); } }
 
 $img = !empty($display['image']) && preg_match('#^https?://#i', $display['image'])
     ? $display['image']
-    : ('https://placehold.co/120x120/E8F5E9/36454F?text=' . urlencode($display['name'] ?? 'Item'));
+    : ('https://placehold.co/120x120/FAF5EC/B45309?text=' . urlencode($display['name'] ?? 'Item'));
 ?>
 
 <div class="max-w-2xl mx-auto">
-    <div class="flex items-start gap-4 mb-6">
-        <img src="<?php echo e($img); ?>" alt="Image of <?php echo e($display['name'] ?? 'Item'); ?>" class="w-16 h-16 rounded-lg object-cover bg-bg-subtle">
-        <div>
-            <h1 class="text-2xl font-bold"><?php echo e($display['name'] ?? 'Item'); ?></h1>
+
+    <!-- Context header -->
+    <div class="card-flush p-4 mb-6 flex items-center gap-4">
+        <img src="<?= e($img) ?>" alt="" class="w-16 h-16 rounded-lg object-cover bg-bg-subtle shrink-0">
+        <div class="min-w-0">
+            <p class="eyebrow">Editing</p>
+            <h1 class="text-text-heading text-2xl truncate"><?= e($display['name'] ?? 'Item') ?></h1>
             <?php if (!empty($display['category'])): ?>
-                <div class="text-sm text-text-muted"><?php echo e($display['category']); ?></div>
+                <p class="text-sm text-text-muted truncate"><?= e($display['category']) ?></p>
             <?php endif; ?>
         </div>
     </div>
 
-    <div class="card p-6">
-        <form action="/items/<?php echo (int)$item['id']; ?>" method="POST" class="space-y-6">
+    <div class="card">
+        <form action="/items/<?= (int)$item['id'] ?>" method="POST" class="space-y-6">
             <?php echo csrf_field(); ?>
+
             <?php if (!empty($errors['general'])): ?>
-                <div class="p-3 rounded bg-red-50 text-red-700 text-sm"><?php echo e($errors['general']); ?></div>
+                <div class="alert-danger text-sm"><?= e($errors['general']) ?></div>
             <?php endif; ?>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                    <label for="quantity" class="block text-sm font-medium mb-1">Quantity</label>
-                    <input id="quantity" name="quantity" type="number" step="0.01" value="<?php echo e($item['quantity'] ?? '1'); ?>"
-                           class="w-full border border-border-default rounded px-3 py-2 bg-surface-default">
-                    <?php if (!empty($errors['quantity'])): ?><p class="text-red-600 text-sm mt-1"><?php echo e($errors['quantity']); ?></p><?php endif; ?>
-                </div>
+                <?php form_input('quantity', 'Quantity', 'number', [
+                    'value' => $item['quantity'] ?? '1',
+                    'step'  => '0.01',
+                    'error' => $errors['quantity'] ?? null,
+                ]); ?>
+
                 <div>
                     <label for="unit" class="block text-sm font-medium mb-1">Unit</label>
                     <?php
                     $units = [
-                        '' => 'Select unit (optional)',
-                        'pcs' => 'pcs',
-                        'g' => 'g',
-                        'kg' => 'kg',
-                        'mg' => 'mg',
-                        'lb' => 'lb',
-                        'oz' => 'oz',
-                        'ml' => 'ml',
-                        'l' => 'L',
-                        'cup' => 'cup',
-                        'tbsp' => 'tbsp',
-                        'tsp' => 'tsp',
-                        'pinch' => 'pinch',
+                        '' => 'Select unit',
+                        'pcs' => 'pcs', 'g' => 'g', 'kg' => 'kg', 'mg' => 'mg',
+                        'lb' => 'lb', 'oz' => 'oz', 'ml' => 'ml', 'l' => 'L',
+                        'cup' => 'cup', 'tbsp' => 'tbsp', 'tsp' => 'tsp', 'pinch' => 'pinch',
                     ];
                     $selectedUnit = $item['unit'] ?? '';
                     ?>
-                    <select id="unit" name="unit" class="w-full border border-border-default rounded px-3 py-2 bg-surface-default">
+                    <select id="unit" name="unit" class="w-full">
                         <?php foreach ($units as $val => $label): ?>
-                            <option value="<?php echo e($val); ?>" <?php echo ($selectedUnit === $val ? 'selected' : ''); ?>><?php echo e($label); ?></option>
+                            <option value="<?= e($val) ?>" <?= $selectedUnit === $val ? 'selected' : '' ?>><?= e($label) ?></option>
                         <?php endforeach; ?>
                         <?php if ($selectedUnit && !array_key_exists($selectedUnit, $units)): ?>
-                            <option value="<?php echo e($selectedUnit); ?>" selected><?php echo e($selectedUnit); ?> (custom)</option>
+                            <option value="<?= e($selectedUnit) ?>" selected><?= e($selectedUnit) ?> (custom)</option>
                         <?php endif; ?>
                     </select>
-                    <?php if (!empty($errors['unit'])): ?><p class="text-red-600 text-sm mt-1"><?php echo e($errors['unit']); ?></p><?php endif; ?>
+                    <?php if (!empty($errors['unit'])): ?>
+                        <p class="text-danger text-sm mt-1"><?= e($errors['unit']) ?></p>
+                    <?php endif; ?>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                    <label for="purchase_date" class="block text-sm font-medium mb-1">Purchase Date</label>
-                    <input id="purchase_date" name="purchase_date" type="date" value="<?php echo e($item['purchase_date'] ?? ''); ?>"
-                           class="w-full border border-border-default rounded px-3 py-2 bg-surface-default">
-                </div>
-                <div>
-                    <label for="expiration_date" class="block text-sm font-medium mb-1">Expiration Date</label>
-                    <input id="expiration_date" name="expiration_date" type="date" value="<?php echo e($item['expiration_date'] ?? ''); ?>"
-                           class="w-full border border-border-default rounded px-3 py-2 bg-surface-default">
-                </div>
+                <?php form_input('purchase_date', 'Purchase date', 'date', [
+                    'value' => $item['purchase_date'] ?? '',
+                    'error' => $errors['purchase_date'] ?? null,
+                ]); ?>
+                <?php form_input('expiration_date', 'Expiration date', 'date', [
+                    'value' => $item['expiration_date'] ?? '',
+                    'error' => $errors['expiration_date'] ?? null,
+                ]); ?>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                    <label for="entered_name" class="block text-sm font-medium mb-1">Entered Name</label>
-                    <input id="entered_name" name="entered_name" type="text" value="<?php echo e($item['entered_name'] ?? ''); ?>"
-                           class="w-full border border-border-default rounded px-3 py-2 bg-surface-default">
-                </div>
-                <div>
-                    <label for="entered_brand" class="block text-sm font-medium mb-1">Entered Brand</label>
-                    <input id="entered_brand" name="entered_brand" type="text" value="<?php echo e($item['entered_brand'] ?? ''); ?>"
-                           class="w-full border border-border-default rounded px-3 py-2 bg-surface-default">
-                </div>
+                <?php form_input('entered_name', 'Entered name', 'text', [
+                    'value' => $item['entered_name'] ?? '',
+                    'error' => $errors['entered_name'] ?? null,
+                ]); ?>
+                <?php form_input('entered_brand', 'Entered brand', 'text', [
+                    'value' => $item['entered_brand'] ?? '',
+                    'error' => $errors['entered_brand'] ?? null,
+                ]); ?>
             </div>
 
-            <!-- carry display context back on failed validation -->
-            <input type="hidden" name="display_name" value="<?php echo e($display['name'] ?? 'Item'); ?>">
-            <input type="hidden" name="display_category" value="<?php echo e($display['category'] ?? ''); ?>">
-            <input type="hidden" name="display_image" value="<?php echo e($display['image'] ?? ''); ?>">
+            <!-- Carry display context through on failed validation -->
+            <input type="hidden" name="display_name"     value="<?= e($display['name'] ?? 'Item') ?>">
+            <input type="hidden" name="display_category" value="<?= e($display['category'] ?? '') ?>">
+            <input type="hidden" name="display_image"    value="<?= e($display['image'] ?? '') ?>">
 
-            <div class="pt-6 border-t border-border-default flex flex-col sm:flex-row-reverse gap-3">
-                <button type="submit" class="btn btn-cta btn-md sm:w-auto w-full">Save Changes</button>
-                <a href="/items/view/<?php echo (int)$item['id']; ?>" class="btn btn-secondary btn-md sm:w-auto w-full">Cancel</a>
+            <div class="pt-6 border-t border-border-default flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <a href="/items/view/<?= (int)$item['id'] ?>" class="btn btn-ghost btn-md w-full sm:w-auto">Cancel</a>
+                <button type="submit" class="btn btn-cta btn-md w-full sm:w-auto">Save changes</button>
             </div>
         </form>
     </div>
@@ -123,4 +115,3 @@ $img = !empty($display['image']) && preg_match('#^https?://#i', $display['image'
 <?php
 $content = ob_get_clean();
 require_once VIEW_PATH . '/Layouts/Users/layout.php';
-?>

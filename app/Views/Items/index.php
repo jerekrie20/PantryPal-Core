@@ -8,9 +8,9 @@
  * - $pagination array (currentPage, totalPages, totalItems, itemsPerPage)
  */
 
+require_once VIEW_PATH . '/Components/ui_elements.php';
 ob_start();
 
-// Helper: safe escape
 if (!function_exists('e')) {
     function e($v): string {
         if ($v === null) return '';
@@ -22,7 +22,6 @@ if (!function_exists('e')) {
 $ingredients = [];
 $products    = [];
 
-// Helper: collapse category which could be string/JSON/array
 if (!function_exists('stringify_category')) {
     function stringify_category($cat): ?string {
         if ($cat === null || $cat === '') return null;
@@ -48,19 +47,13 @@ if (!function_exists('stringify_category')) {
     }
 }
 
-// No extra model lookups; prefer joined fields from Items::findAll
-try {
-    $today = new \DateTimeImmutable('today');
-} catch (\Exception $e) {
-    $today = null;
-}
+try { $today = new \DateTimeImmutable('today'); } catch (\Exception $e) { $today = null; }
 
 if (!empty($items) && is_array($items)) {
     foreach ($items as $row) {
         $id = (int)($row['id'] ?? 0);
         if ($id <= 0) continue;
 
-        // Status and badge (lightweight, similar to Dashboard)
         $status = 'In Stock';
         $badge  = 'badge-success';
         $expiredFlag = false;
@@ -82,9 +75,7 @@ if (!empty($items) && is_array($items)) {
                     $status = 'Expires in ' . $diffDays . ' days';
                     $badge  = 'badge-neutral';
                 }
-            } catch (\Exception $e) {
-                // keep defaults
-            }
+            } catch (\Exception $e) { /* keep defaults */ }
         }
 
         $isIngredient = !empty($row['ingredient_id']);
@@ -114,7 +105,7 @@ if (!empty($items) && is_array($items)) {
             'status'      => $status,
             'category'    => $category ?? 'Uncategorized',
             'badge_class' => $badge,
-            'image'       => $image, // placeholder handled in component
+            'image'       => $image,
             'expired'     => $expiredFlag,
             'url'         => $isIngredient ? ('/ingredients/view/' . $id) : ($isProduct ? ('/products/view/' . $id) : ('/items/view/' . $id)),
         ];
@@ -131,103 +122,148 @@ if (!empty($items) && is_array($items)) {
 
 $ingredientsCount = count($ingredients);
 $productsCount = count($products);
-
-// Determine default tab based on URL hash via JS; default to ingredients
+$totalCount = $ingredientsCount + $productsCount;
 ?>
 
-<section class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
-    <div>
-        <h1 class="text-3xl font-bold text-text-heading"><?php echo e($title ?? 'My Pantry'); ?></h1>
-        <p class="text-text-muted mt-1">Browse your items by Ingredients or Products.</p>
+<?php ui_page_header(
+    $title ?? 'My Pantry',
+    $totalCount > 0
+        ? 'Browse your items by ingredients or products. Filter by name to find something specific.'
+        : 'Add your first item to start tracking expirations and cooking smarter.',
+    '<a href="/items/create" class="btn btn-cta btn-md">Add new item</a>',
+    'Inventory'
+); ?>
+
+<?php if ($totalCount === 0): ?>
+    <?php ui_empty_state(
+        'Your pantry is empty',
+        'Scan a barcode or type in your first ingredient or product. We\'ll auto-fill the details when we recognize it.',
+        'Add your first item',
+        '/items/create',
+        '🛒'
+    ); ?>
+<?php else: ?>
+
+    <!-- Segmented tabs + filter -->
+    <div class="card-flush p-4 mb-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div role="tablist" aria-label="Item types" class="inline-flex bg-bg-subtle rounded-lg p-1 gap-1">
+            <button id="tab-ingredients" data-tab="ingredients" role="tab" aria-selected="true" aria-controls="panel-ingredients"
+                    class="px-4 py-1.5 text-sm font-semibold rounded-md transition-colors">
+                Ingredients
+                <span class="ml-1.5 inline-flex items-center justify-center text-xs px-1.5 py-0.5 rounded-full bg-bg-component text-text-muted"><?= (int)$ingredientsCount ?></span>
+            </button>
+            <button id="tab-products" data-tab="products" role="tab" aria-selected="false" aria-controls="panel-products"
+                    class="px-4 py-1.5 text-sm font-semibold rounded-md transition-colors">
+                Products
+                <span class="ml-1.5 inline-flex items-center justify-center text-xs px-1.5 py-0.5 rounded-full bg-bg-component text-text-muted"><?= (int)$productsCount ?></span>
+            </button>
+        </div>
+
+        <div class="relative w-full sm:w-72">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/>
+            </svg>
+            <input id="pantry-filter" type="search" placeholder="Filter items…" class="w-full pl-9" autocomplete="off" />
+        </div>
     </div>
-    <a href="/items/create" class="btn btn-cta btn-md mt-4 sm:mt-0">Add New Item</a>
-</section>
 
-<!-- Tabs -->
-<div class="flex border-b border-border-default mb-4" role="tablist" aria-label="Item Types">
-    <button id="tab-ingredients" class="px-4 py-2 -mb-px border-b-2 border-transparent hover:border-border-muted text-sm font-semibold rounded-t-md transition-colors" data-tab="ingredients" role="tab" aria-controls="panel-ingredients" aria-selected="true">
-        Ingredients <span class="ml-2 inline-block text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700"><?php echo (int)$ingredientsCount; ?></span>
-    </button>
-    <button id="tab-products" class="ml-2 px-4 py-2 -mb-px border-b-2 border-transparent hover:border-border-muted text-sm font-semibold rounded-t-md transition-colors" data-tab="products" role="tab" aria-controls="panel-products" aria-selected="false">
-        Products <span class="ml-2 inline-block text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700"><?php echo (int)$productsCount; ?></span>
-    </button>
-</div>
-
-<!-- Panels -->
-<div id="panel-ingredients" role="tabpanel" aria-labelledby="tab-ingredients">
-    <div class="bg-bg-component rounded-xl shadow-md">
-        <ul class="divide-y divide-border-default">
-            <?php if (empty($ingredients)): ?>
-                <li class="p-8 text-center text-text-muted">No ingredients yet. Add one to get started!</li>
-            <?php else: ?>
-                <?php foreach ($ingredients as $item): ?>
-                    <?php include VIEW_PATH . '/Components/pantry_item.php'; ?>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </ul>
+    <!-- Ingredients panel -->
+    <div id="panel-ingredients" role="tabpanel" aria-labelledby="tab-ingredients">
+        <?php if (empty($ingredients)): ?>
+            <?php ui_empty_state(
+                'No ingredients yet',
+                'Generic items like apples, flour, or chicken — track them as ingredients to power recipe matching.',
+                'Add an ingredient',
+                '/items/create',
+                '🥕'
+            ); ?>
+        <?php else: ?>
+            <div class="card-flush">
+                <ul class="divide-y divide-border-default" data-list="ingredients">
+                    <?php foreach ($ingredients as $item): ?>
+                        <?php include VIEW_PATH . '/Components/pantry_item.php'; ?>
+                    <?php endforeach; ?>
+                </ul>
+                <p data-empty="ingredients" class="hidden p-6 text-center text-text-muted text-sm">No ingredients match that filter.</p>
+            </div>
+        <?php endif; ?>
     </div>
-</div>
 
-<div id="panel-products" role="tabpanel" aria-labelledby="tab-products" class="hidden">
-    <div class="bg-bg-component rounded-xl shadow-md">
-        <ul class="divide-y divide-border-default">
-            <?php if (empty($products)): ?>
-                <li class="p-8 text-center text-text-muted">No products yet. Add one to get started!</li>
-            <?php else: ?>
-                <?php foreach ($products as $item): ?>
-                    <?php include VIEW_PATH . '/Components/pantry_item.php'; ?>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </ul>
+    <!-- Products panel -->
+    <div id="panel-products" role="tabpanel" aria-labelledby="tab-products" class="hidden">
+        <?php if (empty($products)): ?>
+            <?php ui_empty_state(
+                'No products yet',
+                'Specific branded items like Ritz Crackers or Häagen-Dazs — scan a barcode to add one in seconds.',
+                'Scan or add a product',
+                '/items/create',
+                '🛒'
+            ); ?>
+        <?php else: ?>
+            <div class="card-flush">
+                <ul class="divide-y divide-border-default" data-list="products">
+                    <?php foreach ($products as $item): ?>
+                        <?php include VIEW_PATH . '/Components/pantry_item.php'; ?>
+                    <?php endforeach; ?>
+                </ul>
+                <p data-empty="products" class="hidden p-6 text-center text-text-muted text-sm">No products match that filter.</p>
+            </div>
+        <?php endif; ?>
     </div>
-</div>
 
-<!-- Simple tabs script -->
-<script>
-(function(){
-  function setActive(btn, active){
-    var add = function(el, cls){ cls.split(' ').forEach(function(c){ if(c) el.classList.add(c); }); };
-    var rem = function(el, cls){ cls.split(' ').forEach(function(c){ if(c) el.classList.remove(c); }); };
-    if(active){
-      add(btn, 'border-primary-600 text-primary-700 bg-white');
-      rem(btn, 'border-transparent text-gray-600');
-    } else {
-      add(btn, 'border-transparent text-gray-600');
-      rem(btn, 'border-primary-600 text-primary-700 bg-white');
-    }
-  }
-  function showTab(kind){
-    var ingBtn = document.getElementById('tab-ingredients');
-    var prodBtn = document.getElementById('tab-products');
-    var ing = document.getElementById('panel-ingredients');
-    var prod = document.getElementById('panel-products');
-    var isIng = (kind === 'products') ? false : true;
+    <script>
+    (function(){
+        function setActive(btn, active){
+            if (active) {
+                btn.classList.add('bg-bg-component', 'text-text-heading', 'shadow-sm');
+                btn.classList.remove('text-text-muted');
+            } else {
+                btn.classList.remove('bg-bg-component', 'text-text-heading', 'shadow-sm');
+                btn.classList.add('text-text-muted');
+            }
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        }
+        function showTab(kind){
+            var isProducts = kind === 'products';
+            var ingBtn = document.getElementById('tab-ingredients');
+            var prodBtn = document.getElementById('tab-products');
+            var ingPanel = document.getElementById('panel-ingredients');
+            var prodPanel = document.getElementById('panel-products');
+            setActive(ingBtn, !isProducts);
+            setActive(prodBtn, isProducts);
+            ingPanel.classList.toggle('hidden', isProducts);
+            prodPanel.classList.toggle('hidden', !isProducts);
+            var hash = isProducts ? '#products' : '#ingredients';
+            if (location.hash !== hash) history.replaceState(null, '', hash);
+        }
+        document.getElementById('tab-ingredients').addEventListener('click', function(){ showTab('ingredients'); });
+        document.getElementById('tab-products').addEventListener('click', function(){ showTab('products'); });
+        showTab((location.hash || '').toLowerCase() === '#products' ? 'products' : 'ingredients');
 
-    if(isIng){
-      ing.classList.remove('hidden');
-      prod.classList.add('hidden');
-      setActive(ingBtn, true);
-      setActive(prodBtn, false);
-      ingBtn.setAttribute('aria-selected','true');
-      prodBtn.setAttribute('aria-selected','false');
-      if(location.hash !== '#ingredients') history.replaceState(null, '', '#ingredients');
-    } else {
-      prod.classList.remove('hidden');
-      ing.classList.add('hidden');
-      setActive(prodBtn, true);
-      setActive(ingBtn, false);
-      prodBtn.setAttribute('aria-selected','true');
-      ingBtn.setAttribute('aria-selected','false');
-      if(location.hash !== '#products') history.replaceState(null, '', '#products');
-    }
-  }
-  document.getElementById('tab-ingredients').addEventListener('click', function(){ showTab('ingredients'); });
-  document.getElementById('tab-products').addEventListener('click', function(){ showTab('products'); });
-  // on load
-  var hash = (location.hash || '#ingredients').toLowerCase();
-  showTab(hash === '#products' ? 'products' : 'ingredients');
-})();
-</script>
+        // Filter
+        var input = document.getElementById('pantry-filter');
+        if (input) {
+            input.addEventListener('input', function(){
+                var q = (input.value || '').trim().toLowerCase();
+                ['ingredients', 'products'].forEach(function(kind){
+                    var list = document.querySelector('[data-list="' + kind + '"]');
+                    var empty = document.querySelector('[data-empty="' + kind + '"]');
+                    if (!list) return;
+                    var rows = list.querySelectorAll('li');
+                    var visible = 0;
+                    rows.forEach(function(li){
+                        var text = (li.textContent || '').toLowerCase();
+                        var match = q === '' || text.indexOf(q) !== -1;
+                        li.style.display = match ? '' : 'none';
+                        if (match) visible++;
+                    });
+                    if (empty) empty.classList.toggle('hidden', visible !== 0);
+                });
+            });
+        }
+    })();
+    </script>
+<?php endif; ?>
 
 <?php
 $content = ob_get_clean();

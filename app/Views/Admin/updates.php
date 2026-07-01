@@ -14,12 +14,12 @@ require VIEW_PATH . '/Admin/partials/nav.php';
   <form method="get" action="/admin/updates" class="bg-bg-component rounded-lg p-3 shadow flex flex-col sm:flex-row gap-3">
     <div class="flex-1">
       <label class="block text-xs text-text-muted mb-1">Search</label>
-      <input class="input w-full" type="text" name="q" placeholder="Title or message" value="<?php echo htmlspecialchars((string)($filters['q'] ?? '')); ?>">
+      <input class="w-full" type="text" name="q" placeholder="Title or message" value="<?php echo htmlspecialchars((string)($filters['q'] ?? '')); ?>">
     </div>
     <div>
       <label class="block text-xs text-text-muted mb-1">Status</label>
       <?php $act = (string)($filters['is_active'] ?? ''); ?>
-      <select class="input" name="is_active">
+      <select name="is_active">
         <option value="" <?php echo $act===''?'selected':''; ?>>— any —</option>
         <option value="1" <?php echo $act==='1'?'selected':''; ?>>Active</option>
         <option value="0" <?php echo $act==='0'?'selected':''; ?>>Inactive</option>
@@ -27,16 +27,16 @@ require VIEW_PATH . '/Admin/partials/nav.php';
     </div>
     <div>
       <label class="block text-xs text-text-muted mb-1">Target User ID</label>
-      <input class="input w-28" type="number" name="target_user_id" value="<?php echo htmlspecialchars((string)($filters['target_user_id'] ?? '')); ?>" placeholder="Any">
+      <input class="w-28" type="number" name="target_user_id" value="<?php echo htmlspecialchars((string)($filters['target_user_id'] ?? '')); ?>" placeholder="Any">
     </div>
     <div>
       <label class="block text-xs text-text-muted mb-1">Author User ID</label>
-      <input class="input w-28" type="number" name="created_by" value="<?php echo htmlspecialchars((string)($filters['created_by'] ?? '')); ?>" placeholder="Any">
+      <input class="w-28" type="number" name="created_by" value="<?php echo htmlspecialchars((string)($filters['created_by'] ?? '')); ?>" placeholder="Any">
     </div>
     <div>
       <label class="block text-xs text-text-muted mb-1">Per Page</label>
       <?php $pp = (int)($filters['perPage'] ?? 25); ?>
-      <select class="input" name="perPage">
+      <select name="perPage">
         <?php foreach ([10,25,50,100] as $n): ?>
           <option value="<?php echo $n; ?>" <?php echo $pp === $n ? 'selected' : ''; ?>><?php echo $n; ?></option>
         <?php endforeach; ?>
@@ -54,7 +54,7 @@ require VIEW_PATH . '/Admin/partials/nav.php';
     <div class="flex items-center justify-between mb-1">
       <h3 class="font-semibold text-text-heading flex-1 mr-3"><?php echo htmlspecialchars($u['title'] ?? 'Update'); ?></h3>
       <div class="flex items-center gap-2">
-        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs <?php echo !empty($u['is_active']) ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'; ?>"><?php echo !empty($u['is_active']) ? 'Active' : 'Inactive'; ?></span>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs <?php echo !empty($u['is_active']) ? 'badge-success' : 'badge-neutral'; ?>"><?php echo !empty($u['is_active']) ? 'Active' : 'Inactive'; ?></span>
         <span class="text-xs text-text-muted"><?php echo htmlspecialchars(substr((string)($u['created_at'] ?? ''), 0, 16)); ?></span>
       </div>
     </div>
@@ -64,10 +64,10 @@ require VIEW_PATH . '/Admin/partials/nav.php';
     </div>
     <p class="whitespace-pre-line"><?php echo nl2br(htmlspecialchars($u['message'] ?? '')); ?></p>
     <div class="mt-3 flex items-center justify-end gap-2">
-      <a class="btn btn-subtle btn-xs" href="/admin/updates/<?php echo (int)($u['id'] ?? 0); ?>/edit">Edit</a>
+      <a class="btn btn-subtle btn-sm" href="/admin/updates/<?php echo (int)($u['id'] ?? 0); ?>/edit">Edit</a>
       <form method="post" action="/admin/updates/<?php echo (int)($u['id'] ?? 0); ?>/delete" onsubmit="return confirm('Delete this update?');">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
-        <button type="submit" class="btn btn-danger btn-xs">Delete</button>
+        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
       </form>
     </div>
   </div>
@@ -79,8 +79,8 @@ require VIEW_PATH . '/Admin/partials/nav.php';
   <div class="flex items-center gap-2">
     <?php $qs = $_GET; $qs['page'] = max(1, $cur - 1); $prevUrl = '/admin/updates' . ($qs ? ('?' . http_build_query($qs)) : ''); ?>
     <?php $qs2 = $_GET; $qs2['page'] = min($tot, $cur + 1); $nextUrl = '/admin/updates' . ($qs2 ? ('?' . http_build_query($qs2)) : ''); ?>
-    <a class="btn btn-subtle btn-xs <?php echo $cur <= 1 ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($prevUrl); ?>">Prev</a>
-    <a class="btn btn-subtle btn-xs <?php echo $cur >= $tot ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($nextUrl); ?>">Next</a>
+    <a class="btn btn-subtle btn-sm <?php echo $cur <= 1 ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($prevUrl); ?>">Prev</a>
+    <a class="btn btn-subtle btn-sm <?php echo $cur >= $tot ? 'pointer-events-none opacity-50' : ''; ?>" href="<?php echo htmlspecialchars($nextUrl); ?>">Next</a>
   </div>
 </div>
 <?php endif; ?>
