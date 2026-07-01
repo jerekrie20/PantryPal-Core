@@ -64,42 +64,55 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
     $imageSrc = $item['image'];
 } else {
     $placeholderText = !empty($item['name']) ? $item['name'] : 'Product';
-    $imageSrc = 'https://placehold.co/240x240/E8F5E9/36454F?text=' . urlencode($placeholderText);
+    $imageSrc = 'https://placehold.co/240x240/FAF5EC/B45309?text=' . urlencode($placeholderText);
 }
+
+require_once VIEW_PATH . '/Components/ui_elements.php';
+
+$itemId = (int)($item['id'] ?? 0);
+$csrf = $_SESSION['csrf_token'] ?? '';
+$actions = '<a class="btn btn-cta btn-md" href="/items/' . $itemId . '/edit">Edit</a>'
+    . '<form action="/items/' . $itemId . '/delete" method="POST" class="inline"'
+    . ' onsubmit="return confirm(&quot;Delete &quot; + ' . json_encode($item['name'] ?? 'this item') . ' + &quot;? This cannot be undone.&quot;);">'
+    . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') . '" />'
+    . '<button type="submit" class="btn btn-danger btn-md">Delete</button></form>';
 ?>
 
-<main class="container mx-auto p-4">
-    <h1 class="text-2xl font-bold mb-4"><?php echo e($title ?? 'Product Details'); ?></h1>
+<?php ui_page_header($item['name'] ?? 'Product', $item['category'] ?? null, $actions, 'Product'); ?>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="md:col-span-2 space-y-6">
-            <!-- Header Card -->
-            <div class="card">
-                <div class="card-body">
-                    <div class="flex flex-col sm:flex-row items-start gap-4">
-                        <img src="<?php echo e($imageSrc); ?>"
-                             alt="Image of <?php echo e($item['name'] ?? 'Product'); ?>"
-                             class="w-24 h-24 sm:w-32 sm:h-32 object-cover rounded-lg bg-gray-100 flex-shrink-0">
-                        <div class="min-w-0">
-                            <h2 class="text-xl font-semibold"><?php echo e($item['name'] ?? 'Product'); ?></h2>
-                            <p class="text-sm text-gray-600"><?php echo e($item['category'] ?? ''); ?></p>
-                            <?php if (!empty($item['brand'])): ?><p class="text-sm text-gray-700">
-                                Brand: <?php echo e($item['brand']); ?></p><?php endif; ?>
-                            <span class="badge <?php echo e($item['badge_class'] ?? 'badge-neutral'); ?> mt-2 inline-block"><?php echo e($item['status'] ?? ''); ?></span>
-                            <div class="mt-3 text-sm text-gray-700">
-                                <p>
-                                    Quantity: <?php echo e((string)($item['quantity'] ?? '')); ?> <?php echo e($item['unit'] ?? ''); ?></p>
-                                <?php if (!empty($item['purchase_date'])): ?>
-                                    <p>Purchased: <?php echo e($item['purchase_date']); ?></p>
-                                <?php endif; ?>
-                                <?php if (!empty($item['expiration_date'])): ?>
-                                    <p>Expires: <?php echo e($item['expiration_date']); ?></p>
-                                <?php endif; ?>
-                            </div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Header card -->
+        <section class="card">
+            <div class="flex flex-col sm:flex-row items-start gap-5">
+                <img src="<?php echo e($imageSrc); ?>" alt="" class="w-28 h-28 sm:w-32 sm:h-32 object-cover rounded-lg bg-bg-subtle shrink-0">
+                <div class="min-w-0 flex-1">
+                    <h2 class="text-text-heading text-xl truncate"><?php echo e($item['name'] ?? 'Product'); ?></h2>
+                    <?php if (!empty($item['brand'])): ?>
+                        <p class="text-sm text-text-muted">Brand: <span class="text-text-base font-medium"><?php echo e($item['brand']); ?></span></p>
+                    <?php endif; ?>
+                    <span class="badge <?php echo e($item['badge_class'] ?? 'badge-neutral'); ?> mt-3 inline-block"><?php echo e($item['status'] ?? ''); ?></span>
+                    <dl class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                        <div>
+                            <dt class="text-text-muted text-xs uppercase tracking-wide">Quantity</dt>
+                            <dd class="text-text-base font-medium mt-1"><?php echo e((string)($item['quantity'] ?? '—')); ?> <?php echo e($item['unit'] ?? ''); ?></dd>
                         </div>
-                    </div>
+                        <?php if (!empty($item['purchase_date'])): ?>
+                            <div>
+                                <dt class="text-text-muted text-xs uppercase tracking-wide">Purchased</dt>
+                                <dd class="text-text-base font-medium mt-1"><?php echo e($item['purchase_date']); ?></dd>
+                            </div>
+                        <?php endif; ?>
+                        <?php if (!empty($item['expiration_date'])): ?>
+                            <div>
+                                <dt class="text-text-muted text-xs uppercase tracking-wide">Expires</dt>
+                                <dd class="text-text-base font-medium mt-1"><?php echo e($item['expiration_date']); ?></dd>
+                            </div>
+                        <?php endif; ?>
+                    </dl>
                 </div>
             </div>
+        </section>
 
             <!-- Product Info (OFF-aware and Spoonacular-friendly) -->
             <?php if (!empty($item['product_raw']) && is_array($item['product_raw'])): ?>
@@ -127,9 +140,9 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                 $imgNutri = off_image($p, 'nutrition');
                 $ingredientsText = $p['ingredients_text_en'] ?? $p['ingredients_text'] ?? null;
                 ?>
-                <div class="card p-6">
-                    <div class="card-header">Product Info</div>
-                    <div class="card-body space-y-2 text-sm text-gray-700">
+                <section class="card">
+                    <h3 class="text-text-heading mb-4">Product info</h3>
+                    <div class="space-y-2 text-sm text-text-base">
                         <?php if ($isOFF): ?>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
@@ -404,51 +417,40 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
         </div>
 
         <aside class="space-y-6">
-            <div class="card">
-                <div class="card-header">Actions</div>
-                <div class="card-body flex flex-col sm:flex-row gap-2">
-                    <a class="btn btn-subtle" href="/items/<?php echo (int)($item['id'] ?? 0); ?>/edit">Edit</a>
-                    <form action="/items/<?php echo (int)($item['id'] ?? 0); ?>/delete" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete &quot;<?php echo htmlspecialchars($item['name'] ?? 'this item'); ?>&quot;? This action cannot be undone.');">
-                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
-                        <button type="submit" class="btn btn-danger">Delete</button>
-                    </form>
-                </div>
-            </div>
-
             <!-- Related Recipes Card -->
-            <div class="card">
-                <div class="card-header">Recipes with this Product</div>
-                <div class="card-body">
+            <section class="card">
+                <h3 class="text-text-heading mb-4">Recipes with this</h3>
                     <?php if (!empty($recipesList)): ?>
                         <div class="space-y-3">
                             <?php foreach ($recipesList as $r): ?>
                                 <div class="flex items-center gap-3">
                                     <?php
-                                    $img = (!empty($r['image']) && preg_match('#^https?://#i', $r['image'])) ? $r['image'] : ('https://placehold.co/56x56/E8F5E9/36454F?text=' . urlencode($r['title'] ?? 'R'));
+                                    $img = (!empty($r['image']) && preg_match('#^https?://#i', $r['image'])) ? $r['image'] : ('https://placehold.co/56x56/FAF5EC/B45309?text=' . urlencode($r['title'] ?? 'R'));
                                     ?>
-                                    <img src="<?php echo e($img); ?>" alt="Recipe image" class="w-14 h-14 object-cover rounded" />
-                                    <div class="flex-1">
-                                        <div class="text-sm font-semibold"><?php echo e($r['title'] ?? 'Recipe'); ?></div>
-                                        <div class="flex gap-2 mt-1">
+                                    <img src="<?php echo e($img); ?>" alt="" class="w-14 h-14 object-cover rounded bg-bg-subtle shrink-0" />
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-semibold text-text-heading truncate"><?php echo e($r['title'] ?? 'Recipe'); ?></p>
+                                        <div class="flex gap-1.5 mt-1 flex-wrap">
                                             <?php if (!empty($r['db_id'])): ?>
-                                                <a href="/recipes/view/<?php echo (int)$r['db_id']; ?>" class="btn btn-cta btn-xs">Details</a>
+                                                <a href="/recipes/view/<?php echo (int)$r['db_id']; ?>" class="btn btn-cta btn-sm">View</a>
                                             <?php endif; ?>
                                             <?php if (!empty($r['sourceUrl'])): ?>
-                                                <a href="<?php echo e($r['sourceUrl']); ?>" target="_blank" rel="noopener" class="btn btn-subtle btn-xs">Source</a>
+                                                <a href="<?php echo e($r['sourceUrl']); ?>" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Source</a>
                                             <?php endif; ?>
                                             <form action="/recipes/save" method="POST" class="inline">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" />
                                                 <input type="hidden" name="id" value="<?php echo e((string)($r['id'] ?? '')); ?>" />
                                                 <input type="hidden" name="title" value="<?php echo e($r['title'] ?? 'Recipe'); ?>" />
                                                 <input type="hidden" name="image" value="<?php echo e($r['image'] ?? ''); ?>" />
                                                 <input type="hidden" name="sourceUrl" value="<?php echo e($r['sourceUrl'] ?? ''); ?>" />
                                                 <input type="hidden" name="payload" value='<?php echo e(json_encode($r)); ?>' />
-                                                <?php 
+                                                <?php
                                                     $prov = 'fatsecret';
                                                     if (!empty($r['provider'])) { $prov = (string)$r['provider']; }
                                                     elseif (!empty($r['api_source'])) { $prov = (string)$r['api_source']; }
                                                 ?>
                                                 <input type="hidden" name="provider" value="<?php echo e($prov); ?>" />
-                                                <button type="submit" class="btn btn-secondary btn-xs">Save</button>
+                                                <button type="submit" class="btn btn-secondary btn-sm">Save</button>
                                             </form>
                                         </div>
                                     </div>
@@ -456,18 +458,16 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
-                        <p class="text-sm text-text-muted">No recipes found yet.</p>
+                        <p class="text-sm text-text-muted">No recipes match yet.</p>
                     <?php endif; ?>
                     <?php if (!empty($item['name'])): ?>
-                        <a href="/recipes?q=<?php echo urlencode($item['name']); ?>&api=1" class="btn btn-cta btn-sm mt-3">Search Online for &quot;<?php echo e($item['name']); ?>&quot;</a>
+                        <a href="/recipes?q=<?php echo urlencode($item['name']); ?>&api=1" class="btn btn-secondary btn-sm mt-4 w-full">Search the web for "<?php echo e($item['name']); ?>"</a>
                     <?php endif; ?>
-                </div>
-            </div>
+            </section>
 
             <!-- Nutrition Card -->
-            <div class="card">
-                <div class="card-header">Nutrition</div>
-                <div class="card-body">
+            <section class="card">
+                <h3 class="text-text-heading mb-4">Nutrition</h3>
                     <?php if (!empty($item['nutrition']) && is_array($item['nutrition'])): ?>
                         <?php
                         $nutri = $item['nutrition'];
@@ -523,7 +523,7 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
                         ?>
 
                         <?php if ($servingText): ?>
-                            <p class="text-sm text-gray-600 mb-2">Serving: <?php echo e($servingText); ?></p>
+                            <p class="text-sm text-text-muted mb-2">Serving: <?php echo e($servingText); ?></p>
                         <?php endif; ?>
 
                         <?php if (!empty($nutrientsList) && is_array($nutrientsList)): ?>
@@ -562,29 +562,27 @@ if (!empty($item['image']) && preg_match('#^https?://#i', $item['image'])) {
 
                             <?php if ($breakdown && (isset($breakdown['percentProtein']) || isset($breakdown['percentFat']) || isset($breakdown['percentCarbs']))): ?>
                                 <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                                    <div><span class="text-gray-600">Protein</span>
+                                    <div><span class="text-text-muted">Protein</span>
                                         <div class="font-medium"><?php echo isset($breakdown['percentProtein']) ? e((string)round($breakdown['percentProtein'])) . '%' : '—'; ?></div>
                                     </div>
-                                    <div><span class="text-gray-600">Fat</span>
+                                    <div><span class="text-text-muted">Fat</span>
                                         <div class="font-medium"><?php echo isset($breakdown['percentFat']) ? e((string)round($breakdown['percentFat'])) . '%' : '—'; ?></div>
                                     </div>
-                                    <div><span class="text-gray-600">Carbs</span>
+                                    <div><span class="text-text-muted">Carbs</span>
                                         <div class="font-medium"><?php echo isset($breakdown['percentCarbs']) ? e((string)round($breakdown['percentCarbs'])) . '%' : '—'; ?></div>
                                     </div>
                                 </div>
                             <?php endif; ?>
                         <?php else: ?>
-                            <p class="text-sm text-gray-600">Nutrition details are unavailable.</p>
+                            <p class="text-sm text-text-muted">Nutrition details are unavailable.</p>
                         <?php endif; ?>
                     <?php else: ?>
-                        <p class="text-sm text-gray-600">Nutrition details are unavailable.</p>
+                        <p class="text-sm text-text-muted">Nutrition details are unavailable.</p>
                     <?php endif; ?>
-                </div>
-            </div>
+            </section>
 
         </aside>
     </div>
-</main>
 
 <?php
 $content = ob_get_clean();

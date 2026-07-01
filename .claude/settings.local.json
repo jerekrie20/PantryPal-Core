@@ -25,7 +25,8 @@
       "Bash(php -l app/Views/Items/index.php)",
       "Bash(php -l app/Views/Items/create.php)",
       "Bash(php -l app/Views/Pages/login.php app/Views/Pages/register.php)",
-      "Bash(php -l app/Views/Recipes/index.php)"
+      "Bash(php -l app/Views/Recipes/index.php)",
+      "Bash(php -l app/Views/Items/edit.php app/Views/Items/confirm.php app/Views/Ingredients/show.php app/Views/Products/show.php)"
     ]
   }
 }
