@@ -61,7 +61,12 @@
       "Bash(composer dump-autoload *)",
       "Bash(git rm *)",
       "Bash(php -l app/Helpers/support.php app/Helpers/Validator.php app/routes/web.php app/Views/Items/index.php app/Views/Items/confirm.php app/Views/Items/edit.php app/Views/Recipes/index.php app/Views/Recipes/recipe_form.php app/Views/Recipes/show.php app/Views/ShoppingList/index.php app/Views/Ingredients/show.php app/Views/Products/show.php)",
-      "Bash(php -l app/Services/Providers/FdcProvider.php app/Models/Ingredients.php app/Models/Products.php app/Services/Pantry/CategoryFormatter.php)"
+      "Bash(php -l app/Services/Providers/FdcProvider.php app/Models/Ingredients.php app/Models/Products.php app/Services/Pantry/CategoryFormatter.php)",
+      "Bash(php -l app/Services/Pantry/PantryItemAssembler.php app/Controllers/ItemsController.php app/Controllers/IngredientsController.php app/Controllers/DashboardController.php app/Models/Items.php app/Views/Items/index.php)",
+      "Bash(grep -n '\\\\$items\\\\b' app/Views/Items/index.php)",
+      "Bash(echo \"clean: $?\")",
+      "Bash(php -l app/Services/Pantry/PantryIntake.php app/Services/Pantry/PantryCache.php app/Services/Pantry/Sources/CatalogSource.php app/Services/Pantry/Sources/IngredientSource.php app/Services/Pantry/Sources/ProductSource.php app/Controllers/Concerns/RunsPantryIntake.php app/Controllers/ItemsController.php app/Controllers/IngredientsController.php app/Controllers/ProductsController.php app/Controllers/ShoppingListController.php app/Controllers/RecipesController.php app/Controllers/DashboardController.php)",
+      "Bash(php -l app/routes/web.php app/Controllers/ItemsController.php app/Controllers/Concerns/RunsPantryIntake.php app/Services/Pantry/PantryItemAssembler.php)"
     ]
   }
 }

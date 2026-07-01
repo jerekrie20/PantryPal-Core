@@ -324,10 +324,9 @@ class RecipesController
             $recipeId = $this->recipes->upsertFromProvider($data, null, $src);
             $this->recipes->saveForUser($recipeId, (int)$userId);
 
-            // Invalidate related caches
+            // The dashboard's saved-recipes stat derives from this
             try {
-                \Helpers\Cache::del('pp:user:' . (int)$userId . ':recipes:savedCount');
-                \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+                \Helpers\Cache::del(\Services\Pantry\PantryCache::dashboardStatsKey((int)$userId));
             } catch (\Throwable $e) { /* ignore */ }
 
             // Redirect back to previous page
@@ -353,10 +352,9 @@ class RecipesController
             $rid = isset($_POST['recipe_id']) ? (int)$_POST['recipe_id'] : 0;
             if ($rid > 0) {
                 $this->recipes->unsaveForUser($rid, (int)$userId);
-                // Invalidate related caches
+                // The dashboard's saved-recipes stat derives from this
                 try {
-                    \Helpers\Cache::del('pp:user:' . (int)$userId . ':recipes:savedCount');
-                    \Helpers\Cache::del('pp:user:' . (int)$userId . ':dashboard:stats:v1');
+                    \Helpers\Cache::del(\Services\Pantry\PantryCache::dashboardStatsKey((int)$userId));
                 } catch (\Throwable $e) { /* ignore */ }
             }
             $back = $_SERVER['HTTP_REFERER'] ?? '/recipes';

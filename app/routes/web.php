@@ -4,8 +4,6 @@ global $router;
 use Controllers\DashboardController;
 use Controllers\HomeController;
 use Controllers\ItemsController;
-use Controllers\IngredientsController;
-use Controllers\ProductsController;
 use Controllers\UserController;
 use Controllers\RecipesController;
 use Controllers\ShoppingListController;
@@ -58,17 +56,28 @@ $router->group(['middleware' => [AuthMiddleware::class, CsrfMiddleware::class]],
     $router->post('/items/{id:int}', [ItemsController::class, 'update']); // Update data from the form
     $router->post('/items/{id:int}/delete', [ItemsController::class, 'destroy']); // Delete an item
 
-    // New: Ingredient-specific routes (thin controllers over Items flow)
-    $router->get('/ingredients/create', [IngredientsController::class, 'create']);
-    $router->post('/ingredients', [IngredientsController::class, 'store']);
-    $router->post('/ingredients/confirm', [IngredientsController::class, 'confirm']);
-    $router->get('/ingredients/view/{id:int}', [IngredientsController::class, 'show']);
-
-    // New: Product-specific routes (thin controllers over Items flow)
-    $router->get('/products/create', [ProductsController::class, 'create']);
-    $router->post('/products', [ProductsController::class, 'store']);
-    $router->post('/products/confirm', [ProductsController::class, 'confirm']);
-    $router->get('/products/view/{id:int}', [ProductsController::class, 'show']);
+    // Legacy kind-specific URLs. Everything is handled by ItemsController now;
+    // GETs redirect permanently, POSTs stay routed for in-flight forms.
+    $router->get('/ingredients/create', function () {
+        header('Location: /items/create?kind=ingredient', true, 301);
+        exit;
+    });
+    $router->get('/products/create', function () {
+        header('Location: /items/create?kind=product', true, 301);
+        exit;
+    });
+    $router->get('/ingredients/view/{id:int}', function ($id) {
+        header('Location: /items/view/' . (int)$id, true, 301);
+        exit;
+    });
+    $router->get('/products/view/{id:int}', function ($id) {
+        header('Location: /items/view/' . (int)$id, true, 301);
+        exit;
+    });
+    $router->post('/ingredients', [ItemsController::class, 'store']);
+    $router->post('/ingredients/confirm', [ItemsController::class, 'confirm']);
+    $router->post('/products', [ItemsController::class, 'store']);
+    $router->post('/products/confirm', [ItemsController::class, 'confirm']);
 
     // Recipes
     $router->get('/recipes', [RecipesController::class, 'index']);

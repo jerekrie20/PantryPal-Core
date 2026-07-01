@@ -1,6 +1,6 @@
 <?php
 // Ingredient detail page (uses global Users layout).
-// Expects $item structured by IngredientsController::show.
+// Expects $item structured by PantryItemAssembler::detail (via ItemsController::show).
 require_once VIEW_PATH . '/Components/ui_elements.php';
 ob_start();
 

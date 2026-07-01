@@ -20,8 +20,9 @@ class Items
 
     public function find(int $id, ?int $userId = null): array|false
     {
-        $sql = "SELECT i.*, 
+        $sql = "SELECT i.*,
                        ing.name            AS ingredient_name,
+                       ing.brand           AS ingredient_brand,
                        ing.category        AS ingredient_category,
                        ing.image_url       AS ingredient_image_url,
                        ing.nutrition_info  AS ingredient_nutrition_info,
@@ -306,33 +307,4 @@ class Items
         return $stmt->execute();
     }
 
-    public function getExpirationStatus(?string $expirationDate): array
-    {
-        $status = 'In Stock';
-        $badge = 'badge-success';
-
-        if (!empty($expirationDate)) {
-            try {
-                $today = new \DateTimeImmutable('today');
-                $exp = new \DateTimeImmutable($expirationDate);
-                $diffDays = (int)$today->diff($exp)->format('%r%a');
-                if ($diffDays < 0) {
-                    $status = 'Expired ' . (abs($diffDays) === 1 ? '1 day ago' : abs($diffDays) . ' days ago');
-                    $badge = 'badge-danger';
-                } elseif ($diffDays === 0) {
-                    $status = 'Expires today';
-                    $badge = 'badge-warning';
-                } elseif ($diffDays <= 3) {
-                    $status = 'Expires in ' . ($diffDays === 1 ? '1 day' : $diffDays . ' days');
-                    $badge = 'badge-warning';
-                } else {
-                    $status = 'Expires in ' . $diffDays . ' days';
-                    $badge = 'badge-neutral';
-                }
-            } catch (\Exception $e) {
-            }
-        }
-
-        return ['status' => $status, 'badge' => $badge];
-    }
 }
