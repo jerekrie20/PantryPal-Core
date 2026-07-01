@@ -8,6 +8,7 @@ use Models\Ingredients;
 use Models\Products;
 use Models\Recipes;
 use Models\Updates;
+use Services\Pantry\CategoryFormatter;
 
 class DashboardController
 {
@@ -65,11 +66,11 @@ class DashboardController
 
             if (!empty($row['ingredient_id'])) {
                 $name = $row['ingredient_name'] ?? $name;
-                $category = $this->stringifyCategory($row['ingredient_category'] ?? null);
+                $category = CategoryFormatter::stringify($row['ingredient_category'] ?? null);
                 $image = $row['ingredient_image_url'] ?? null;
             } elseif (!empty($row['product_id'])) {
                 $name = $row['product_title'] ?? $name;
-                $category = $this->stringifyCategory($row['product_category'] ?? null);
+                $category = CategoryFormatter::stringify($row['product_category'] ?? null);
                 $image = $row['product_image_url'] ?? null;
             }
 
@@ -134,32 +135,5 @@ class DashboardController
 
         return View::render('/Users/dashboard', $data);
     }
-
-    /** Collapse category values that might arrive as arrays / JSON strings. */
-    private function stringifyCategory($cat): ?string
-    {
-        if ($cat === null || $cat === '') return null;
-
-        if (is_string($cat)) {
-            $trim = ltrim($cat);
-            if ($trim !== '' && ($trim[0] === '{' || $trim[0] === '[')) {
-                $decoded = json_decode($cat, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    return $this->stringifyCategory($decoded);
-                }
-            }
-            return $cat;
-        }
-        if (is_array($cat)) {
-            if (isset($cat['categoryPath']) && is_array($cat['categoryPath'])) {
-                return implode(' › ', array_filter($cat['categoryPath'], 'is_string'));
-            }
-            $vals = [];
-            foreach ($cat as $v) if (is_string($v)) $vals[] = $v;
-            return $vals ? implode(' › ', $vals) : null;
-        }
-        return null;
-    }
-
 
 }

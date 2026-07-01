@@ -7,10 +7,20 @@ if (!function_exists('vite_tags')) {
     }
 }
 
-// Global HTML escape helper
+// Global HTML escape helper.
+// Array-safe: provider payloads (OFF/FDC) sometimes leak arrays into display
+// fields; flatten them to "key: value" text instead of "Array" + warning.
 if (!function_exists('e')) {
     function e($value): string {
-        return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        if (is_array($value)) {
+            $parts = [];
+            foreach ($value as $k => $v) {
+                $str = is_array($v) ? json_encode($v) : (string)($v ?? '');
+                $parts[] = is_string($k) ? ($k . ': ' . $str) : $str;
+            }
+            $value = implode(', ', $parts);
+        }
+        return htmlspecialchars((string)($value ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 }
 

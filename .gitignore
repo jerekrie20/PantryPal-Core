@@ -66,3 +66,4 @@ pnpm-debug.log*
 
 # Local environment overrides
 *.local.php
+.phpunit.cache/

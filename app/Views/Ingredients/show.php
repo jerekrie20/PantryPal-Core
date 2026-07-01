@@ -4,26 +4,6 @@
 require_once VIEW_PATH . '/Components/ui_elements.php';
 ob_start();
 
-if (!function_exists('e')) {
-    function e($v): string
-    {
-        if (is_array($v)) {
-            $parts = [];
-            foreach ($v as $k => $val) {
-                if (is_array($val)) {
-                    $parts[] = is_string($k) ? ($k . ': ' . json_encode($val)) : json_encode($val);
-                } else {
-                    $parts[] = is_string($k) ? ($k . ': ' . (string)($val ?? '')) : (string)($val ?? '');
-                }
-            }
-            $v = implode(', ', $parts);
-        } elseif ($v === null) {
-            $v = '';
-        }
-        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
-    }
-}
-
 $imageSrc = !empty($item['image']) && preg_match('#^https?://#i', $item['image'])
     ? $item['image']
     : ('https://placehold.co/240x240/FAF5EC/B45309?text=' . urlencode($item['name'] ?? 'Ingredient'));

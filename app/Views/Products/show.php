@@ -3,27 +3,6 @@
 // Expects $item structured by ItemsController::show
 ob_start();
 
-// Safe escape helper (like show_ref.php)
-if (!function_exists('e')) {
-    function e($v): string
-    {
-        if (is_array($v)) {
-            $parts = [];
-            foreach ($v as $k => $val) {
-                if (is_array($val)) {
-                    $parts[] = is_string($k) ? ($k . ': ' . json_encode($val)) : json_encode($val);
-                } else {
-                    $parts[] = is_string($k) ? ($k . ': ' . (string)($val ?? '')) : (string)($val ?? '');
-                }
-            }
-            $v = implode(', ', $parts);
-        } elseif ($v === null) {
-            $v = '';
-        }
-        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
-    }
-}
-
 // Pretty-print OFF tags
 if (!function_exists('pretty_tags')) {
     function pretty_tags($tags): ?string

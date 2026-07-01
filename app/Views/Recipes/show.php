@@ -11,7 +11,6 @@
 require_once VIEW_PATH . '/Components/ui_elements.php';
 ob_start();
 
-if (!function_exists('e')) { function e($v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); } }
 
 $img = (!empty($recipe['image']) && (preg_match('#^https?://#i', $recipe['image']) || str_starts_with($recipe['image'], '/')))
     ? $recipe['image']
