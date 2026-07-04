@@ -280,11 +280,18 @@ function startShopping() {
     }
 
     if (html5QrCode) {
-        html5QrCode.stop().catch(function () {}).finally(function () {
-            html5QrCode.clear();
+        // Same sync-throw guard as stopScanner: a never-started scanner throws on stop()
+        try {
+            html5QrCode.stop().catch(function () {}).finally(function () {
+                try { html5QrCode.clear(); } catch (e) {}
+                html5QrCode = null;
+                _startHtml5QrCode();
+            });
+        } catch (e) {
+            try { html5QrCode.clear(); } catch (e2) {}
             html5QrCode = null;
             _startHtml5QrCode();
-        });
+        }
     } else {
         _startHtml5QrCode();
     }
@@ -324,16 +331,24 @@ function _startHtml5QrCode() {
 }
 
 function stopScanner() {
-    if (html5QrCode) {
-        html5QrCode.stop().catch(function () {}).finally(function () {
-            html5QrCode.clear();
-            html5QrCode = null;
-        });
-    }
+    // Hide the modal FIRST — camera teardown must never keep the UI stuck open
     lastScannedBarcode = null;
     scanCooldown       = false;
     document.getElementById('scanner-modal').classList.add('hidden');
     document.getElementById('scanner-result').classList.add('hidden');
+
+    if (html5QrCode) {
+        // stop() throws synchronously if the camera never started (e.g. permission denied)
+        try {
+            html5QrCode.stop().catch(function () {}).finally(function () {
+                try { html5QrCode.clear(); } catch (e) {}
+                html5QrCode = null;
+            });
+        } catch (e) {
+            try { html5QrCode.clear(); } catch (e2) {}
+            html5QrCode = null;
+        }
+    }
 }
 
 function showScannerError(msg) {
