@@ -67,18 +67,25 @@ class LangCacheClient
 
             $statusCode = $response->getStatusCode();
 
-            // 200 = cache hit, 404 = cache miss
+            // 200 with matches = hit; 200 with empty data (or 404) = miss
             if ($statusCode === 200) {
                 $body = json_decode($response->getBody()->getContents(), true);
 
-                if (isset($body['response'])) {
+                // Current API shape: {"data": [{id, prompt, response, similarity, ...}]}
+                $match = $body['data'][0] ?? (isset($body['response']) ? $body : null);
+
+                if (is_array($match) && isset($match['response'])) {
                     return [
-                        'response' => $body['response'],
-                        'entryId' => $body['id'] ?? null,
+                        'response' => $match['response'],
+                        'entryId' => $match['id'] ?? null,
                         'cached' => true,
-                        'similarity' => $body['similarity'] ?? null
+                        'similarity' => $match['similarity'] ?? null
                     ];
                 }
+            } elseif ($statusCode !== 404) {
+                // Anything other than hit/miss is a config problem — don't hide it
+                error_log("LangCache search error (HTTP {$statusCode}): "
+                    . substr($response->getBody()->getContents(), 0, 300));
             }
 
             return null;
@@ -126,7 +133,12 @@ class LangCacheClient
                 ]
             );
 
-            return $response->getStatusCode() === 201;
+            $statusCode = $response->getStatusCode();
+            if ($statusCode !== 201) {
+                error_log("LangCache store error (HTTP {$statusCode}): "
+                    . substr($response->getBody()->getContents(), 0, 300));
+            }
+            return $statusCode === 201;
 
         } catch (\Exception $e) {
             error_log('LangCache store failed: ' . $e->getMessage());

@@ -56,11 +56,15 @@ class CookingAssistant
 
         try {
             // Check LangCache first for semantic match
+            // Note: LangCache rejects blank attribute values, so only send non-empty ones
             $cached = null;
-            $attributes = ['userId' => (string)$this->userId];
-            if ($this->pageContext && isset($this->pageContext['type'])) {
-                $attributes['pageType'] = $this->pageContext['type'];
-                if (isset($this->pageContext['id'])) {
+            $attributes = [];
+            if ($this->userId !== null) {
+                $attributes['userId'] = (string)$this->userId;
+            }
+            if ($this->pageContext && !empty($this->pageContext['type'])) {
+                $attributes['pageType'] = (string)$this->pageContext['type'];
+                if (!empty($this->pageContext['id'])) {
                     $attributes['pageId'] = (string)$this->pageContext['id'];
                 }
             }

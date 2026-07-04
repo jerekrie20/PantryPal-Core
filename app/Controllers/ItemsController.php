@@ -290,13 +290,43 @@ class ItemsController
 
             $this->items->delete($id, (int)$userId);
             PantryCache::bustForUser((int)$userId);
-            header('Location: /dashboard');
+            header('Location: ' . $this->afterDeleteTarget($id));
             exit;
         } catch (\Throwable $e) {
             error_log('ItemsController::destroy error: '.$e->getMessage());
             http_response_code(500);
             return View::render('Pages/500', ['title' => 'Server Error']);
         }
+    }
+
+    /**
+     * Where to send the user after deleting an item: back to the page they
+     * came from (dashboard, filtered /items list, ...), except when that page
+     * was the deleted item's own view/edit page — that would 404.
+     */
+    private function afterDeleteTarget(int $deletedId): string
+    {
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+        if ($referer === '') {
+            return '/items';
+        }
+
+        // Only trust same-host referers, and only reuse path + query from them
+        $refHost = parse_url($referer, PHP_URL_HOST);
+        $ownHost = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]);
+        if ($refHost !== null && strtolower($refHost) !== $ownHost) {
+            return '/items';
+        }
+
+        $path = parse_url($referer, PHP_URL_PATH) ?: '/items';
+
+        // The deleted item's own pages no longer exist
+        if (preg_match('#^/items/(?:view/|renew/)?' . $deletedId . '(?:/|$)#', $path)) {
+            return '/items';
+        }
+
+        $query = parse_url($referer, PHP_URL_QUERY);
+        return $path . ($query ? '?' . $query : '');
     }
 
     public function renew(int $id)

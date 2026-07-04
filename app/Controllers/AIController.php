@@ -77,6 +77,7 @@ class AIController
                     'message' => $response['message'],
                     'history' => $assistant->getHistory(),
                     'usage' => $response['usage'] ?? [],
+                    'cached' => $response['cached'] ?? false,
                     'remaining_queries' => $rateLimitResult['remaining'] - 1
                 ]);
             } else {
