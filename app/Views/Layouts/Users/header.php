@@ -21,7 +21,6 @@ $csrf = $_SESSION['csrf_token'] ?? '';
                 <!-- Desktop nav -->
                 <a href="/dashboard" class="btn btn-subtle btn-md hidden sm:inline-flex">Dashboard</a>
                 <a href="/recipes" class="btn btn-subtle btn-md hidden sm:inline-flex">Recipes</a>
-                <a href="/recipes?ugc=1" class="btn btn-subtle btn-md hidden sm:inline-flex">My Recipes</a>
                 <a href="/items" class="btn btn-subtle btn-md hidden sm:inline-flex">Items</a>
                 <a href="/shopping-list" class="btn btn-subtle btn-md hidden sm:inline-flex" title="Shopping List">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
