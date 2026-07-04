@@ -273,6 +273,12 @@ function startShopping() {
         return;
     }
 
+    // Camera requires a secure context (HTTPS); a plain-HTTP LAN address will never work
+    if (!window.isSecureContext) {
+        showScannerError('The camera only works over a secure (https) connection. Open the site via its https address and try again.');
+        return;
+    }
+
     if (html5QrCode) {
         html5QrCode.stop().catch(function () {}).finally(function () {
             html5QrCode.clear();
@@ -304,7 +310,16 @@ function _startHtml5QrCode() {
         },
         function () { /* per-frame scan errors are normal, ignore */ }
     ).catch(function (err) {
-        showScannerError('Could not start camera: ' + err);
+        var msg = String(err);
+        if (msg.indexOf('NotAllowedError') !== -1) {
+            showScannerError('Camera access is blocked for this site. Tap the lock/aA icon in your browser\'s address bar, allow Camera, then reload this page.');
+        } else if (msg.indexOf('NotFoundError') !== -1) {
+            showScannerError('No camera was found on this device.');
+        } else if (msg.indexOf('NotReadableError') !== -1) {
+            showScannerError('The camera is being used by another app. Close it and try again.');
+        } else {
+            showScannerError('Could not start camera: ' + msg);
+        }
     });
 }
 

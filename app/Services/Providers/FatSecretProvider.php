@@ -22,7 +22,10 @@ class FatSecretProvider
 {
     private const TOKEN_URL       = 'https://oauth.fatsecret.com/connect/token';
     private const API_BASE        = 'https://platform.fatsecret.com/rest/';
-    private const TOKEN_CACHE_KEY = 'fatsecret:__oauth_token__';
+    // Scope-specific cache key: this provider needs 'basic barcode', while
+    // FatSecretRecipesProvider fetches a 'basic'-only token. Sharing one key
+    // let the narrower token evict this one and break barcode lookups.
+    private const TOKEN_CACHE_KEY = 'fatsecret:__oauth_token_barcode__';
     private const CACHE_TTL       = 86400; // 24 hours
 
     private string $clientId;
