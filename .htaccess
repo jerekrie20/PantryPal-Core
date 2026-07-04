@@ -6,6 +6,14 @@ Options -Indexes
 RewriteEngine On
 RewriteBase /
 
+# --- Security: block sensitive files/directories BEFORE the serve-directly rules ---
+# Dotfiles and env files (.env, .git, .htaccess itself is protected by Apache)
+RewriteRule (^|/)\.(?!well-known/) - [F,L]
+# Application internals — nothing outside public/ should be web-accessible
+RewriteRule ^(app|src|tests|vendor|docs|storage|node_modules)(/|$) - [F,L]
+# Project metadata
+RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|vite\.config\..*)$ - [F,L]
+
 # Serve existing files/directories directly
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]

@@ -81,10 +81,13 @@ class AIController
                     'remaining_queries' => $rateLimitResult['remaining'] - 1
                 ]);
             } else {
+                if (!$this->isDebug()) {
+                    unset($response['debug']);
+                }
                 http_response_code(500);
                 echo json_encode($response);
             }
-            
+
         } catch (\Exception $e) {
             error_log('AI chat error: ' . $e->getMessage());
             error_log('AI chat error trace: ' . $e->getTraceAsString());
@@ -92,9 +95,18 @@ class AIController
             echo json_encode([
                 'success' => false,
                 'error' => 'An error occurred while processing your request',
-                'debug' => $_ENV['APP_DEBUG'] ?? false ? $e->getMessage() : null
+                'debug' => $this->isDebug() ? $e->getMessage() : null
             ]);
         }
+    }
+
+    /**
+     * APP_DEBUG comes through as a string ("false" is truthy!) — parse it properly
+     */
+    private function isDebug(): bool
+    {
+        $raw = $_ENV['APP_DEBUG'] ?? getenv('APP_DEBUG') ?: 'false';
+        return filter_var($raw, FILTER_VALIDATE_BOOLEAN);
     }
     
     /**

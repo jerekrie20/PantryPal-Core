@@ -13,6 +13,12 @@ const APP_PATH = APP_ROOT . '/app';
 // Load environment
 require_once APP_PATH . '/Config/environment.php';
 
+// Web access only when internal tools are explicitly enabled (CLI always allowed)
+if (PHP_SAPI !== 'cli' && !filter_var(getenv('INTERNAL_TOOLS_ENABLED') ?: 'false', FILTER_VALIDATE_BOOLEAN)) {
+    http_response_code(404);
+    exit;
+}
+
 header('Content-Type: text/plain');
 
 echo "=== AI Assistant Configuration Test ===\n\n";
