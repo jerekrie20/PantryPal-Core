@@ -21,7 +21,7 @@
             </a>
 
             <nav class="hidden md:flex items-center gap-1">
-                <a href="/features" class="btn btn-ghost btn-sm">Features</a>
+                <a href="/" class="btn btn-ghost btn-sm">Home</a>
                 <a href="/about" class="btn btn-ghost btn-sm">About</a>
                 <?php if (!empty($_SESSION['user_id'])): ?>
                     <a href="/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
