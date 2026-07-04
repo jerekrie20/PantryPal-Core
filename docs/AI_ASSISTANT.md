@@ -14,16 +14,30 @@ The AI Cooking Assistant is a context-aware chatbot that helps users with cookin
 
 ## Setup
 
+The assistant supports two providers, selected via `.env`:
+
+| Provider | Cost | Get a key |
+|----------|------|-----------|
+| **Google Gemini** (default) | Free tier — no card required, ~1,500 requests/day | https://aistudio.google.com/apikey |
+| **Anthropic Claude** | Paid — Haiku 4.5 at ~$0.005/query | https://console.anthropic.com/ |
+
 ### 1. Get an API Key
 
-Sign up for an Anthropic API key at https://console.anthropic.com/
+For development, grab a free Gemini key from Google AI Studio.
 
 ### 2. Configure Environment
 
-Add your API key to your `.env` file:
+Add to your `.env` file:
 
 ```bash
-ANTHROPIC_API_KEY=your_api_key_here
+# 'gemini' or 'anthropic' — omit to auto-detect (Gemini preferred)
+AI_PROVIDER=gemini
+
+GEMINI_API_KEY=your_gemini_key_here
+# GEMINI_MODEL=gemini-flash-latest        # optional override
+
+ANTHROPIC_API_KEY=your_anthropic_key_here
+# ANTHROPIC_MODEL=claude-haiku-4-5        # optional override
 ```
 
 ### 3. Add Premium Column (Optional)
@@ -73,15 +87,17 @@ The system uses Redis to track usage:
 
 ## Cost Considerations
 
-Using Claude API:
-- Model: `claude-3-5-sonnet-20241022`
-- Average cost: ~$0.002 per query
-- Max tokens per response: 1024
+**Gemini (free tier):** $0 up to ~1,500 requests/day on Flash models. Good for
+development and small user bases; upgrade to a paid Gemini tier or switch to
+Claude when you outgrow the rate limits.
 
-For 100 premium users making 10 queries/day:
-- Daily API cost: ~$2
-- Monthly API cost: ~$60
+**Claude Haiku 4.5** (`claude-haiku-4-5`, $1/$5 per MTok):
+- Average cost: ~$0.005 per query (pantry context in, 1024 max tokens out)
+- For 100 premium users making 10 queries/day: ~$5/day, ~$150/month
 - Pricing at $9.99/month premium = profitable
+
+LangCache semantic caching (if enabled) reduces costs further on both
+providers by serving repeated/similar questions without an API call.
 
 ## Files
 
@@ -111,19 +127,27 @@ $limit = 10; // Change to desired limit
 
 Edit `CookingAssistant.php` method `buildSystemPrompt()` to adjust the AI's behavior and restrictions.
 
-### Change AI Model
+### Change AI Model or Provider
 
-In `CookingAssistant.php`:
+Set in `.env` — no code changes needed:
 
-```php
-'model' => 'claude-3-5-sonnet-20241022', // or 'claude-3-haiku-20240307' for cheaper
+```bash
+AI_PROVIDER=anthropic              # switch provider (gemini | anthropic)
+GEMINI_MODEL=gemini-flash-latest   # override Gemini model
+ANTHROPIC_MODEL=claude-haiku-4-5   # override Claude model
 ```
+
+Provider implementations live in `app/Services/AI/Providers/`.
 
 ## Troubleshooting
 
-### "ANTHROPIC_API_KEY not configured"
-- Ensure `.env` file has the key
+### "No AI provider configured" / "GEMINI_API_KEY not configured"
+- Ensure `.env` file has `GEMINI_API_KEY` or `ANTHROPIC_API_KEY`
 - Restart your web server after adding the key
+
+### Anthropic "credit balance is too low"
+- Your Anthropic account needs credits (https://console.anthropic.com/settings/billing)
+- Or set `AI_PROVIDER=gemini` to use the free Gemini tier instead
 
 ### Rate limit not working
 - Check Redis connection is active

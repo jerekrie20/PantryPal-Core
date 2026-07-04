@@ -2,11 +2,12 @@
 
 namespace Services\AI;
 
-use GuzzleHttp\Client;
 use Models\Items;
 use Models\Recipes;
 use Models\Ingredients;
 use Services\AI\LangCacheClient;
+use Services\AI\Providers\ChatProviderInterface;
+use Services\AI\Providers\ProviderFactory;
 
 /**
  * AI Cooking Assistant - Context-aware helper for pantry and recipe questions
@@ -14,8 +15,7 @@ use Services\AI\LangCacheClient;
  */
 class CookingAssistant
 {
-    private Client $httpClient;
-    private string $apiKey;
+    private ChatProviderInterface $provider;
     private ?int $userId;
     private ?array $pageContext;
     private array $conversationHistory = [];
@@ -23,14 +23,10 @@ class CookingAssistant
 
     public function __construct(?int $userId = null, ?array $pageContext = null)
     {
-        $this->httpClient = new Client(['timeout' => 30]);
-        $this->apiKey = getenv('ANTHROPIC_API_KEY') ?: '';
+        // Resolves Gemini or Claude based on AI_PROVIDER / available keys in .env
+        $this->provider = ProviderFactory::make();
         $this->userId = $userId;
         $this->pageContext = $pageContext;
-
-        if (empty($this->apiKey)) {
-            throw new \RuntimeException('ANTHROPIC_API_KEY not configured in .env file');
-        }
 
         // Initialize LangCache if enabled
         try {
@@ -82,8 +78,8 @@ class CookingAssistant
                     'similarity' => $cached['similarity'] ?? null
                 ];
             } else {
-                // Call Claude API
-                $response = $this->callClaudeAPI($systemPrompt, $this->conversationHistory);
+                // Call the configured AI provider (Gemini or Claude)
+                $response = $this->provider->chat($systemPrompt, $this->conversationHistory);
                 $response['cached'] = false;
 
                 // Store response in LangCache for future semantic matches
@@ -108,10 +104,20 @@ class CookingAssistant
 
         } catch (\Exception $e) {
             error_log('CookingAssistant error: ' . $e->getMessage());
+
+            // Transient capacity errors (Gemini 503 "high demand", 429, 529) get a friendlier message
+            $msg = $e->getMessage();
+            $isBusy = str_contains($msg, '503')
+                || str_contains($msg, '429')
+                || stripos($msg, 'high demand') !== false
+                || stripos($msg, 'overloaded') !== false;
+
             return [
                 'success' => false,
-                'error' => 'Sorry, I encountered an error. Please try again.',
-                'debug' => $e->getMessage()
+                'error' => $isBusy
+                    ? 'The AI service is busy right now — please try again in a few seconds.'
+                    : 'Sorry, I encountered an error. Please try again.',
+                'debug' => $msg
             ];
         }
     }
@@ -260,33 +266,6 @@ PROMPT;
         }
         
         return $context;
-    }
-    
-    /**
-     * Call Claude API
-     */
-    private function callClaudeAPI(string $systemPrompt, array $messages): array
-    {
-        $response = $this->httpClient->post('https://api.anthropic.com/v1/messages', [
-            'headers' => [
-                'x-api-key' => $this->apiKey,
-                'anthropic-version' => '2023-06-01',
-                'content-type' => 'application/json',
-            ],
-            'json' => [
-                'model' => 'claude-sonnet-4-5-20250929', // Claude Sonnet 4.5 - Best balance of quality and cost
-                'max_tokens' => 1024,
-                'system' => $systemPrompt,
-                'messages' => $messages
-            ]
-        ]);
-        
-        $data = json_decode($response->getBody()->getContents(), true);
-        
-        return [
-            'content' => $data['content'][0]['text'] ?? 'No response',
-            'usage' => $data['usage'] ?? []
-        ];
     }
     
     /**

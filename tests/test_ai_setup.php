@@ -17,16 +17,27 @@ header('Content-Type: text/plain');
 
 echo "=== AI Assistant Configuration Test ===\n\n";
 
-// Test 1: Check if API key is set
-echo "1. Checking ANTHROPIC_API_KEY...\n";
-$apiKey = getenv('ANTHROPIC_API_KEY') ?: '';
-if (empty($apiKey)) {
-    echo "   ❌ FAIL: ANTHROPIC_API_KEY not found in environment\n";
-    echo "   Fix: Add ANTHROPIC_API_KEY=your_key_here to your .env file\n\n";
-} else {
-    $maskedKey = substr($apiKey, 0, 7) . '...' . substr($apiKey, -4);
-    echo "   ✅ PASS: API key found ($maskedKey)\n\n";
+// Test 1: Check AI provider configuration
+echo "1. Checking AI provider configuration...\n";
+$aiProvider = getenv('AI_PROVIDER') ?: '(auto-detect)';
+$geminiKey = getenv('GEMINI_API_KEY') ?: '';
+$anthropicKey = getenv('ANTHROPIC_API_KEY') ?: '';
+$apiKey = $geminiKey ?: $anthropicKey;
+
+echo "   AI_PROVIDER: {$aiProvider}\n";
+if (!empty($geminiKey)) {
+    $masked = substr($geminiKey, 0, 7) . '...' . substr($geminiKey, -4);
+    echo "   ✅ GEMINI_API_KEY found ($masked)\n";
 }
+if (!empty($anthropicKey)) {
+    $masked = substr($anthropicKey, 0, 7) . '...' . substr($anthropicKey, -4);
+    echo "   ✅ ANTHROPIC_API_KEY found ($masked)\n";
+}
+if (empty($apiKey)) {
+    echo "   ❌ FAIL: No AI API key found in environment\n";
+    echo "   Fix: Add GEMINI_API_KEY (free) or ANTHROPIC_API_KEY to your .env file\n";
+}
+echo "\n";
 
 // Test 2: Check Guzzle HTTP client
 echo "2. Checking GuzzleHttp\\Client...\n";
@@ -111,8 +122,9 @@ echo "\n=== Test Complete ===\n\n";
 if (empty($apiKey)) {
     echo "⚠️  ACTION REQUIRED:\n";
     echo "1. Copy .env.example to .env\n";
-    echo "2. Get API key from: https://console.anthropic.com/\n";
-    echo "3. Add ANTHROPIC_API_KEY=your_key_here to .env\n";
+    echo "2. Get a free Gemini key from: https://aistudio.google.com/apikey\n";
+    echo "   (or a paid Anthropic key from: https://console.anthropic.com/)\n";
+    echo "3. Add GEMINI_API_KEY=your_key_here (or ANTHROPIC_API_KEY=...) to .env\n";
     echo "4. Restart your web server\n";
 } else {
     echo "✅ Configuration looks good!\n";

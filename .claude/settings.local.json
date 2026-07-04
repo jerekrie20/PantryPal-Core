@@ -66,7 +66,9 @@
       "Bash(grep -n '\\\\$items\\\\b' app/Views/Items/index.php)",
       "Bash(echo \"clean: $?\")",
       "Bash(php -l app/Services/Pantry/PantryIntake.php app/Services/Pantry/PantryCache.php app/Services/Pantry/Sources/CatalogSource.php app/Services/Pantry/Sources/IngredientSource.php app/Services/Pantry/Sources/ProductSource.php app/Controllers/Concerns/RunsPantryIntake.php app/Controllers/ItemsController.php app/Controllers/IngredientsController.php app/Controllers/ProductsController.php app/Controllers/ShoppingListController.php app/Controllers/RecipesController.php app/Controllers/DashboardController.php)",
-      "Bash(php -l app/routes/web.php app/Controllers/ItemsController.php app/Controllers/Concerns/RunsPantryIntake.php app/Services/Pantry/PantryItemAssembler.php)"
+      "Bash(php -l app/routes/web.php app/Controllers/ItemsController.php app/Controllers/Concerns/RunsPantryIntake.php app/Services/Pantry/PantryItemAssembler.php)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)"
     ]
   }
 }

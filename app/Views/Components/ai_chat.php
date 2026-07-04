@@ -24,7 +24,8 @@ if (isset($item) && is_array($item)) {
     $pageContext['type'] = 'item';
     $pageContext['id'] = $item['id'] ?? null;
     $pageContext['data'] = [
-        'name' => $item['ingredient_name'] ?? $item['product_title'] ?? $item['entered_name'] ?? 'Unknown Item',
+        // 'name' is the assembled shape (PantryItemAssembler::detail); the rest cover raw-row/edit-form shapes
+        'name' => $item['name'] ?? $item['ingredient_name'] ?? $item['product_title'] ?? $item['entered_name'] ?? 'Unknown Item',
         'quantity' => $item['quantity'] ?? null,
         'unit' => $item['unit'] ?? null,
         'expiration_date' => $item['expiration_date'] ?? null
