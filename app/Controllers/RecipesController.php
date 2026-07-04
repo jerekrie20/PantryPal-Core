@@ -9,6 +9,7 @@ use Models\Products;
 use Models\Recipes;
 use Policies\RecipePolicy;
 use Services\ImageService;
+use Services\Pantry\IngredientCanonicalizer;
 use Services\Pantry\PantryTermNormalizer;
 use Services\Recipes\FatSecretRecipesProvider;
 
@@ -57,19 +58,19 @@ class RecipesController
 
             $recipes = [];
             $error = null;
+            $notice = null;
             $mode = 'saved';
             $pagination = null;
             // Collect pantry keywords for the toggleable pantry UI on the search page
             $names = $this->collectPantryNames((int)$userId);
             // Selected subset from query (Use My Pantry selections)
+            // AI-canonicalized: "Red Seedless Grapes" searches as "grapes"
             $selectedPantry = [];
             if (!empty($_GET['pantry']) && is_array($_GET['pantry'])) {
-                foreach ($_GET['pantry'] as $v) {
-                    $t = PantryTermNormalizer::normalize((string)$v);
-                    if ($t !== '') $selectedPantry[] = $t;
-                }
-                // de-dup
-                $selectedPantry = array_values(array_unique($selectedPantry));
+                $map = (new IngredientCanonicalizer())->canonicalizeAll(
+                    array_map('strval', $_GET['pantry'])
+                );
+                $selectedPantry = array_values(array_unique(array_values($map)));
             }
             // Pantry match mode: all (AND) or any (OR). Default to 'all'.
             $pantryMode = isset($_GET['pantry_mode']) ? strtolower(trim((string)$_GET['pantry_mode'])) : 'all';
@@ -116,7 +117,12 @@ class RecipesController
                                 }
                                 foreach ($selectedPantry as $t) {
                                     if ($t === '') continue;
-                                    if (strpos($hay, strtolower($t)) === false) return false;
+                                    $t = strtolower($t);
+                                    // Accept singular form too: "grapes" should match "grape salad"
+                                    $singular = rtrim($t, 's');
+                                    if (strpos($hay, $t) === false && ($singular === '' || strpos($hay, $singular) === false)) {
+                                        return false;
+                                    }
                                 }
                                 return true;
                             }));
@@ -129,6 +135,45 @@ class RecipesController
                     }
                     if ($total === 0 && !$this->provider) {
                         $error = 'No live recipe API configured. Set FATSECRET_CLIENT_ID and FATSECRET_CLIENT_SECRET in .env to enable live results.';
+                    }
+                }
+
+                // Broaden-on-zero: All-mode with several items often matches nothing.
+                // Retry as Any so users get results instead of a dead end.
+                if (empty($recipes) && $requireAll && count($selectedPantry) > 1) {
+                    $local = $ugcOnly
+                        ? $this->recipes->findByIngredientsLocalPagedUser($selectedPantry, 1, $perPage, false)
+                        : $this->recipes->findByIngredientsLocalPaged($selectedPantry, 1, $perPage, false);
+                    $recipes = $local['results'] ?? [];
+                    $total = (int)($local['total'] ?? 0);
+
+                    if (!$ugcOnly && count($recipes) < $perPage && $this->provider) {
+                        $seen = [];
+                        foreach ($recipes as $r) {
+                            $dbid = $r['db_id'] ?? null; $k = $dbid ? ('db:' . $dbid) : ('title:' . ($r['title'] ?? ''));
+                            $seen[$k] = true;
+                        }
+                        // Query each term separately — the provider joins terms into one
+                        // all-words expression, which is what caused the zero results.
+                        $perTerm = (int)max(2, ceil($perPage / count($selectedPantry)));
+                        foreach (array_slice($selectedPantry, 0, 5) as $term) {
+                            if (count($recipes) >= $perPage) break;
+                            foreach ($this->provider->searchByQuery($term, $perTerm) as $r) {
+                                try { $id = $this->recipes->upsertFromProvider($r, null, 'fatsecret'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                                $k = isset($r['db_id']) ? ('db:' . $r['db_id']) : ('title:' . ($r['title'] ?? ''));
+                                if (!isset($seen[$k])) { $recipes[] = $r; $seen[$k] = true; }
+                            }
+                        }
+                    }
+
+                    if (!empty($recipes)) {
+                        $notice = 'No recipes use all of your selected items — showing recipes that use at least one of them.';
+                        $pagination = [
+                            'currentPage' => 1,
+                            'perPage' => $perPage,
+                            'total' => $total,
+                            'totalPages' => (int)max(1, ($total ? ceil($total / $perPage) : 1)),
+                        ];
                     }
                 }
             } elseif ($q === '') {
@@ -193,11 +238,28 @@ class RecipesController
                 }
             }
 
+            // Broaden-on-zero for typed searches: product-style queries like
+            // "red seedless grapes" match nothing; retry with the AI-canonicalized
+            // ingredient term ("grapes") and tell the user what we did.
+            if (empty($recipes) && $q !== '' && empty($selectedPantry) && !$browse && !$ugcOnly && $this->provider) {
+                $broadQ = (new IngredientCanonicalizer())->canonicalize($q);
+                if ($broadQ !== '' && strcasecmp($broadQ, $q) !== 0) {
+                    foreach ($this->provider->searchByQuery($broadQ, $perPage) as $r) {
+                        try { $id = $this->recipes->upsertFromProvider($r, null, 'fatsecret'); $r['db_id'] = $id; } catch (\Throwable $e) { /* ignore */ }
+                        $recipes[] = $r;
+                    }
+                    if (!empty($recipes)) {
+                        $notice = 'No exact matches for "' . $q . '" — showing recipes for "' . $broadQ . '".';
+                    }
+                }
+            }
+
             return View::render('Recipes/index', [
                 'title' => $browse ? 'Browse Recipes' : 'Find Recipes',
                 'query' => $q,
                 'recipes' => $recipes,
                 'error' => $error,
+                'notice' => $notice,
                 'mode' => $mode,
                 'filters' => $filters,
                 'pagination' => $pagination,
@@ -590,10 +652,9 @@ class RecipesController
                 $names[] = (string)$row['entered_name'];
             }
         }
-        // Normalize, de-dup and limit length
-        $names = array_values(array_unique(array_filter(array_map(function($s){
-            return PantryTermNormalizer::normalize((string)$s);
-        }, $names))));
+        // Canonicalize to recipe-search terms (AI + permanent cache, rule-based fallback)
+        $map = (new IngredientCanonicalizer())->canonicalizeAll($names);
+        $names = array_values(array_unique(array_values($map)));
         // Keep a reasonable number for the API call
         if (count($names) > $limit) $names = array_slice($names, 0, $limit);
         return $names;

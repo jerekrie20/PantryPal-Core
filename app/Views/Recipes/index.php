@@ -206,6 +206,10 @@ $tabClasses = function (bool $active): string {
         <?php if (!empty($error)): ?>
             <div class="alert-danger text-sm"><?= e($error) ?></div>
         <?php endif; ?>
+
+        <?php if (!empty($notice)): ?>
+            <div class="alert-warning text-sm"><?= e($notice) ?></div>
+        <?php endif; ?>
     </form>
 </div>
 
